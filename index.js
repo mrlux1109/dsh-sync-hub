@@ -159,21 +159,59 @@ function result(ok, code, text) {
 }
 
 /**
- * Same-origin fence for the settings API. The webServer prefix route is not
- * covered by the shell's own auth (cf. our-free-model's trust fence), so the
- * card's POST endpoints (push/pull/console) require the request to come from
- * the same host the page was served from. The desktop page fetches same-origin
- * (document.baseURI resolves into this server), so a real card call passes;
- * a raw LAN caller without a browser page does not.
+ * Trust fence for the settings API, mirroring the kernel's isTrustedApiRequest
+ * shape (cf. dsh-our-free-model src/trust.js structuralReason):
+ *   - Host must be loopback (DNS-rebinding defence);
+ *   - Sec-Fetch-Site: cross-site is refused;
+ *   - Origin/Referer must match the Host authority, EXCEPT the desktop relay:
+ *     the dsh-app://app page forwards fetches to loopback HTTP with a
+ *     dsh-app://app Referer and no Origin / no Sec-Fetch-* markers.
+ * A raw LAN caller (or a malicious web page) matches none of these and gets 403.
  */
-function sameOrigin(req) {
+const LOOPBACK_NAMES = new Set(['127.0.0.1', 'localhost', '::1', '[::1]'])
+
+function authorityOf(value, defaultScheme) {
+  if (typeof value !== 'string' || value.trim() === '') return null
+  let url
   try {
-    const origin = req.headers['origin'] || req.headers['referer']
-    if (!origin) return false
-    return new URL(origin).host === String(req.headers['host'] || '').toLowerCase()
+    url = new URL(value.includes('://') ? value.trim() : `${defaultScheme ?? 'http'}://${value.trim()}`)
+  } catch {
+    return null
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
+  const port = url.port === '' ? (url.protocol === 'https:' ? '443' : '80') : url.port
+  return { scheme: url.protocol.replace(':', ''), hostname: url.hostname.toLowerCase(), port }
+}
+
+function isDesktopRelayReferer(value) {
+  try {
+    const url = new URL(value)
+    return url.protocol === 'dsh-app:' && url.hostname === 'app' && url.port === ''
+      && url.username === '' && url.password === ''
   } catch {
     return false
   }
+}
+
+function trustedRequest(req) {
+  const host = authorityOf(req.headers['host'], 'http')
+  if (host === null || !LOOPBACK_NAMES.has(host.hostname)) return false
+  const site = String(req.headers['sec-fetch-site'] ?? '').toLowerCase()
+  if (site === 'cross-site') return false
+  for (const header of ['origin', 'referer']) {
+    const raw = req.headers[header]
+    if (typeof raw !== 'string' || raw.trim() === '') continue
+    if (header === 'referer' && isDesktopRelayReferer(raw)) {
+      // the desktop relay strips browser markers but keeps this Referer;
+      // if markers are present it is NOT the relay
+      if (req.headers['origin'] !== undefined || req.headers['sec-fetch-site'] !== undefined) return false
+      continue
+    }
+    const authority = authorityOf(raw.trim())
+    if (authority === null) return false
+    if (authority.scheme !== host.scheme || authority.hostname !== host.hostname || authority.port !== host.port) return false
+  }
+  return true
 }
 
 function readJsonBody(req) {
@@ -240,7 +278,7 @@ async function apiHandler(req, res, config) {
   const url = new URL(req.url ?? '/', 'http://localhost')
   const routePath = url.pathname.replace(/^\/api\/sync-hub/, '').replace(/\/+$/, '') || '/'
   const method = String(req.method ?? 'GET').toUpperCase()
-  if (!sameOrigin(req)) return send(403, { error: 'same-origin only' })
+  if (!trustedRequest(req)) return send(403, { error: 'untrusted origin' })
   const hub = resolveHub(config)
   if (!hub) return send(200, { ok: false, code: -1, text: 'sync-hub not found on this machine (set config.hubPath)' })
   try {
