@@ -30,6 +30,8 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import * as skills from './lib/skills.js'
+import * as plugins from './lib/plugins.js'
 
 export const inject = ['tools']
 
@@ -701,6 +703,73 @@ async function apiHandler(req, res, config) {
         : mode === 'allnice' ? ['-InstallAllNice']
         : ['-InstallAll']
       return run('tools.ps1', pass, 900000)
+    }
+    // ── skills: inventory / enable-disable / import / create / trash ─────────
+    // Simpler than @michengai/dsh-skills-manager on purpose: sync-hub covers
+    // list + enable/disable + URL import + create + trash. Only DSH's own dir
+    // is writable; other agents' dirs are read-only.
+    if (method === 'GET' && routePath === '/skills/list') {
+      const items = skills.listSkills()
+      return send(200, {
+        ok: true, items,
+        total: items.length,
+        enabled: items.filter((s) => s.enabled).length,
+        invalid: items.filter((s) => !s.valid).length,
+        roots: skills.skillRoots().filter((r) => fs.existsSync(r.dir)).map((r) => ({ id: r.id, label: r.label, writable: r.writable })),
+      })
+    }
+    if (method === 'POST' && routePath === '/skills/toggle') {
+      const body = await readJsonBody(req)
+      const r = skills.toggleSkill({ name: body.name, rootId: body.rootId, enable: !!body.enable })
+      return send(200, { ok: r.ok, code: r.ok ? 0 : -1, text: r.text })
+    }
+    if (method === 'POST' && routePath === '/skills/read') {
+      const body = await readJsonBody(req)
+      const r = skills.readSkill({ name: body.name, rootId: body.rootId })
+      return send(200, { ok: r.ok, code: r.ok ? 0 : -1, text: r.text })
+    }
+    if (method === 'POST' && routePath === '/skills/import') {
+      const body = await readJsonBody(req)
+      const r = await skills.importSkillFromUrl({ url: body.url, name: body.name })
+      return send(200, { ok: r.ok, code: r.ok ? 0 : -1, text: r.text })
+    }
+    if (method === 'POST' && routePath === '/skills/create') {
+      const body = await readJsonBody(req)
+      const r = skills.createSkill({ name: body.name, description: body.description, body: body.body })
+      return send(200, { ok: r.ok, code: r.ok ? 0 : -1, text: r.text })
+    }
+    if (method === 'POST' && routePath === '/skills/trash') {
+      const body = await readJsonBody(req)
+      const r = skills.trashSkill({ name: body.name })
+      return send(200, { ok: r.ok, code: r.ok ? 0 : -1, text: r.text })
+    }
+    if (method === 'GET' && routePath === '/skills/trash') {
+      const t = skills.listTrash()
+      return send(200, { ok: true, dir: t.dir, items: t.items })
+    }
+    if (method === 'POST' && routePath === '/skills/restore') {
+      const body = await readJsonBody(req)
+      const r = skills.restoreTrash({ name: body.name })
+      return send(200, { ok: r.ok, code: r.ok ? 0 : -1, text: r.text })
+    }
+    // ── plugins: installed inventory / npm market / install / uninstall ──────
+    if (method === 'GET' && routePath === '/plugins/list') {
+      return send(200, { ok: true, ...plugins.listInstalled() })
+    }
+    if (method === 'GET' && routePath === '/plugins/market') {
+      const url = new URL(req.url ?? '/', 'http://localhost')
+      const r = await plugins.searchMarket({ query: url.searchParams.get('q') || '', size: url.searchParams.get('size') })
+      return send(200, r)
+    }
+    if (method === 'POST' && routePath === '/plugins/install') {
+      const body = await readJsonBody(req)
+      const r = await plugins.installPlugin({ name: body.name, profile: body.profile })
+      return send(200, { ok: r.ok, code: r.ok ? 0 : -1, text: r.text })
+    }
+    if (method === 'POST' && routePath === '/plugins/uninstall') {
+      const body = await readJsonBody(req)
+      const r = await plugins.uninstallPlugin({ name: body.name, profile: body.profile })
+      return send(200, { ok: r.ok, code: r.ok ? 0 : -1, text: r.text })
     }
     return send(404, { error: 'no such route' })
   } catch (e) {

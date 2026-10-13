@@ -42,7 +42,7 @@ window.__ModuleLoader__.load({
         retry: '重试',
         error: '连接失败：{e}',
         state: { pass: '正常', warn: '注意', fail: '异常', info: '信息' },
-        tab: { overview: '概览', sync: '同步', backup: '备份', env: '环境', plugin: '技能插件', tools: '工具链', settings: '设置' },
+        tab: { overview: '概览', sync: '同步', backup: '备份', skills: '技能', plugins: '插件', tools: '工具链', settings: '设置' },
 
         'ov.version': '版本',
         'ov.commit': '最新提交',
@@ -147,6 +147,51 @@ window.__ModuleLoader__.load({
         'skills.junk': '自动生成的占位技能（可忽略或清理）',
         'skills.none': '两边一致',
 
+        // ── 技能页 ──────────────────────────────────────────────────────────
+        'sk.title': '本机技能',
+        'sk.what': '管理本机所有 Agent 技能：查看、启用/停用、导入、新建、删除。只有 DSH 与 Shared Agent 目录可写，其他 Agent 目录只读展示。',
+        'sk.count': '共 {total} 个，启用 {enabled} 个',
+        'sk.invalid': '{n} 个不合法（DSH 会静默跳过）',
+        'sk.ro': '（只读）',
+        'sk.filter': '按名称/描述筛选',
+        'sk.listTitle': '技能列表',
+        'sk.enable': '启用',
+        'sk.disable': '停用',
+        'sk.view': '查看',
+        'sk.trash': '删除',
+        'sk.restore': '恢复',
+        'sk.addTitle': '导入线上技能 / 新建技能',
+        'sk.addHint': '导入支持：GitHub 仓库地址、GitHub 子目录、.zip 压缩包、原始 SKILL.md 链接。已存在的同名技能不会被覆盖。',
+        'sk.urlPh': '粘贴网址（GitHub 仓库 / zip / SKILL.md）',
+        'sk.namePh': '技能名（可留空自动识别）',
+        'sk.newNamePh': '新技能名（kebab-case）',
+        'sk.newDescPh': 'description（必填，决定何时被调用）',
+        'sk.hubTitle': '与中枢同步',
+        'sk.trashTitle': '回收站',
+        'sk.trashEmpty': '回收站是空的',
+        'act.skRefresh': '刷新列表',
+        'act.skImport': '导入',
+        'act.skCreate': '新建',
+        'act.skDiff': '对比中枢',
+        'act.skTrashList': '查看回收站',
+
+        // ── 插件页 ──────────────────────────────────────────────────────────
+        'pl.title': '已安装插件',
+        'pl.what': '查看各 profile 已装的插件、链接健康状态，可卸载；市场页可从 npm 搜索并安装新插件。',
+        'pl.profile': 'profile {name}（{n} 个）',
+        'pl.bundled': '已挂载',
+        'pl.broken': '链接损坏',
+        'pl.uninstall': '卸载',
+        'pl.builtin': '内置（无依赖行）',
+        'pl.marketTitle': '插件市场（npm）',
+        'pl.marketHint': '搜索 npm 上的 DSH 插件（关键词 dsh-plugin）。安装前请完全退出 DSH，否则 pnpm 被锁。',
+        'pl.searchPh': '搜索插件（留空看热门）',
+        'pl.found': '找到 {n} 个',
+        'pl.noResult': '没有结果',
+        'pl.install': '安装',
+        'act.plList': '刷新已装',
+        'act.plSearch': '搜索市场',
+
         'check.pass': '通过',
         'check.warn': '注意',
         'check.fail': '失败',
@@ -165,7 +210,7 @@ window.__ModuleLoader__.load({
         retry: 'Retry',
         error: 'Connection failed: {e}',
         state: { pass: 'OK', warn: 'Warning', fail: 'Failed', info: 'Info' },
-        tab: { overview: 'Overview', sync: 'Sync', backup: 'Backup', env: 'Environment', plugin: 'Skills', tools: 'Toolchain', settings: 'Settings' },
+        tab: { overview: 'Overview', sync: 'Sync', backup: 'Backup', skills: 'Skills', plugins: 'Plugins', tools: 'Toolchain', settings: 'Settings' },
 
         'ov.version': 'Version',
         'ov.commit': 'Last commit',
@@ -270,6 +315,51 @@ window.__ModuleLoader__.load({
         'skills.junk': 'auto-generated placeholders (ignorable)',
         'skills.none': 'both sides match',
 
+        // ── skills tab ──────────────────────────────────────────────────────
+        'sk.title': 'Local skills',
+        'sk.what': 'Manage every Agent skill on this machine: view, enable/disable, import, create, delete. Only the DSH and Shared Agent dirs are writable; other agents are read-only.',
+        'sk.count': '{total} total, {enabled} enabled',
+        'sk.invalid': '{n} invalid (DSH silently skips them)',
+        'sk.ro': ' (read-only)',
+        'sk.filter': 'Filter by name/description',
+        'sk.listTitle': 'Skill list',
+        'sk.enable': 'Enable',
+        'sk.disable': 'Disable',
+        'sk.view': 'View',
+        'sk.trash': 'Delete',
+        'sk.restore': 'Restore',
+        'sk.addTitle': 'Import from URL / create new',
+        'sk.addHint': 'Import supports: GitHub repo, GitHub subdirectory, .zip archive, raw SKILL.md URL. An existing name is never overwritten.',
+        'sk.urlPh': 'paste a URL (GitHub repo / zip / SKILL.md)',
+        'sk.namePh': 'skill name (blank = auto-detect)',
+        'sk.newNamePh': 'new skill name (kebab-case)',
+        'sk.newDescPh': 'description (required — decides when it is used)',
+        'sk.hubTitle': 'Sync with hub',
+        'sk.trashTitle': 'Trash',
+        'sk.trashEmpty': 'trash is empty',
+        'act.skRefresh': 'Refresh list',
+        'act.skImport': 'Import',
+        'act.skCreate': 'Create',
+        'act.skDiff': 'Diff with hub',
+        'act.skTrashList': 'View trash',
+
+        // ── plugins tab ─────────────────────────────────────────────────────
+        'pl.title': 'Installed plugins',
+        'pl.what': 'Installed plugins per profile with link health; uninstall here. The market searches npm and installs new ones.',
+        'pl.profile': 'profile {name} ({n})',
+        'pl.bundled': 'bundled',
+        'pl.broken': 'link broken',
+        'pl.uninstall': 'Uninstall',
+        'pl.builtin': 'built-in (no dependency row)',
+        'pl.marketTitle': 'Plugin market (npm)',
+        'pl.marketHint': 'Search DSH plugins on npm (keyword dsh-plugin). Quit DSH fully before installing or pnpm stays locked.',
+        'pl.searchPh': 'search plugins (blank = popular)',
+        'pl.found': '{n} found',
+        'pl.noResult': 'no results',
+        'pl.install': 'Install',
+        'act.plList': 'Refresh installed',
+        'act.plSearch': 'Search market',
+
         'check.pass': 'pass',
         'check.warn': 'warn',
         'check.fail': 'fail',
@@ -331,7 +421,7 @@ window.__ModuleLoader__.load({
       pre: { margin: 0, padding: '0.55rem', borderRadius: '0.45rem', fontSize: '0.7rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: '16rem', overflow: 'auto', background: 'var(--color-surface, rgba(128,128,128,0.07))', border: '1px solid var(--color-border, rgba(128,128,128,0.2))', fontFamily: 'ui-monospace, Consolas, monospace' },
     }
 
-    const TABS = ['overview', 'sync', 'backup', 'env', 'plugin', 'tools', 'settings']
+    const TABS = ['overview', 'sync', 'backup', 'skills', 'plugins', 'tools', 'settings']
 
     function Dot({ level }) {
       const L = LEVEL[level] || LEVEL.info
@@ -370,6 +460,18 @@ window.__ModuleLoader__.load({
       const [pullSkipSkills, setPullSkipSkills] = useState(false)
       const [pullSkipProfile, setPullSkipProfile] = useState(false)
       const [pullForce, setPullForce] = useState(false)
+      // skills page
+      const [skList, setSkList] = useState(undefined)
+      const [skFilter, setSkFilter] = useState('')
+      const [skUrl, setSkUrl] = useState('')
+      const [skName, setSkName] = useState('')
+      const [skNewName, setSkNewName] = useState('')
+      const [skNewDesc, setSkNewDesc] = useState('')
+      const [trashList, setTrashList] = useState(undefined)
+      // plugins page
+      const [plList, setPlList] = useState(undefined)
+      const [plMarket, setPlMarket] = useState(undefined)
+      const [plQuery, setPlQuery] = useState('')
 
       const put = useCallback((k, v) => setOut(p => ({ ...p, [k]: v })), [])
 
@@ -383,9 +485,11 @@ window.__ModuleLoader__.load({
       useEffect(() => { loadOverview() }, [loadOverview])
 
       // Every kind MUST have a branch here (missing branch = dead button).
-      const run = useCallback(async (kind, key) => {
+      // `arg` carries per-row payloads (skill name/rootId, plugin name/profile).
+      const run = useCallback(async (kind, key, arg) => {
         setBusy(kind)
         put(key, '')
+        const a = arg || {}
         try {
           let r
           switch (kind) {
@@ -400,13 +504,59 @@ window.__ModuleLoader__.load({
             case 'doctorFix': r = await post('/doctor', { fix: true }, 240000); break
             case 'net': r = await post('/net', {}, 180000); break
             case 'backups': r = await api('/backups', { timeout: 90000 }); setBackups(r.items || []); break
-            case 'restore': r = await post('/restore', { name: key === 'restoreLatest' ? 'latest-agents' : (window.__shRestore || '') }, 90000); break
+            case 'restore': r = await post('/restore', { name: a.name || (key === 'restoreLatest' ? 'latest-agents' : (window.__shRestore || '')) }, 90000); break
             case 'sessionsBackup': r = await post('/sessions', { action: 'backup' }, 600000); break
             case 'sessionsList': r = await post('/sessions', { action: 'list' }, 90000); break
             case 'skillsInfo': r = await api('/skills', { timeout: 60000 }); setSkills(r); break
             case 'skillsToHub': r = await post('/skills', { dir: 'tohub' }, 240000); break
             case 'skillsFromHub': r = await post('/skills', { dir: 'fromhub' }, 240000); break
-            case 'pluginsList': r = await post('/plugins', { action: 'list' }, 120000); break
+            // ── skills page ──────────────────────────────────────────────────
+            case 'skRefresh': {
+              const list = await api('/skills/list', { timeout: 60000 })
+              setSkList(list)
+              r = { text: list.ok ? '' : String(list.error || '') }
+              break
+            }
+            case 'skEnable': r = await post('/skills/toggle', { name: a.name, rootId: a.rootId, enable: true }, 30000); await run('skRefresh', key); break
+            case 'skDisable': r = await post('/skills/toggle', { name: a.name, rootId: a.rootId, enable: false }, 30000); await run('skRefresh', key); break
+            case 'skRead': r = await post('/skills/read', { name: a.name, rootId: a.rootId }, 30000); break
+            case 'skImport': {
+              if (!skUrl.trim()) { r = { text: '请先填网址' }; break }
+              r = await post('/skills/import', { url: skUrl.trim(), name: skName.trim() }, 300000)
+              if (r.ok) { setSkUrl(''); setSkName('') }
+              await run('skRefresh', key)
+              break
+            }
+            case 'skCreate': {
+              if (!skNewName.trim() || !skNewDesc.trim()) { r = { text: '技能名和 description 都要填' }; break }
+              r = await post('/skills/create', { name: skNewName.trim(), description: skNewDesc.trim() }, 30000)
+              if (r.ok) { setSkNewName(''); setSkNewDesc('') }
+              await run('skRefresh', key)
+              break
+            }
+            case 'skTrash': r = await post('/skills/trash', { name: a.name }, 30000); await run('skRefresh', key); break
+            case 'skTrashList': {
+              const t = await api('/skills/trash', { timeout: 30000 })
+              setTrashList(t)
+              r = { text: '' }
+              break
+            }
+            case 'skRestore': r = await post('/skills/restore', { name: a.name }, 30000); await run('skTrashList', 'skTrashList'); await run('skRefresh', key); break
+            // ── plugins page ─────────────────────────────────────────────────
+            case 'plRefresh': {
+              const list = await api('/plugins/list', { timeout: 60000 })
+              setPlList(list)
+              r = { text: '' }
+              break
+            }
+            case 'plSearch': {
+              const m = await api('/plugins/market?q=' + encodeURIComponent(plQuery.trim()) + '&size=20', { timeout: 60000 })
+              setPlMarket(m)
+              r = { text: m.ok ? '' : String(m.text || '') }
+              break
+            }
+            case 'plInstall': r = await post('/plugins/install', { name: a.name, profile: a.profile || 'desktop' }, 900000); break
+            case 'plUninstall': r = await post('/plugins/uninstall', { name: a.name, profile: a.profile || 'desktop' }, 300000); await run('plRefresh', key); break
             case 'pluginsInstall': r = await post('/plugins', { action: 'install' }, 600000); break
             case 'toolsRefresh': await loadOverview(); r = { text: '' }; break
             case 'toolsInstall': r = await post('/tools/install', { mode: 'all' }, 900000); await loadOverview(); break
@@ -416,19 +566,19 @@ window.__ModuleLoader__.load({
             case 'bootstrap': r = await post('/bootstrap', { machine: bMachine, dest: bDest, ...(bRepo.trim() ? { repoUrl: bRepo.trim() } : {}) }, 1500000); break
             default: r = { text: 'unknown action: ' + kind }
           }
-          put(key, (r && r.text) || '')
+          if (r && r.text) put(key, r.text)
         } catch (e) {
           put(key, '✗ ' + String(e?.message ?? e))
         } finally { setBusy('') }
-      }, [loadOverview, put, cUser, cToken, bMachine, bDest, bRepo, pushScope, pullSkipSkills, pullSkipProfile, pullForce])
+      }, [loadOverview, put, cUser, cToken, bMachine, bDest, bRepo, pushScope, pullSkipSkills, pullSkipProfile, pullForce, skUrl, skName, skNewName, skNewDesc, plQuery])
 
-      const Btn = ({ label, kind, key: outKey, primary, small }) => {
+      const Btn = ({ label, kind, key: outKey, primary, small, arg }) => {
         const isBusy = busy === kind
         return h('button', {
           type: 'button',
           style: { ...S.btn, ...(primary ? S.primary : {}), ...(small ? { fontSize: '0.72rem', padding: '0.22rem 0.55rem' } : {}), ...(isBusy ? { opacity: 0.65 } : {}) },
           disabled: !!busy,
-          onClick: () => run(kind, outKey || kind),
+          onClick: () => run(kind, outKey || kind, arg),
         }, isBusy ? (label + ' …') : label)
       }
 
@@ -588,28 +738,69 @@ window.__ModuleLoader__.load({
           h(Result, { k: 'sessB' }), h(Result, { k: 'sessL' })),
       ]
 
-      const envTab = [
-        h(Card, { key: 'e', title: t('sec.health') },
-          h('div', { style: S.row },
-            h(Btn, { label: t('act.doctor'), kind: 'doctor', key: 'doc' }),
-            h(Btn, { label: t('act.doctorFix'), kind: 'doctorFix', key: 'docFix', primary: true }),
-            h(Btn, { label: t('act.net'), kind: 'net', key: 'net' })),
-          h(Result, { k: 'doc' }), h(Result, { k: 'docFix' }), h(Result, { k: 'net' })),
-        h(Card, { key: 'l', title: t('sec.logs') },
-          h('div', { style: S.row }, h(Btn, { label: t('act.logs'), kind: 'logs', key: 'logs' })),
-          logs ? h(Fragment, {},
-            h('p', { style: S.hint }, t('logs.newest', { name: logs.newest || '-' })),
-            h('pre', { style: S.pre }, logs.tail || '')) : null,
-          h(Result, { k: 'logs' })),
-      ]
+      // (environment checks were merged into the toolchain tab: both are
+      //  "this machine" concerns, and a separate tab for 3 buttons was noise)
 
-      const pluginTab = [
-        h(Card, { key: 'k', title: t('sec.skills') },
+      // ── 技能页：本机技能管理（启停/导入/新建）+ 中枢同步 ──────────────────
+      const skillsTab = [
+        h(Card, { key: 'stat', title: t('sk.title') },
+          h('p', { style: S.hint }, t('sk.what')),
+          skList ? h('p', { style: { fontSize: '0.78rem', margin: 0 } },
+            t('sk.count', { total: skList.total, enabled: skList.enabled }) +
+            (skList.invalid ? '   ·   ' + t('sk.invalid', { n: skList.invalid }) : '') +
+            (skList.roots ? '   ·   ' + skList.roots.map(r => r.label + (r.writable ? '' : t('sk.ro'))).join(' / ') : ''))
+            : h('p', { style: S.hint }, t('loading')),
+          h('div', { style: S.row },
+            h(Btn, { label: t('act.skRefresh'), kind: 'skRefresh', key: 'skRefresh', primary: true }),
+            h('input', { type: 'text', placeholder: t('sk.filter'), value: skFilter, style: { ...S.input, width: '11rem' }, onChange: e => setSkFilter(e.target.value) }))),
+
+        // full inventory: one row per skill, toggle + read + trash
+        skList && skList.items ? h(Card, { key: 'list', title: t('sk.listTitle') },
+          ...skList.items
+            .filter(s => !skFilter || s.name.toLowerCase().includes(skFilter.toLowerCase()) || (s.description || '').toLowerCase().includes(skFilter.toLowerCase()))
+            .slice(0, 200)
+            .map(s => h('div', { key: s.rootId + '/' + s.name, style: S.listRow },
+              h(Dot, { level: s.enabled ? 'pass' : 'info' }),
+              h('span', { style: { flex: '1 1 12rem', wordBreak: 'break-all', fontWeight: s.enabled ? 500 : 400, opacity: s.enabled ? 1 : 0.55 } }, s.name),
+              h('span', { style: { ...S.chip, opacity: 0.7, fontSize: '0.62rem' } }, s.rootLabel),
+              h('span', { style: { fontSize: '0.66rem', opacity: 0.5, minWidth: '3.2rem', textAlign: 'right' } }, s.sizeKB + 'KB'),
+              h('span', { style: { flex: '2 1 14rem', fontSize: '0.68rem', opacity: 0.6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, s.description || ''),
+              s.writable ? h('button', {
+                type: 'button', style: { ...S.btn, fontSize: '0.66rem', padding: '0.12rem 0.45rem' }, disabled: !!busy,
+                onClick: () => run(s.enabled ? 'skDisable' : 'skEnable', 'skOp', { name: s.name, rootId: s.rootId }),
+              }, s.enabled ? t('sk.disable') : t('sk.enable')) : null,
+              h('button', {
+                type: 'button', style: { ...S.btn, fontSize: '0.66rem', padding: '0.12rem 0.45rem' }, disabled: !!busy,
+                onClick: () => run('skRead', 'skOp', { name: s.name, rootId: s.rootId }),
+              }, t('sk.view')),
+              s.writable && s.rootId === 'dsh' ? h('button', {
+                type: 'button', style: { ...S.btn, fontSize: '0.66rem', padding: '0.12rem 0.45rem' }, disabled: !!busy,
+                onClick: () => run('skTrash', 'skOp', { name: s.name }),
+              }, t('sk.trash')) : null))
+          ) : null,
+        h(Result, { k: 'skOp' }),
+
+        // import from URL / create new
+        h(Card, { key: 'add', title: t('sk.addTitle') },
+          h('p', { style: S.hint }, t('sk.addHint')),
+          h('div', { style: S.row },
+            h('input', { type: 'text', placeholder: t('sk.urlPh'), value: skUrl, disabled: !!busy, style: { ...S.input, width: '24rem' }, onChange: e => setSkUrl(e.target.value) }),
+            h('input', { type: 'text', placeholder: t('sk.namePh'), value: skName, disabled: !!busy, style: { ...S.input, width: '9rem' }, onChange: e => setSkName(e.target.value) }),
+            h(Btn, { label: t('act.skImport'), kind: 'skImport', key: 'skImport', primary: true })),
+          h(Result, { k: 'skImport' }),
+          h('div', { style: S.row },
+            h('input', { type: 'text', placeholder: t('sk.newNamePh'), value: skNewName, disabled: !!busy, style: { ...S.input, width: '10rem' }, onChange: e => setSkNewName(e.target.value) }),
+            h('input', { type: 'text', placeholder: t('sk.newDescPh'), value: skNewDesc, disabled: !!busy, style: { ...S.input, width: '20rem' }, onChange: e => setSkNewDesc(e.target.value) }),
+            h(Btn, { label: t('act.skCreate'), kind: 'skCreate', key: 'skCreate' })),
+          h(Result, { k: 'skCreate' })),
+
+        // hub sync (cloud side of skills)
+        h(Card, { key: 'hub', title: t('sk.hubTitle') },
+          h('p', { style: S.hint }, t('hint.skills')),
           h('div', { style: S.row },
             h(Btn, { label: t('act.skillsToHub'), kind: 'skillsToHub', key: 'skTo', primary: true }),
             h(Btn, { label: t('act.skillsFromHub'), kind: 'skillsFromHub', key: 'skFrom' }),
-            h(Btn, { label: t('refresh'), kind: 'skillsInfo', key: 'skInfo' })),
-          h('p', { style: S.hint }, t('hint.skills')),
+            h(Btn, { label: t('act.skDiff'), kind: 'skillsInfo', key: 'skInfo' })),
           skills ? h(Fragment, {},
             h('p', { style: { ...S.hint, opacity: 0.75 } }, t('skills.summary', { hub: skills.hub, local: skills.local })),
             (skills.onlyLocalReal || []).length ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.2rem' } },
@@ -627,12 +818,65 @@ window.__ModuleLoader__.load({
             (!(skills.onlyLocalReal || []).length && !(skills.onlyHub || []).length && !(skills.diff || []).length)
               ? h('p', { style: S.hint }, t('skills.none')) : null) : null,
           h(Result, { k: 'skTo' }), h(Result, { k: 'skFrom' })),
-        h(Card, { key: 'p', title: t('sec.plugins') },
+
+        // trash
+        h(Card, { key: 'trash', title: t('sk.trashTitle') },
+          h('div', { style: S.row }, h(Btn, { label: t('act.skTrashList'), kind: 'skTrashList', key: 'skTrashList' })),
+          trashList ? (trashList.items.length
+            ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.25rem' } },
+                ...trashList.items.map(x => h('div', { key: x.name, style: S.listRow },
+                  h('span', { style: { flex: 1, wordBreak: 'break-all' } }, x.name),
+                  h('button', {
+                    type: 'button', style: { ...S.btn, fontSize: '0.66rem', padding: '0.12rem 0.45rem' }, disabled: !!busy,
+                    onClick: () => run('skRestore', 'skOp', { name: x.name }),
+                  }, t('sk.restore')))))
+            : h('p', { style: S.hint }, t('sk.trashEmpty'))) : null,
+          h(Result, { k: 'skTrashList' })),
+      ]
+
+      // ── 插件页：已装清单 + npm 市场 + 安装/卸载 ───────────────────────────
+      const pluginsTab = [
+        h(Card, { key: 'inst', title: t('pl.title') },
+          h('p', { style: S.hint }, t('pl.what')),
           h('div', { style: S.row },
-            h(Btn, { label: t('act.pluginsList'), kind: 'pluginsList', key: 'plList' }),
+            h(Btn, { label: t('act.plList'), kind: 'plRefresh', key: 'plRefresh', primary: true }),
             h(Btn, { label: t('act.pluginsInstall'), kind: 'pluginsInstall', key: 'plInst' })),
           h('p', { style: S.hint }, t('hint.restart')),
-          h(Result, { k: 'plList' }), h(Result, { k: 'plInst' })),
+          plList && plList.profiles ? h(Fragment, {},
+            ...plList.profiles.map(p => h('div', { key: p.profile, style: { display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.3rem' } },
+              h('div', { style: { fontSize: '0.74rem', fontWeight: 600, opacity: 0.85 } }, t('pl.profile', { name: p.profile, n: p.items.length })),
+              ...p.items.map(it => h('div', { key: p.profile + it.name, style: S.listRow },
+                h(Dot, { level: it.linkOk ? 'pass' : 'fail' }),
+                h('span', { style: { flex: '1 1 14rem', wordBreak: 'break-all' } }, it.name),
+                h('span', { style: { fontSize: '0.7rem', opacity: 0.7, minWidth: '4rem' } }, it.version || '-'),
+                it.bundled ? h('span', { style: { ...S.chip, fontSize: '0.6rem' } }, t('pl.bundled')) : null,
+                it.linkOk ? null : h('span', { style: { fontSize: '0.66rem', color: '#d1242f' } }, t('pl.broken')),
+                h('button', {
+                  type: 'button', style: { ...S.btn, fontSize: '0.66rem', padding: '0.12rem 0.45rem' }, disabled: !!busy,
+                  onClick: () => run('plUninstall', 'plOp', { name: it.name, profile: p.profile }),
+                }, t('pl.uninstall')))),
+              p.orphanBundles.length ? h('div', { style: { fontSize: '0.66rem', opacity: 0.5 } },
+                t('pl.builtin') + ': ' + p.orphanBundles.join(', ')) : null))) : h('p', { style: S.hint }, t('loading')),
+          h(Result, { k: 'plRefresh' }), h(Result, { k: 'plOp' }), h(Result, { k: 'plInst' })),
+
+        h(Card, { key: 'mkt', title: t('pl.marketTitle') },
+          h('p', { style: S.hint }, t('pl.marketHint')),
+          h('div', { style: S.row },
+            h('input', { type: 'text', placeholder: t('pl.searchPh'), value: plQuery, disabled: !!busy, style: { ...S.input, width: '16rem' }, onChange: e => setPlQuery(e.target.value) }),
+            h(Btn, { label: t('act.plSearch'), kind: 'plSearch', key: 'plSearch', primary: true })),
+          plMarket && plMarket.items ? (plMarket.items.length
+            ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.25rem' } },
+                h('p', { style: { ...S.hint, opacity: 0.6 } }, t('pl.found', { n: plMarket.total })),
+                ...plMarket.items.map(it => h('div', { key: it.name, style: S.listRow },
+                  h('span', { style: { flex: '1 1 14rem', wordBreak: 'break-all' } }, it.name),
+                  h('span', { style: { fontSize: '0.7rem', opacity: 0.7, minWidth: '4rem' } }, it.version),
+                  h('span', { style: { flex: '2 1 14rem', fontSize: '0.68rem', opacity: 0.6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, it.description),
+                  h('button', {
+                    type: 'button', style: { ...S.btn, fontSize: '0.66rem', padding: '0.12rem 0.45rem' }, disabled: !!busy,
+                    onClick: () => run('plInstall', 'plInstallOut', { name: it.name, profile: 'desktop' }),
+                  }, t('pl.install')))))
+            : h('p', { style: S.hint }, t('pl.noResult'))) : null,
+          h(Result, { k: 'plSearch' }), h(Result, { k: 'plInstallOut' })),
       ]
 
       const toolsTab = [
@@ -651,6 +895,19 @@ window.__ModuleLoader__.load({
             h(Btn, { label: t('act.toolsInstallNice'), kind: 'toolsInstallNice', key: 'tlInstNice' })),
           h('p', { style: S.hint }, t('hint.tools')),
           h(Result, { k: 'tlInst' }), h(Result, { k: 'tlInstNice' })),
+        // environment checks live here now: they are all "this machine" concerns
+        h(Card, { key: 'e', title: t('sec.health') },
+          h('div', { style: S.row },
+            h(Btn, { label: t('act.doctor'), kind: 'doctor', key: 'doc' }),
+            h(Btn, { label: t('act.doctorFix'), kind: 'doctorFix', key: 'docFix', primary: true }),
+            h(Btn, { label: t('act.net'), kind: 'net', key: 'net' })),
+          h(Result, { k: 'doc' }), h(Result, { k: 'docFix' }), h(Result, { k: 'net' })),
+        h(Card, { key: 'l', title: t('sec.logs') },
+          h('div', { style: S.row }, h(Btn, { label: t('act.logs'), kind: 'logs', key: 'logs' })),
+          logs ? h(Fragment, {},
+            h('p', { style: S.hint }, t('logs.newest', { name: logs.newest || '-' })),
+            h('pre', { style: S.pre }, logs.tail || '')) : null,
+          h(Result, { k: 'logs' })),
       ]
 
       const settingsTab = [
@@ -679,8 +936,8 @@ window.__ModuleLoader__.load({
       const body = tab === 'overview' ? overviewTab
         : tab === 'sync' ? syncTab
         : tab === 'backup' ? backupTab
-        : tab === 'env' ? envTab
-        : tab === 'plugin' ? pluginTab
+        : tab === 'skills' ? skillsTab
+        : tab === 'plugins' ? pluginsTab
         : tab === 'tools' ? toolsTab
         : settingsTab
 
