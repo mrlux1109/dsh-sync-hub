@@ -108,8 +108,10 @@ function quote(s) {
   return "'" + String(s).replace(/'/g, "''") + "'"
 }
 
-/** Run a tools/*.ps1 script; resolves { code, out } with UTF-8 console output. */
-function runPs(hub, file, args, exec) {
+/** Run a tools/*.ps1 script; resolves { code, out } with UTF-8 console output.
+ *  opts.timeoutMs kills a hung child (code -3) so the card never blocks forever. */
+function runPs(hub, file, args, exec, opts) {
+  const timeoutMs = (opts && opts.timeoutMs) || 0
   return new Promise((resolve) => {
     const scriptPath = path.join(hub, 'tools', file)
     const argList = (args || []).map(quote).join(' ')
@@ -127,6 +129,11 @@ function runPs(hub, file, args, exec) {
     }
     let out = ''
     let aborted = false
+    let timedOut = false
+    let timer = null
+    if (timeoutMs > 0) {
+      timer = setTimeout(() => { timedOut = true; try { child.kill() } catch { /* gone */ } }, timeoutMs)
+    }
     child.stdout.on('data', (d) => { out += d.toString('utf8') })
     child.stderr.on('data', (d) => { out += d.toString('utf8') })
     const onAbort = () => { aborted = true; try { child.kill() } catch { /* already gone */ } }
@@ -137,20 +144,28 @@ function runPs(hub, file, args, exec) {
     }
     child.on('error', (e) => resolve({ code: -1, out: out + String(e) }))
     child.on('close', (code) => {
+      if (timer) clearTimeout(timer)
       if (signal) { try { signal.removeEventListener('abort', onAbort) } catch { /* noop */ } }
-      resolve({ code: aborted ? -2 : (code === null ? -1 : code), out })
+      resolve({ code: timedOut ? -3 : aborted ? -2 : (code === null ? -1 : code), out })
     })
   })
 }
 
-function runGit(hub, gitArgs) {
+function runGit(hub, gitArgs, timeoutMs) {
   return new Promise((resolve) => {
-    const child = spawn('git', ['-C', hub, ...gitArgs], { cwd: hub, windowsHide: true })
+    const child = spawn('git', ['-C', hub, ...gitArgs], {
+      cwd: hub, windowsHide: true, env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'never' },
+    })
     let out = ''
+    let timedOut = false
+    const timer = timeoutMs > 0 ? setTimeout(() => { timedOut = true; try { child.kill() } catch { /* gone */ } }, timeoutMs) : null
     child.stdout.on('data', (d) => { out += d.toString('utf8') })
     child.stderr.on('data', (d) => { out += d.toString('utf8') })
-    child.on('error', (e) => resolve({ code: -1, out: String(e) }))
-    child.on('close', (code) => resolve({ code: code === null ? -1 : code, out }))
+    child.on('error', (e) => { if (timer) clearTimeout(timer); resolve({ code: -1, out: String(e) }) })
+    child.on('close', (code) => {
+      if (timer) clearTimeout(timer)
+      resolve({ code: timedOut ? -3 : (code === null ? -1 : code), out })
+    })
   })
 }
 
@@ -280,8 +295,13 @@ async function apiHandler(req, res, config) {
   const method = String(req.method ?? 'GET').toUpperCase()
   if (!trustedRequest(req)) return send(403, { error: 'untrusted origin' })
   const hub = resolveHub(config)
-  if (!hub) return send(200, { ok: false, code: -1, text: 'sync-hub not found on this machine (set config.hubPath)' })
+  if (!hub) return send(200, { ok: false, notFound: true, code: -1, text: 'sync-hub 未在本机找到。新机器请先运行 tools/install-plugin.ps1（克隆中枢 + 安装插件 + 布线 profile），完成后重启 DSH；已有中枢可在 config.hubPath 指定路径。' })
   try {
+    // shared one-shot runner for the card's tool routes (kills a hung child)
+    const run = async (file, args, ms) => {
+      const r = await runPs(hub, file, args || [], null, { timeoutMs: ms || 120000 })
+      return send(200, result(r.code === 0, r.code, tail(r.out, 20000) || '(no output)'))
+    }
     if (method === 'GET' && routePath === '/info') {
       const ver = fs.readFileSync(path.join(hub, 'VERSION'), 'utf8').trim()
       const log = await runGit(hub, ['log', '-1', '--format=%h|%ci|%s'])
@@ -354,6 +374,87 @@ async function apiHandler(req, res, config) {
       return send(200, result(saved.ok && probe.ok, saved.ok ? 0 : -1,
         (saved.ok && probe.ok ? 'credential stored (user=' + probe.user + ')' : 'store failed: ' + (saved.err ?? '')) +
         (reach.code === 0 ? '  ·  ' + host + ' reachable' : '  ·  repo not reachable yet (see shared 4.12)')))
+    }
+    // ── the 6 menu features, now on the card (all non-interactive) ────────────
+    if (method === 'POST' && routePath === '/doctor') {
+      const body = await readJsonBody(req)
+      return run('doctor.ps1', body.fix ? ['-Fix'] : [], 180000)
+    }
+    if (method === 'POST' && routePath === '/net') {
+      return run('troubleshoot.ps1', ['-Net'], 120000)
+    }
+    if (method === 'GET' && routePath === '/backups') {
+      return run('backup.ps1', ['-List'], 60000)
+    }
+    if (method === 'POST' && routePath === '/restore') {
+      const body = await readJsonBody(req)
+      const name = String(body.name ?? '').trim()
+      if (!name) return send(200, result(false, -1, 'name is required (from /backups list)'))
+      if (/[\\/]|\.\./.test(name)) return send(200, result(false, -1, 'invalid backup name'))
+      return run('backup.ps1', ['-Restore', name], 60000)
+    }
+    if (method === 'POST' && routePath === '/skills') {
+      const body = await readJsonBody(req)
+      const dir = String(body.dir ?? '').trim()
+      if (dir === 'tohub') return run('skills-market.ps1', ['-ToHub'], 120000)
+      if (dir === 'fromhub') return run('skills-market.ps1', ['-FromHub'], 120000)
+      return send(200, result(false, -1, 'dir must be tohub | fromhub'))
+    }
+    if (method === 'POST' && routePath === '/plugins') {
+      const body = await readJsonBody(req)
+      const act = String(body.action ?? 'List').trim()
+      const map = { list: 'List', install: 'Install', update: 'Update', setlink: 'SetLink', restart: 'Restart' }
+      const a = map[act.toLowerCase()]
+      if (!a) return send(200, result(false, -1, 'action must be list | install | update | setlink | restart'))
+      const extra = a === 'Install' ? ['-NoRestart'] : []
+      return run('plugins.ps1', ['-Action', a].concat(extra), 300000)
+    }
+    if (method === 'POST' && routePath === '/sessions') {
+      const body = await readJsonBody(req)
+      const act = String(body.action ?? '').trim().toLowerCase()
+      if (act === 'backup') return run('backup-sessions.ps1', ['-Backup', '-IncludeInGit'], 300000)
+      if (act === 'list') return run('backup-sessions.ps1', ['-List'], 60000)
+      if (act === 'restore') {
+        const from = String(body.from ?? '').trim()
+        return from ? run('backup-sessions.ps1', ['-Restore', '-From', from], 300000)
+                    : run('backup-sessions.ps1', ['-Restore'], 300000)
+      }
+      return send(200, result(false, -1, 'action must be backup | list | restore'))
+    }
+    // ── bootstrap: fresh machine, hub not cloned yet. The card supplies the
+    //    repo URL (default = the owner's private Gitee repo), the credential is
+    //    already in the Windows store from /cred. git clone -> apply -> plugin
+    //    install, all non-interactive (apply never asks YES on a machine with no
+    //    saved identity marker). ───────────────────────────────────────────────
+    if (method === 'POST' && routePath === '/bootstrap') {
+      const body = await readJsonBody(req)
+      const repoUrl = String(body.repoUrl ?? '').trim() || 'https://gitee.com/mrlux/ai-sync-hub.git'
+      const machine = String(body.machine ?? '').trim().toLowerCase()
+      const dest = String(body.dest ?? '').trim()
+      if (!/^[a-z][a-z0-9-]{0,15}$/.test(machine)) {
+        return send(200, result(false, -1, 'machine id must be lowercase letters/digits/dash, e.g. home / shop'))
+      }
+      if (!dest || /[<>|"*?]/.test(dest)) {
+        return send(200, result(false, -1, 'dest must be a plain folder path, e.g. D:\\AI\\sync-hub'))
+      }
+      let repoHost = 'gitee.com'
+      try { repoHost = new URL(repoUrl).host } catch { return send(200, result(false, -1, 'invalid repoUrl')) }
+      const cred = await probeGiteeCredential(repoHost)
+      if (!cred.ok) return send(200, result(false, -1, 'no Gitee credential stored - save it in the credential box above first'))
+      if (fs.existsSync(path.join(dest, '.git'))) {
+        return send(200, result(false, -1, 'dest already a git repo: ' + dest + ' - pick another folder or use 拉取'))
+      }
+      const steps = []
+      const cl = await runGit(process.cwd(), ['clone', repoUrl, dest], 600000)
+      steps.push('clone: ' + (cl.code === 0 ? 'OK' : 'FAIL ' + tail(cl.out, 400)))
+      if (cl.code !== 0) return send(200, result(false, cl.code, steps.join('\n')))
+      const r2 = await runPs(dest, 'apply.ps1', ['-Machine', machine], null, { timeoutMs: 600000 })
+      steps.push('apply: ' + (r2.code === 0 ? 'OK' : 'exit ' + r2.code + ' ' + tail(r2.out, 400)))
+      const r3 = await runPs(dest, 'plugins.ps1', ['-Action', 'Install', '-NoRestart'], null, { timeoutMs: 600000 })
+      steps.push('plugins: ' + (r3.code === 0 ? 'OK' : 'exit ' + r3.code + ' ' + tail(r3.out, 400)))
+      const ok = r2.code === 0 && r3.code === 0
+      return send(200, result(ok, ok ? 0 : -1, steps.join('\n') +
+        '\n\n' + (ok ? '中枢已就位: ' + dest + '  ·  重启 DSH 后记忆/技能生效（本插件也会随中枢更新）' : '部分步骤失败，详见上方输出；可用「打开控制台」人工处理')))
     }
     return send(404, { error: 'no such route' })
   } catch (e) {
