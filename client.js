@@ -1,21 +1,20 @@
 /**
- * dsh-sync-hub — browser half (settings card, tabbed).
+ * dsh-sync-hub — browser half (settings card, tabbed, structured UI).
  *
- * Layout rules learned from user feedback (memory/shared.md 4.20):
- *   - Every action gives IMMEDIATE feedback next to the button it belongs to
- *     ("执行中…" on the clicked button) and prints its result INSIDE the
- *     current tab. Never park the only output panel at the bottom of a long
- *     page: users cannot see it, so a working button looks dead.
- *   - Functions are grouped into TABS; a single 20-button column reads as noise.
+ * Design rules (memory/shared.md 4.20 + user feedback 2026-10-13):
+ *   - Group into TABS; never one long 20-button page.
+ *   - Feedback lands NEXT TO the button that caused it; never park output at
+ *     the bottom of a long page.
+ *   - Draw STRUCTURED data (rows, dots, chips, clickable list) instead of
+ *     dumping PowerShell console text — terminal syntax ([PASS], ── ──) is
+ *     noise in a GUI.
+ *   - One /overview request on mount instead of three slow parallel ones.
+ *   - Every action kind MUST have a switch branch (a missing one silently
+ *     does nothing).
  *
- * Tabs: 概览 / 同步 / 备份 / 环境 / 插件与技能 / 工具链 / 设置
- * Data comes from the host half's same-origin /api/sync-hub/* routes.
+ * Tabs: 概览 / 同步 / 备份 / 环境 / 技能插件 / 工具链 / 设置
  *
- * Contract (verified 2026-10-13, memory/shared.md 4.17):
- *   - ModuleLoader bundle; factory MUST return module.exports (NOT module)
- *   - inject = ['slots','locale']; React from the shell
- *   - every action kind MUST have a switch branch (a missing one falls through
- *     to default and the button silently does nothing)
+ * Contract: factory MUST return module.exports (NOT module).
  *
  * @module client.js
  */
@@ -25,171 +24,211 @@ window.__ModuleLoader__.load({
     const module = { exports: {} }
     const exports = module.exports
     const React = require('react')
-    const { createElement: h, Fragment, useState, useEffect, useCallback } = React
+    const { createElement: h, Fragment, useState, useEffect, useCallback, useMemo } = React
 
     const NS = 'settings.syncHub'
     const inject = ['slots', 'locale']
 
     const DICT = {
       zh: {
-        'nav': '同步中枢',
-        'title': '同步中枢 · sync-hub',
-        'subtitle': '两台电脑的 AI 记忆 / 技能 / 配置同步（Gitee 私有仓库）',
-        'loading': '读取中…',
-        'error': '后端不可达：{e}',
-        'busy': '执行中…',
-        'done': '完成',
-        'output': '输出',
-        'clear': '清除输出',
-        'version': '版本',
-        'commit': '最新提交',
-        'skills': '技能',
-        'dirty0': '工作区干净',
-        'dirtyN': '{n} 个未提交改动',
+        nav: '同步中枢',
+        title: '同步中枢',
+        subtitle: '两台电脑的 AI 记忆 / 技能 / 配置同步',
+        loading: '读取中…',
+        refresh: '刷新',
+        busy: '执行中…',
+        output: '详情',
+        clear: '收起',
+        retry: '重试',
+        error: '连接失败：{e}',
+        state: { pass: '正常', warn: '注意', fail: '异常', info: '信息' },
+        tab: { overview: '概览', sync: '同步', backup: '备份', env: '环境', plugin: '技能插件', tools: '工具链', settings: '设置' },
 
-        'tab.overview': '概览',
-        'tab.sync': '同步',
-        'tab.backup': '备份',
-        'tab.env': '环境',
-        'tab.plugin': '插件技能',
-        'tab.tools': '工具链',
-        'tab.settings': '设置',
+        'ov.version': '版本',
+        'ov.commit': '最新提交',
+        'ov.skills': '技能',
+        'ov.tree': '工作区',
+        'ov.clean': '干净',
+        'ov.dirty': '{n} 个改动待提交',
+        'ov.health': '健康检查',
+        'ov.runcheck': '运行自检',
+        'ov.synced': '与远端一致',
+        'ov.ahead': '本地领先 {n}',
+        'ov.behind': '远端领先 {n}',
 
-        'act.refresh': '刷新',
         'act.status': '查看差异',
         'act.push': '上传备份',
         'act.pull': '拉取并应用',
         'act.console': '打开控制台',
         'act.doctor': '体检',
-        'act.doctorFix': '体检+修复',
+        'act.doctorFix': '体检并修复',
         'act.net': '网络诊断',
-        'act.backups': '历史备份',
+        'act.backups': '备份列表',
         'act.restore': '恢复',
-        'act.sessionsBackup': '会话备份',
+        'act.restoreLatest': '恢复最新记忆',
+        'act.sessionsBackup': '备份会话',
         'act.sessionsList': '会话列表',
-        'act.skillsToHub': '技能→中枢',
-        'act.skillsFromHub': '中枢→技能',
+        'act.skillsToHub': '收集新技能',
+        'act.skillsFromHub': '安装中枢技能',
         'act.pluginsList': '插件状态',
-        'act.pluginsInstall': '装/修插件',
-        'act.toolsRefresh': '工具体检',
-        'act.toolsInstall': '补齐缺的',
-        'act.toolsInstallNice': '补齐含可选',
+        'act.pluginsInstall': '安装/修复插件',
+        'act.toolsRefresh': '重新检测',
+        'act.toolsInstall': '补齐必需',
+        'act.toolsInstallNice': '补齐全部',
+        'act.logs': '查看日志',
         'act.bootstrap': '一键接入',
+        'act.saveCred': '保存并测试',
 
         'sec.daily': '日常同步',
-        'sec.backup': '备份',
+        'sec.health': '环境维护',
+        'sec.backup': '记忆备份',
         'sec.sessions': '会话备份',
-        'sec.env': '环境维护',
-        'sec.plugin': '插件与技能',
+        'sec.skills': '技能',
+        'sec.plugins': '插件',
         'sec.tools': 'AI 工具链',
         'sec.cred': 'Gitee 凭据',
-        'sec.bootstrap': '新机器接入（本机还没有中枢仓库时）',
+        'sec.logs': '运行日志',
+        'sec.bootstrap': '新机器接入',
 
-        'hint.pull': '拉取会应用到 DSH，重启后生效；冲突会停下并报告。',
-        'hint.console': '换身份 / 一条龙 / 冲突处理仍在窗口里人工完成。',
-        'hint.restart': '涉及记忆/插件的改动需重启 DSH 生效。',
-        'hint.restore': '先点「历史备份」看列表，再把文件名填进输入框。',
-        'hint.tools': '核心工具缺失会影响同步；可选工具按需装。',
-        'hint.overview': '这是本机与中枢的当前状态，改动后可点「刷新」。',
+        'hint.daily': '干活前拉取、干完活上传。冲突会停下并报告，不会自动改。',
+        'hint.console': '换机器身份、一条龙、冲突处理这类需要人工确认的，在控制台窗口里做。',
+        'hint.backup': '备份永不删除。恢复前会自动把当前文件再备份一次。',
+        'hint.sessions': '会话备份含对话记录，凭据类文件永不包含。',
+        'hint.skills': '本机新装的技能可收集到中枢，另一台拉取即可用。',
+        'hint.tools': '核心工具缺失会影响同步；其余按需。DSH 自带 ripgrep 与 LibreOffice，无需另装。',
+        'hint.restart': '涉及记忆/插件的改动，重启 DSH 后生效。',
+        'hint.cred': '令牌存进 Windows 凭据管理器，不写任何文件，也不会回显。',
+        'hint.token': '令牌获取：gitee.com → 设置 → 私人令牌（勾 projects）。',
+        'hint.bootstrap': '本机还没有中枢仓库时用：填机器名和目标目录，一键克隆+应用+装插件。',
 
-        'tools.count': '已装 {p}/{n}',
-        'tools.coreMissing': '核心工具缺失，同步会受影响',
-        'tools.allPresent': '全部就位',
+        'tools.summary': '{p}/{n} 已安装',
+        'tools.missingCore': '缺少必需工具',
+        'tools.allGood': '全部就位',
+        'tools.need': { core: '必需', dev: '开发', nice: '可选' },
 
-        'cred.have': '已保存',
-        'cred.none': '未保存 —— push/clone 会失败',
+        'cred.ok': '已保存',
+        'cred.none': '未保存',
+        'cred.noneHint': 'push / clone 会失败，请先保存',
         'cred.user': 'Gitee 用户名',
         'cred.token': '私人令牌（只写不回显）',
-        'cred.save': '保存并测试',
-        'cred.where': '令牌存 Windows 凭据管理器（git credential），永不写入任何文件或仓库。',
-        'hint.token': '拿令牌：gitee.com → 设置 → 私人令牌（勾 projects 权限）。',
 
-        'boot.machine': '机器短名（小写，如 home / shop）',
-        'boot.dest': '中枢克隆到（如 D:\\AI\\sync-hub）',
-        'boot.repo': '仓库地址（回车=默认）',
-        'boot.desc': '前提：已装 git 且本页凭据已保存。点「一键接入」= clone 中枢 + apply 记忆/技能 + 装插件，完成后重启 DSH。',
-        'boot.needCred': '先在上方保存 Gitee 凭据，再接入。',
-        'restore.placeholder': '备份文件名',
+        'boot.machine': '机器短名（如 home / shop）',
+        'boot.dest': '克隆到（如 D:\\AI\\sync-hub）',
+        'boot.repo': '仓库地址（留空用默认）',
+        'boot.needCred': '请先保存 Gitee 凭据',
+
+        'skills.summary': '中枢 {hub} · 本机 {local}',
+        'skills.onlyLocal': '仅本机有（可收集到中枢）',
+        'skills.onlyHub': '仅中枢有（可安装到本机）',
+        'skills.diff': '两边不同（需人工比对）',
+        'skills.junk': '自动生成的占位技能（可忽略或清理）',
+        'skills.none': '两边一致',
+
+        'check.pass': '通过',
+        'check.warn': '注意',
+        'check.fail': '失败',
+        'logs.newest': '最新日志：{name}',
+        'empty.output': '（无输出）',
       },
       en: {
-        'nav': 'Sync Hub',
-        'title': 'Sync Hub · sync-hub',
-        'subtitle': 'Cross-machine AI memory / skills / config (private Gitee repo)',
-        'loading': 'Loading…',
-        'error': 'Backend unreachable: {e}',
-        'busy': 'Running…',
-        'done': 'done',
-        'output': 'Output',
-        'clear': 'Clear output',
-        'version': 'Version',
-        'commit': 'Last commit',
-        'skills': 'Skills',
-        'dirty0': 'working tree clean',
-        'dirtyN': '{n} uncommitted change(s)',
+        nav: 'Sync Hub',
+        title: 'Sync Hub',
+        subtitle: 'Cross-machine AI memory / skills / config',
+        loading: 'Loading…',
+        refresh: 'Refresh',
+        busy: 'Running…',
+        output: 'Details',
+        clear: 'Hide',
+        retry: 'Retry',
+        error: 'Connection failed: {e}',
+        state: { pass: 'OK', warn: 'Warning', fail: 'Failed', info: 'Info' },
+        tab: { overview: 'Overview', sync: 'Sync', backup: 'Backup', env: 'Environment', plugin: 'Skills', tools: 'Toolchain', settings: 'Settings' },
 
-        'tab.overview': 'Overview',
-        'tab.sync': 'Sync',
-        'tab.backup': 'Backup',
-        'tab.env': 'Environment',
-        'tab.plugin': 'Plugins',
-        'tab.tools': 'Toolchain',
-        'tab.settings': 'Settings',
+        'ov.version': 'Version',
+        'ov.commit': 'Last commit',
+        'ov.skills': 'Skills',
+        'ov.tree': 'Working tree',
+        'ov.clean': 'clean',
+        'ov.dirty': '{n} pending change(s)',
+        'ov.health': 'Health',
+        'ov.runcheck': 'Run self-check',
+        'ov.synced': 'in sync with remote',
+        'ov.ahead': '{n} ahead',
+        'ov.behind': '{n} behind',
 
-        'act.refresh': 'Refresh',
         'act.status': 'Status',
         'act.push': 'Push',
         'act.pull': 'Pull & apply',
         'act.console': 'Open console',
         'act.doctor': 'Doctor',
         'act.doctorFix': 'Doctor + fix',
-        'act.net': 'Net check',
+        'act.net': 'Network check',
         'act.backups': 'Backups',
         'act.restore': 'Restore',
+        'act.restoreLatest': 'Restore newest memory',
         'act.sessionsBackup': 'Backup sessions',
         'act.sessionsList': 'Session list',
-        'act.skillsToHub': 'Skills → hub',
-        'act.skillsFromHub': 'Hub → skills',
+        'act.skillsToHub': 'Collect new skills',
+        'act.skillsFromHub': 'Install hub skills',
         'act.pluginsList': 'Plugin status',
-        'act.pluginsInstall': 'Install/repair',
-        'act.toolsRefresh': 'Tool check',
-        'act.toolsInstall': 'Install missing',
-        'act.toolsInstallNice': 'Install + optional',
+        'act.pluginsInstall': 'Install/repair plugins',
+        'act.toolsRefresh': 'Re-detect',
+        'act.toolsInstall': 'Install required',
+        'act.toolsInstallNice': 'Install all',
+        'act.logs': 'View logs',
         'act.bootstrap': 'Bootstrap',
+        'act.saveCred': 'Save & test',
 
         'sec.daily': 'Daily sync',
-        'sec.backup': 'Backups',
-        'sec.sessions': 'Session backup',
-        'sec.env': 'Environment',
-        'sec.plugin': 'Plugins & skills',
+        'sec.health': 'Environment',
+        'sec.backup': 'Memory backups',
+        'sec.sessions': 'Session backups',
+        'sec.skills': 'Skills',
+        'sec.plugins': 'Plugins',
         'sec.tools': 'AI toolchain',
         'sec.cred': 'Gitee credential',
-        'sec.bootstrap': 'New machine (hub not cloned yet)',
+        'sec.logs': 'Runtime logs',
+        'sec.bootstrap': 'New machine',
 
-        'hint.pull': 'Pull applies to DSH (restart to take effect); conflicts stop and report.',
-        'hint.console': 'Identity switch / one-stop setup / conflict fixes stay manual in the window.',
-        'hint.restart': 'Memory/plugin changes need a DSH restart.',
-        'hint.restore': 'Run Backups first, then paste a file name here.',
-        'hint.tools': 'Missing core tools affect sync; optional ones are up to you.',
-        'hint.overview': 'Current state of this machine vs the hub; hit Refresh after changes.',
+        'hint.daily': 'Pull before work, push after. Conflicts stop and report; nothing is auto-resolved.',
+        'hint.console': 'Identity switch, one-stop setup and conflict fixes stay in the console window.',
+        'hint.backup': 'Backups are never deleted. Restore backs up the current file first.',
+        'hint.sessions': 'Session backups contain chat history; credentials are never included.',
+        'hint.skills': 'Collect locally added skills to the hub so the other machine can install them.',
+        'hint.tools': 'Missing core tools affect sync. DSH bundles ripgrep and LibreOffice already.',
+        'hint.restart': 'Memory/plugin changes take effect after a DSH restart.',
+        'hint.cred': 'The token goes to the Windows Credential Manager — never a file, never echoed.',
+        'hint.token': 'Token: gitee.com → Settings → Private Token (projects scope).',
+        'hint.bootstrap': 'Use when this machine has no hub clone: name + folder, then clone + apply + install.',
 
-        'tools.count': '{p}/{n} installed',
-        'tools.coreMissing': 'core tools missing — sync is affected',
-        'tools.allPresent': 'all present',
+        'tools.summary': '{p}/{n} installed',
+        'tools.missingCore': 'required tools missing',
+        'tools.allGood': 'all present',
+        'tools.need': { core: 'required', dev: 'dev', nice: 'optional' },
 
-        'cred.have': 'stored',
-        'cred.none': 'no credential — push/clone will fail',
+        'cred.ok': 'stored',
+        'cred.none': 'not stored',
+        'cred.noneHint': 'push / clone will fail — save it first',
         'cred.user': 'Gitee username',
         'cred.token': 'private token (write-only)',
-        'cred.save': 'Save & test',
-        'cred.where': 'Stored in the Windows Credential Manager via git credential — never in any file or repo.',
-        'hint.token': 'Token: gitee.com → Settings → Private Token (projects scope).',
 
-        'boot.machine': 'machine id (lowercase, e.g. home / shop)',
-        'boot.dest': 'clone hub into (e.g. D:\\AI\\sync-hub)',
+        'boot.machine': 'machine id (e.g. home / shop)',
+        'boot.dest': 'clone into (e.g. D:\\AI\\sync-hub)',
         'boot.repo': 'repo URL (blank = default)',
-        'boot.desc': 'Needs git + the credential saved on this page. Bootstrap = clone hub + apply memory/skills + install plugin; then restart DSH.',
-        'boot.needCred': 'Save the Gitee credential above first.',
-        'restore.placeholder': 'backup file name',
+        'boot.needCred': 'Save the Gitee credential first',
+
+        'skills.summary': 'hub {hub} · local {local}',
+        'skills.onlyLocal': 'local only (collectable)',
+        'skills.onlyHub': 'hub only (installable)',
+        'skills.diff': 'differ (needs review)',
+        'skills.junk': 'auto-generated placeholders (ignorable)',
+        'skills.none': 'both sides match',
+
+        'check.pass': 'pass',
+        'check.warn': 'warn',
+        'check.fail': 'fail',
+        'logs.newest': 'newest log: {name}',
+        'empty.output': '(no output)',
       },
     }
 
@@ -198,321 +237,355 @@ window.__ModuleLoader__.load({
     })()
 
     async function api(path, options) {
-      const { timeout = 15000, ...fetchOptions } = options ?? {}
+      const { timeout = 20000, ...rest } = options ?? {}
       const ctrl = new AbortController()
       const timer = setTimeout(() => ctrl.abort(), timeout)
       try {
-        const response = await fetch(`${API}${path}`, { ...fetchOptions, redirect: 'error', signal: ctrl.signal })
-        const text = await response.text()
+        const res = await fetch(`${API}${path}`, { ...rest, redirect: 'error', signal: ctrl.signal })
+        const text = await res.text()
         let payload
         try { payload = text === '' ? {} : JSON.parse(text) } catch { payload = { error: text.slice(0, 200) } }
-        if (!response.ok) throw new Error(payload?.error ?? `HTTP ${response.status}`)
+        if (!res.ok) throw new Error(payload?.error ?? `HTTP ${res.status}`)
         return payload
-      } finally {
-        clearTimeout(timer)
-      }
+      } finally { clearTimeout(timer) }
     }
     const post = (path, body, timeout) => api(path, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      ...body === undefined ? {} : { body: JSON.stringify(body) },
-      ...timeout === undefined ? {} : { timeout },
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      ...(timeout === undefined ? {} : { timeout }),
     })
 
+    const LEVEL = {
+      pass: { dot: '#2ea043', bg: 'rgba(46,160,67,0.10)', label: 'pass' },
+      ok: { dot: '#2ea043', bg: 'rgba(46,160,67,0.10)', label: 'pass' },
+      warn: { dot: '#d29922', bg: 'rgba(210,153,34,0.12)', label: 'warn' },
+      fail: { dot: '#d1242f', bg: 'rgba(209,36,47,0.12)', label: 'fail' },
+      info: { dot: '#6e7781', bg: 'rgba(110,119,129,0.10)', label: 'info' },
+      note: { dot: '#6e7781', bg: 'transparent', label: '' },
+    }
+
     const S = {
-      label: { fontSize: '0.75rem', opacity: 0.65, minWidth: '4.5rem' },
-      value: { fontSize: '0.85rem' },
-      btn: {
-        padding: '0.35rem 0.8rem', borderRadius: '0.5rem', fontSize: '0.8rem',
-        border: '1px solid var(--color-border, rgba(128,128,128,0.35))',
-        background: 'var(--color-surface, rgba(128,128,128,0.08))',
-        color: 'var(--color-text, inherit)', cursor: 'pointer',
-      },
-      btnPrimary: { background: 'var(--color-accent, #2a6)', color: '#fff' },
-      input: {
-        padding: '0.35rem 0.6rem', borderRadius: '0.5rem', fontSize: '0.78rem', width: '13rem',
-        border: '1px solid var(--color-border, rgba(128,128,128,0.35))',
-        background: 'var(--color-surface, rgba(128,128,128,0.06))',
-        color: 'var(--color-text, inherit)',
-      },
-      pre: {
-        margin: 0, padding: '0.6rem', borderRadius: '0.5rem', fontSize: '0.72rem',
-        whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: '20rem', overflow: 'auto',
-        background: 'var(--color-surface, rgba(128,128,128,0.08))',
-        border: '1px solid var(--color-border, rgba(128,128,128,0.25))',
-      },
-      tabs: { display: 'flex', gap: '0.25rem', flexWrap: 'wrap', borderBottom: '1px solid var(--color-border, rgba(128,128,128,0.25))', paddingBottom: '0.5rem' },
-      tab: {
-        padding: '0.3rem 0.7rem', borderRadius: '0.5rem 0.5rem 0 0', fontSize: '0.8rem',
-        border: '1px solid transparent', background: 'transparent',
-        color: 'var(--color-text, inherit)', cursor: 'pointer', opacity: 0.65,
-      },
-      tabActive: {
-        opacity: 1, fontWeight: 600,
-        borderBottom: '2px solid var(--color-accent, #2a6)',
-      },
-      secTitle: { fontSize: '0.85rem', margin: '0 0 0.4rem', opacity: 0.9 },
-      sec: { borderTop: '1px solid var(--color-border, rgba(128,128,128,0.25))', paddingTop: '0.7rem', display: 'flex', flexDirection: 'column', gap: '0.45rem' },
-      secFirst: { paddingTop: 0, borderTop: 'none', display: 'flex', flexDirection: 'column', gap: '0.45rem' },
-      row: { display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' },
-      hint: { fontSize: '0.68rem', opacity: 0.55, margin: 0 },
-      chip: {
-        fontSize: '0.68rem', padding: '0.1rem 0.45rem', borderRadius: '0.7rem',
-        border: '1px solid var(--color-border, rgba(128,128,128,0.3))',
-      },
-      busyDot: { fontSize: '0.72rem', color: 'var(--color-accent, #2a6)' },
-      ok: { color: 'var(--color-success, #2a9)' },
-      bad: { color: 'var(--color-danger, #d33)' },
+      wrap: { display: 'flex', flexDirection: 'column', gap: '0.85rem', maxWidth: '52rem' },
+      h2: { fontSize: '1.1rem', margin: 0, fontWeight: 600 },
+      sub: { fontSize: '0.78rem', opacity: 0.6, margin: 0 },
+      tabs: { display: 'flex', gap: '0.2rem', flexWrap: 'wrap', borderBottom: '1px solid var(--color-border, rgba(128,128,128,0.22))' },
+      tab: { padding: '0.4rem 0.75rem', fontSize: '0.8rem', border: 'none', background: 'transparent', color: 'inherit', cursor: 'pointer', opacity: 0.6, borderBottom: '2px solid transparent', marginBottom: '-1px' },
+      tabOn: { opacity: 1, fontWeight: 600, borderBottom: '2px solid var(--color-accent, #2a6)' },
+      card: { border: '1px solid var(--color-border, rgba(128,128,128,0.22))', borderRadius: '0.6rem', padding: '0.75rem 0.85rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' },
+      cardTitle: { fontSize: '0.82rem', fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' },
+      row: { display: 'flex', gap: '0.45rem', flexWrap: 'wrap', alignItems: 'center' },
+      btn: { padding: '0.32rem 0.75rem', borderRadius: '0.45rem', fontSize: '0.78rem', border: '1px solid var(--color-border, rgba(128,128,128,0.3))', background: 'var(--color-surface, rgba(128,128,128,0.07))', color: 'inherit', cursor: 'pointer' },
+      primary: { background: 'var(--color-accent, #2a6)', color: '#fff', borderColor: 'transparent' },
+      input: { padding: '0.32rem 0.55rem', borderRadius: '0.45rem', fontSize: '0.76rem', width: '12rem', border: '1px solid var(--color-border, rgba(128,128,128,0.3))', background: 'var(--color-surface, rgba(128,128,128,0.05))', color: 'inherit' },
+      hint: { fontSize: '0.7rem', opacity: 0.55, margin: 0, lineHeight: 1.5 },
+      kv: { display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.3rem 0.75rem', fontSize: '0.78rem', alignItems: 'baseline' },
+      kvKey: { opacity: 0.6, whiteSpace: 'nowrap' },
+      chip: { fontSize: '0.68rem', padding: '0.12rem 0.45rem', borderRadius: '0.65rem', border: '1px solid var(--color-border, rgba(128,128,128,0.28))', whiteSpace: 'nowrap' },
+      listRow: { display: 'flex', gap: '0.5rem', alignItems: 'center', fontSize: '0.76rem', padding: '0.3rem 0.45rem', borderRadius: '0.4rem', background: 'var(--color-surface, rgba(128,128,128,0.05))' },
+      pre: { margin: 0, padding: '0.55rem', borderRadius: '0.45rem', fontSize: '0.7rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: '16rem', overflow: 'auto', background: 'var(--color-surface, rgba(128,128,128,0.07))', border: '1px solid var(--color-border, rgba(128,128,128,0.2))', fontFamily: 'ui-monospace, Consolas, monospace' },
     }
 
     const TABS = ['overview', 'sync', 'backup', 'env', 'plugin', 'tools', 'settings']
 
-    function Row(t, label, value) {
-      return h('div', { style: { display: 'flex', gap: '0.75rem', padding: '0.2rem 0' } },
-        h('span', { style: S.label }, t(label)),
-        h('span', { style: S.value }, value))
+    function Dot({ level }) {
+      const L = LEVEL[level] || LEVEL.info
+      return h('span', { style: { display: 'inline-block', width: '0.5rem', height: '0.5rem', borderRadius: '50%', background: L.dot, flex: '0 0 auto' } })
+    }
+    // rest parameter: callers pass children as separate arguments
+    // (Card({title}, childA, childB)). A single `children` prop would break
+    // as soon as a card has more than one child.
+    function Card({ title, level, ...rest }) {
+      const kids = rest.children || []
+      return h('div', { style: S.card },
+        title ? h('h3', { style: S.cardTitle }, level ? h(Dot, { level }) : null, title) : null,
+        ...(Array.isArray(kids) ? kids : [kids]))
+    }
+    function KV({ k, v }) {
+      return h(Fragment, {}, h('span', { style: S.kvKey }, k), h('span', {}, v))
     }
 
     function SyncHubPage({ t }) {
       const [tab, setTab] = useState('overview')
-      const [info, setInfo] = useState(undefined)
+      const [ov, setOv] = useState(undefined)
       const [err, setErr] = useState('')
-      const [busyKind, setBusyKind] = useState('')
-      const [outputs, setOutputs] = useState({})
-      const [cred, setCred] = useState(undefined)
-      const [tools, setTools] = useState(undefined)
+      const [busy, setBusy] = useState('')
+      const [out, setOut] = useState({})
+      const [checks, setChecks] = useState(undefined)
+      const [backups, setBackups] = useState(undefined)
+      const [skills, setSkills] = useState(undefined)
+      const [logs, setLogs] = useState(undefined)
       const [cUser, setCUser] = useState('')
       const [cToken, setCToken] = useState('')
       const [bMachine, setBMachine] = useState('')
       const [bDest, setBDest] = useState('')
       const [bRepo, setBRepo] = useState('')
-      const [restoreName, setRestoreName] = useState('')
 
-      const setOut = useCallback((key, text) => {
-        setOutputs(prev => ({ ...prev, [key]: text }))
-      }, [])
+      const put = useCallback((k, v) => setOut(p => ({ ...p, [k]: v })), [])
 
-      const loadInfo = useCallback(() => {
+      const loadOverview = useCallback(() => {
         setErr('')
-        return api('/info')
-          .then(payload => { setInfo(payload); if (!payload.ok) setErr(payload.notFound ? '' : 'notFound') })
+        return api('/overview', { timeout: 120000 })
+          .then(setOv)
           .catch(e => setErr(String(e?.message ?? e)))
       }, [])
-      const loadCred = useCallback(() => {
-        api('/cred').then(setCred).catch(() => setCred({ ok: false }))
-      }, [])
-      const loadTools = useCallback(() => {
-        api('/tools', { timeout: 120_000 }).then(setTools).catch(() => setTools({ ok: false, tools: [] }))
-      }, [])
 
-      useEffect(() => { loadInfo(); loadCred(); loadTools() }, [loadInfo, loadCred, loadTools])
+      useEffect(() => { loadOverview() }, [loadOverview])
 
-      // Every kind below MUST exist as a switch branch: a missing one falls
-      // through to default and the button looks dead (memory/shared.md 4.20).
-      const run = useCallback(async (kind, tabKey) => {
-        setBusyKind(kind)
-        setOut(tabKey, '')
+      // Every kind MUST have a branch here (missing branch = dead button).
+      const run = useCallback(async (kind, key) => {
+        setBusy(kind)
+        put(key, '')
         try {
-          let payload
+          let r
           switch (kind) {
-            case 'refresh': await Promise.all([loadInfo(), loadCred(), loadTools()]); payload = { text: '' }; break
-            case 'status': payload = await api('/status', { timeout: 120_000 }); break
-            case 'pull': payload = await post('/pull', undefined, 300_000); break
-            case 'push': payload = await post('/push', {}, 300_000); break
-            case 'console': payload = await post('/console'); break
-            case 'doctor': payload = await post('/doctor', {}, 240_000); break
-            case 'doctorFix': payload = await post('/doctor', { fix: true }, 240_000); break
-            case 'net': payload = await post('/net', {}, 180_000); break
-            case 'backups': payload = await api('/backups', { timeout: 90_000 }); break
-            case 'restore': payload = await post('/restore', { name: restoreName }, 90_000); setRestoreName(''); break
-            case 'sessionsBackup': payload = await post('/sessions', { action: 'backup' }, 600_000); break
-            case 'sessionsList': payload = await post('/sessions', { action: 'list' }, 90_000); break
-            case 'skillsToHub': payload = await post('/skills', { dir: 'tohub' }, 240_000); break
-            case 'skillsFromHub': payload = await post('/skills', { dir: 'fromhub' }, 240_000); break
-            case 'pluginsList': payload = await post('/plugins', { action: 'list' }, 120_000); break
-            case 'pluginsInstall': payload = await post('/plugins', { action: 'install' }, 600_000); break
-            case 'toolsRefresh': await loadTools(); payload = { text: '' }; break
-            case 'toolsInstall': payload = await post('/tools/install', { mode: 'all' }, 900_000); await loadTools(); break
-            case 'toolsInstallNice': payload = await post('/tools/install', { mode: 'allnice' }, 1_800_000); await loadTools(); break
-            case 'saveCred':
-              payload = await post('/cred', { username: cUser, token: cToken }, 180_000)
-              setCToken(''); loadCred(); break
-            case 'bootstrap':
-              payload = await post('/bootstrap', {
-                machine: bMachine, dest: bDest,
-                ...bRepo.trim() ? { repoUrl: bRepo.trim() } : {},
-              }, 1_500_000)
-              break
-            default: payload = { text: 'unknown action: ' + kind }
+            case 'refresh': await loadOverview(); r = { text: '' }; break
+            case 'selfcheck': r = await api('/selfcheck', { timeout: 180000 }); setChecks(r.checks || []); break
+            case 'status': r = await api('/status', { timeout: 120000 }); break
+            case 'push': r = await post('/push', {}, 300000); await loadOverview(); break
+            case 'pull': r = await post('/pull', undefined, 300000); await loadOverview(); break
+            case 'console': r = await post('/console'); break
+            case 'doctor': r = await post('/doctor', {}, 240000); break
+            case 'doctorFix': r = await post('/doctor', { fix: true }, 240000); break
+            case 'net': r = await post('/net', {}, 180000); break
+            case 'backups': r = await api('/backups', { timeout: 90000 }); setBackups(r.items || []); break
+            case 'restore': r = await post('/restore', { name: key === 'restoreLatest' ? 'latest-agents' : (window.__shRestore || '') }, 90000); break
+            case 'sessionsBackup': r = await post('/sessions', { action: 'backup' }, 600000); break
+            case 'sessionsList': r = await post('/sessions', { action: 'list' }, 90000); break
+            case 'skillsInfo': r = await api('/skills', { timeout: 60000 }); setSkills(r); break
+            case 'skillsToHub': r = await post('/skills', { dir: 'tohub' }, 240000); break
+            case 'skillsFromHub': r = await post('/skills', { dir: 'fromhub' }, 240000); break
+            case 'pluginsList': r = await post('/plugins', { action: 'list' }, 120000); break
+            case 'pluginsInstall': r = await post('/plugins', { action: 'install' }, 600000); break
+            case 'toolsRefresh': await loadOverview(); r = { text: '' }; break
+            case 'toolsInstall': r = await post('/tools/install', { mode: 'all' }, 900000); await loadOverview(); break
+            case 'toolsInstallNice': r = await post('/tools/install', { mode: 'allnice' }, 1800000); await loadOverview(); break
+            case 'logs': r = await api('/logs', { timeout: 30000 }); setLogs(r); break
+            case 'saveCred': r = await post('/cred', { username: cUser, token: cToken }, 180000); setCToken(''); await loadOverview(); break
+            case 'bootstrap': r = await post('/bootstrap', { machine: bMachine, dest: bDest, ...(bRepo.trim() ? { repoUrl: bRepo.trim() } : {}) }, 1500000); break
+            default: r = { text: 'unknown action: ' + kind }
           }
-          setOut(tabKey, payload?.text || '')
-          if (kind === 'pull' || kind === 'push' || kind === 'bootstrap' || kind === 'restore') loadInfo()
+          put(key, (r && r.text) || '')
         } catch (e) {
-          setOut(tabKey, '✗ ' + String(e?.message ?? e))
-        } finally {
-          setBusyKind('')
-        }
-      }, [loadInfo, loadCred, loadTools, setOut, cUser, cToken, restoreName, bMachine, bDest, bRepo])
+          put(key, '✗ ' + String(e?.message ?? e))
+        } finally { setBusy('') }
+      }, [loadOverview, put, cUser, cToken, bMachine, bDest, bRepo])
 
-      // A button that shows its own progress and never leaves the user guessing.
-      const btn = (labelKey, kind, tabKey, extraStyle) => {
-        const isBusy = busyKind === kind
+      const Btn = ({ label, kind, key: outKey, primary, small }) => {
+        const isBusy = busy === kind
         return h('button', {
-          key: labelKey + kind, type: 'button',
-          style: { ...S.btn, ...extraStyle, ...(isBusy ? { opacity: 0.7 } : {}) },
-          disabled: !!busyKind,
-          onClick: () => run(kind, tabKey),
-        }, isBusy ? (t(labelKey) + ' …') : t(labelKey))
+          type: 'button',
+          style: { ...S.btn, ...(primary ? S.primary : {}), ...(small ? { fontSize: '0.72rem', padding: '0.22rem 0.55rem' } : {}), ...(isBusy ? { opacity: 0.65 } : {}) },
+          disabled: !!busy,
+          onClick: () => run(kind, outKey || kind),
+        }, isBusy ? (label + ' …') : label)
       }
-      const row = (...kids) => h('div', { style: S.row }, ...kids)
 
-      // Output lives inside the tab that produced it, right under the buttons.
-      const outBox = (tabKey) => {
-        const text = outputs[tabKey]
+      // result of an action, shown inside the card that owns it
+      const Result = ({ k }) => {
+        const text = out[k]
         if (!text) return null
         return h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.3rem' } },
           h('div', { style: { ...S.row, justifyContent: 'space-between' } },
-            h('span', { style: S.label }, t('output')),
-            h('button', { type: 'button', style: S.btn, onClick: () => setOut(tabKey, '') }, t('clear'))),
+            h('span', { style: { fontSize: '0.7rem', opacity: 0.6 } }, t('output')),
+            h('button', { type: 'button', style: { ...S.btn, ...{ fontSize: '0.68rem', padding: '0.15rem 0.45rem' } }, onClick: () => put(k, '') }, t('clear'))),
           h('pre', { style: S.pre }, text))
       }
-      const busyLine = (kind) => busyKind === kind ? h('span', { style: S.busyDot }, t('busy')) : null
 
-      // ── header + tab bar (always visible) ──────────────────────────────────
-      const header = h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.5rem' } },
-        h('section', {},
-          h('h2', { style: { fontSize: '1.05rem', margin: '0 0 0.15rem' } }, t('title')),
-          h('p', { style: { fontSize: '0.8rem', opacity: 0.7, margin: 0 } }, t('subtitle'))),
+      const header = h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.6rem' } },
+        h('div', {},
+          h('h2', { style: S.h2 }, t('title')),
+          h('p', { style: S.sub }, t('subtitle'))),
         h('div', { style: S.tabs }, ...TABS.map(k => h('button', {
-          key: k, type: 'button',
-          style: { ...S.tab, ...(tab === k ? S.tabActive : {}) },
-          onClick: () => setTab(k),
+          key: k, type: 'button', style: { ...S.tab, ...(tab === k ? S.tabOn : {}) }, onClick: () => setTab(k),
         }, t('tab.' + k)))))
 
-      // ── no hub yet: only the bootstrap path is useful ──────────────────────
-      if (info && !info.ok) {
-        return h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.9rem', maxWidth: '48rem' } },
-          header,
-          err ? h('p', { style: { ...S.bad, fontSize: '0.8rem' } }, t('error').replace('{e}', err)) : null,
-          h('div', { style: S.secFirst },
-            h('h3', { style: S.secTitle }, t('sec.cred')),
-            h('p', { style: { fontSize: '0.78rem', margin: 0 } },
-              cred === undefined ? t('loading')
-                : cred.hasCredential
-                  ? h(Fragment, {}, h('span', { style: S.ok }, t('cred.have')), '  ' + (cred.username || ''))
-                  : h('span', { style: S.bad }, t('cred.none'))),
-            row(
-              h('input', { type: 'text', placeholder: t('cred.user'), value: cUser, disabled: !!busyKind, style: S.input, onChange: e => setCUser(e.target.value) }),
-              h('input', { type: 'password', placeholder: t('cred.token'), value: cToken, disabled: !!busyKind, style: S.input, onChange: e => setCToken(e.target.value) }),
-              btn('cred.save', 'saveCred', 'settings')),
-            busyLine('saveCred'),
-            h('p', S.hint, t('cred.where')),
-            h('p', S.hint, t('hint.token'))),
-          h('div', { style: S.sec },
-            h('h3', { style: S.secTitle }, t('sec.bootstrap')),
-            h('p', { style: { fontSize: '0.75rem', margin: 0, opacity: 0.75 } }, t('boot.desc')),
-            row(
-              h('input', { type: 'text', placeholder: t('boot.machine'), value: bMachine, disabled: !!busyKind, style: S.input, onChange: e => setBMachine(e.target.value) }),
-              h('input', { type: 'text', placeholder: t('boot.dest'), value: bDest, disabled: !!busyKind, style: { ...S.input, width: '16rem' }, onChange: e => setBDest(e.target.value) })),
-            row(
-              h('input', { type: 'text', placeholder: t('boot.repo'), value: bRepo, disabled: !!busyKind, style: { ...S.input, width: '22rem' }, onChange: e => setBRepo(e.target.value) }),
-              btn('act.bootstrap', 'bootstrap', 'settings', S.btnPrimary)),
-            busyLine('bootstrap'),
-            !(cred && cred.hasCredential) && !busyKind ? h('p', { style: { ...S.bad, fontSize: '0.72rem', margin: 0 } }, t('boot.needCred')) : null),
-          outBox('settings'))
+      const shell = (...body) => h('div', { style: S.wrap }, header, ...body)
+
+      // ── no hub yet ─────────────────────────────────────────────────────────
+      if (ov && ov.info === undefined && !err) {
+        return shell(h('p', { style: S.hint }, t('loading')))
+      }
+      const noHub = ov && ov.ok === false
+      if (noHub) {
+        return shell(
+          h(Card, { title: t('sec.cred'), level: 'warn' },
+            h('div', { style: S.row },
+              h('input', { type: 'text', placeholder: t('cred.user'), value: cUser, style: S.input, onChange: e => setCUser(e.target.value) }),
+              h('input', { type: 'password', placeholder: t('cred.token'), value: cToken, style: S.input, onChange: e => setCToken(e.target.value) }),
+              h(Btn, { label: t('act.saveCred'), kind: 'saveCred' })),
+            h('p', { style: S.hint }, t('hint.cred')),
+            h('p', { style: S.hint }, t('hint.token')),
+            h(Result, { k: 'saveCred' })),
+          h(Card, { title: t('sec.bootstrap') },
+            h('div', { style: S.row },
+              h('input', { type: 'text', placeholder: t('boot.machine'), value: bMachine, style: S.input, onChange: e => setBMachine(e.target.value) }),
+              h('input', { type: 'text', placeholder: t('boot.dest'), value: bDest, style: { ...S.input, width: '15rem' }, onChange: e => setBDest(e.target.value) })),
+            h('div', { style: S.row },
+              h('input', { type: 'text', placeholder: t('boot.repo'), value: bRepo, style: { ...S.input, width: '20rem' }, onChange: e => setBRepo(e.target.value) }),
+              h(Btn, { label: t('act.bootstrap'), kind: 'bootstrap', primary: true })),
+            h('p', { style: S.hint }, t('hint.bootstrap')),
+            h(Result, { k: 'bootstrap' })))
       }
 
-      // ── normal tabs ────────────────────────────────────────────────────────
-      const overview = h('div', { style: S.secFirst },
-        h('h3', { style: S.secTitle }, t('hint.overview')),
-        info === undefined && !err
-          ? h('p', { style: { fontSize: '0.8rem', opacity: 0.6 } }, t('loading'))
-          : err
-            ? h('p', { style: { ...S.bad, fontSize: '0.8rem' } }, t('error').replace('{e}', err))
-            : h(Fragment, {},
-                Row(t, 'version', 'v' + info.version + '  ·  ' + info.machine),
-                Row(t, 'commit', [info.commit, info.commitDate, info.commitSubject].filter(Boolean).join(' | ')),
-                Row(t, 'skills', String(info.skills)),
-                Row(t, 'dirty', info.dirty === 0 ? t('dirty0') : info.dirty > 0 ? t('dirtyN').replace('{n}', String(info.dirty)) : '')),
-        row(btn('act.refresh', 'refresh', 'overview')))
+      const info = (ov && ov.info) || {}
+      const cred = (ov && ov.cred) || {}
+      const tools = (ov && ov.tools) || { tools: [], present: 0, total: 0, missingCore: 0 }
+      const st = (ov && ov.status) || { sections: [], worst: 'pass' }
 
-      const syncTab = h('div', { style: S.secFirst },
-        h('h3', { style: S.secTitle }, t('sec.daily')),
-        row(btn('act.status', 'status', 'sync'), btn('act.push', 'push', 'sync', S.btnPrimary), btn('act.pull', 'pull', 'sync', S.btnPrimary)),
-        row(btn('act.console', 'console', 'sync')),
-        busyLine('status'), busyLine('push'), busyLine('pull'),
-        h('p', S.hint, t('hint.pull')),
-        h('p', S.hint, t('hint.console')),
-        outBox('sync'))
+      const overviewTab = [
+        h(Card, { key: 'kv' },
+          h('div', { style: S.kv },
+            h(KV, { k: t('ov.version'), v: 'v' + (info.version || '?') + '   ·   ' + (info.machine || '') }),
+            h(KV, { k: t('ov.commit'), v: [info.commit, info.commitDate, info.commitSubject].filter(Boolean).join('  ') }),
+            h(KV, { k: t('ov.skills'), v: String(info.skills ?? '?') }),
+            h(KV, { k: t('ov.tree'), v: info.dirty === 0 ? t('ov.clean') : t('ov.dirty', { n: info.dirty }) }),
+            h(KV, { k: t('sec.cred'), v: cred.hasCredential ? (t('cred.ok') + '  ·  ' + (cred.username || '') + '  ·  ' + (cred.repoHost || '')) : t('cred.none') }),
+            h(KV, { k: t('sec.tools'), v: t('tools.summary', { p: tools.present, n: tools.total }) + (tools.missingCore ? '   ·   ' + t('tools.missingCore') : '') })),
+          h('div', { style: S.row },
+            h(Btn, { label: t('refresh'), kind: 'refresh', key: 'ovRefresh' }),
+            h(Btn, { label: t('ov.runcheck'), kind: 'selfcheck', key: 'selfcheck' }))),
+        checks ? h(Card, { key: 'chk', title: t('ov.health'), level: checks.some(c => c.level === 'fail') ? 'fail' : (checks.some(c => c.level === 'warn') ? 'warn' : 'pass') },
+          ...checks.map(c => h('div', { key: c.key, style: S.listRow },
+            h(Dot, { level: c.level }),
+            h('span', { style: { minWidth: '5.5rem', opacity: 0.75 } }, c.key),
+            h('span', { style: { flex: 1 } }, c.detail)))) : null,
+        h(Result, { key: 'r', k: 'selfcheck' }),
+      ]
 
-      const backupTab = h('div', { style: S.secFirst },
-        h('h3', { style: S.secTitle }, t('sec.backup')),
-        row(btn('act.backups', 'backups', 'backup'),
-          h('input', { type: 'text', placeholder: t('restore.placeholder'), value: restoreName, disabled: !!busyKind, style: { ...S.input, width: '15rem' }, onChange: e => setRestoreName(e.target.value) }),
-          btn('act.restore', 'restore', 'backup')),
-        h('p', S.hint, t('hint.restore')),
-        h('h3', { style: { ...S.secTitle, marginTop: '0.4rem' } }, t('sec.sessions')),
-        row(btn('act.sessionsBackup', 'sessionsBackup', 'backup'), btn('act.sessionsList', 'sessionsList', 'backup')),
-        busyLine('backups'), busyLine('restore'),
-        outBox('backup'))
+      const syncTab = [
+        h(Card, { key: 'c', title: t('sec.daily'), level: st.worst },
+          h('div', { style: S.row },
+            h(Btn, { label: t('act.pull'), kind: 'pull', key: 'syncPull', primary: true }),
+            h(Btn, { label: t('act.push'), kind: 'push', key: 'syncPush', primary: true }),
+            h(Btn, { label: t('act.status'), kind: 'status', key: 'syncStatus' }),
+            h(Btn, { label: t('act.console'), kind: 'console', key: 'syncConsole' })),
+          h('p', { style: S.hint }, t('hint.daily')),
+          h('p', { style: S.hint }, t('hint.console')),
+          h(Result, { k: 'syncPull' }), h(Result, { k: 'syncPush' }), h(Result, { k: 'syncStatus' })),
+        st.sections && st.sections.length ? h(Card, { key: 'st', title: t('act.status'), level: st.worst },
+          ...st.sections.map((sec, i) => h('div', { key: i, style: { display: 'flex', flexDirection: 'column', gap: '0.2rem' } },
+            h('div', { style: { fontSize: '0.72rem', opacity: 0.55, marginTop: i ? '0.3rem' : 0 } }, sec.title),
+            ...sec.items.map((it, j) => h('div', { key: j, style: { ...S.listRow, alignItems: 'flex-start', background: LEVEL[it.level]?.bg || 'transparent' } },
+              h(Dot, { level: it.level }),
+              h('span', { style: { whiteSpace: 'pre-wrap' } }, it.text)))))) : null,
+      ]
 
-      const envTab = h('div', { style: S.secFirst },
-        h('h3', { style: S.secTitle }, t('sec.env')),
-        row(btn('act.doctor', 'doctor', 'env'), btn('act.doctorFix', 'doctorFix', 'env'), btn('act.net', 'net', 'env')),
-        busyLine('doctor'), busyLine('doctorFix'), busyLine('net'),
-        outBox('env'))
+      const backupTab = [
+        h(Card, { key: 'b', title: t('sec.backup') },
+          h('div', { style: S.row },
+            h(Btn, { label: t('act.backups'), kind: 'backups', key: 'bkList' }),
+            h(Btn, { label: t('act.restoreLatest'), kind: 'restore', key: 'restoreLatest', primary: true })),
+          h('p', { style: S.hint }, t('hint.backup')),
+          backups === undefined ? null : (backups.length === 0
+            ? h('p', { style: S.hint }, t('empty.output'))
+            : h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.25rem' } },
+                ...backups.map(b => h('div', { key: b.name, style: S.listRow },
+                  h('span', { style: { opacity: 0.5, minWidth: '1.6rem' } }, '#' + b.index),
+                  h('span', { style: { flex: 1, wordBreak: 'break-all' } }, b.name),
+                  h('span', { style: { opacity: 0.6, whiteSpace: 'nowrap' } }, b.size + '  ' + b.date),
+                  h('button', {
+                    type: 'button', style: { ...S.btn, fontSize: '0.68rem', padding: '0.15rem 0.5rem' },
+                    disabled: !!busy,
+                    onClick: () => { window.__shRestore = b.name; run('restore', 'restoreLatest') },
+                  }, t('act.restore')))))),
+          h(Result, { k: 'bkList' }), h(Result, { k: 'restoreLatest' })),
+        h(Card, { key: 's', title: t('sec.sessions') },
+          h('div', { style: S.row },
+            h(Btn, { label: t('act.sessionsBackup'), kind: 'sessionsBackup', key: 'sessB' }),
+            h(Btn, { label: t('act.sessionsList'), kind: 'sessionsList', key: 'sessL' })),
+          h('p', { style: S.hint }, t('hint.sessions')),
+          h(Result, { k: 'sessB' }), h(Result, { k: 'sessL' })),
+      ]
 
-      const pluginTab = h('div', { style: S.secFirst },
-        h('h3', { style: S.secTitle }, t('sec.plugin')),
-        row(btn('act.skillsToHub', 'skillsToHub', 'plugin'), btn('act.skillsFromHub', 'skillsFromHub', 'plugin')),
-        row(btn('act.pluginsList', 'pluginsList', 'plugin'), btn('act.pluginsInstall', 'pluginsInstall', 'plugin')),
-        busyLine('skillsToHub'), busyLine('skillsFromHub'), busyLine('pluginsList'), busyLine('pluginsInstall'),
-        h('p', S.hint, t('hint.restart')),
-        outBox('plugin'))
+      const envTab = [
+        h(Card, { key: 'e', title: t('sec.health') },
+          h('div', { style: S.row },
+            h(Btn, { label: t('act.doctor'), kind: 'doctor', key: 'doc' }),
+            h(Btn, { label: t('act.doctorFix'), kind: 'doctorFix', key: 'docFix', primary: true }),
+            h(Btn, { label: t('act.net'), kind: 'net', key: 'net' })),
+          h(Result, { k: 'doc' }), h(Result, { k: 'docFix' }), h(Result, { k: 'net' })),
+        h(Card, { key: 'l', title: t('sec.logs') },
+          h('div', { style: S.row }, h(Btn, { label: t('act.logs'), kind: 'logs', key: 'logs' })),
+          logs ? h(Fragment, {},
+            h('p', { style: S.hint }, t('logs.newest', { name: logs.newest || '-' })),
+            h('pre', { style: S.pre }, logs.tail || '')) : null,
+          h(Result, { k: 'logs' })),
+      ]
 
-      const toolCountText = tools === undefined ? t('loading')
-        : t('tools.count').replace('{p}', String(tools.present)).replace('{n}', String(tools.total))
-      const toolCountColor = !tools ? {} : (tools.missingCore > 0 ? S.bad : S.ok)
-      const toolsTab = h('div', { style: S.secFirst },
-        h('h3', { style: S.secTitle }, t('sec.tools')),
-        h('p', { style: { fontSize: '0.8rem', margin: 0, ...toolCountColor } },
-          toolCountText + (tools && tools.missingCore > 0 ? '  ·  ' + t('tools.coreMissing') : '')),
-        h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '0.35rem' } },
-          ...((tools && tools.tools) ? tools.tools.map(x => h('span', {
-            key: x.Key,
-            style: { ...S.chip, opacity: x.Present ? 1 : 0.45, ...(x.Present ? S.ok : {}) },
-          }, (x.Present ? '✓ ' : '✗ ') + x.Key)) : [])),
-        row(btn('act.toolsRefresh', 'toolsRefresh', 'tools'), btn('act.toolsInstall', 'toolsInstall', 'tools'), btn('act.toolsInstallNice', 'toolsInstallNice', 'tools')),
-        busyLine('toolsInstall'), busyLine('toolsInstallNice'),
-        h('p', S.hint, t('hint.tools')),
-        outBox('tools'))
+      const pluginTab = [
+        h(Card, { key: 'k', title: t('sec.skills') },
+          h('div', { style: S.row },
+            h(Btn, { label: t('act.skillsToHub'), kind: 'skillsToHub', key: 'skTo', primary: true }),
+            h(Btn, { label: t('act.skillsFromHub'), kind: 'skillsFromHub', key: 'skFrom' }),
+            h(Btn, { label: t('refresh'), kind: 'skillsInfo', key: 'skInfo' })),
+          h('p', { style: S.hint }, t('hint.skills')),
+          skills ? h(Fragment, {},
+            h('p', { style: { ...S.hint, opacity: 0.75 } }, t('skills.summary', { hub: skills.hub, local: skills.local })),
+            (skills.onlyLocalReal || []).length ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.2rem' } },
+              h('div', { style: { fontSize: '0.72rem', opacity: 0.6 } }, t('skills.onlyLocal')),
+              h('div', { style: { ...S.row, gap: '0.3rem' } }, ...skills.onlyLocalReal.map(n => h('span', { key: n, style: S.chip }, n)))) : null,
+            (skills.onlyLocalJunk || []).length ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.2rem' } },
+              h('div', { style: { fontSize: '0.72rem', opacity: 0.45 } }, t('skills.junk')),
+              h('div', { style: { ...S.row, gap: '0.3rem' } }, ...skills.onlyLocalJunk.map(n => h('span', { key: n, style: { ...S.chip, opacity: 0.5 } }, n)))) : null,
+            (skills.onlyHub || []).length ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.2rem' } },
+              h('div', { style: { fontSize: '0.72rem', opacity: 0.6 } }, t('skills.onlyHub')),
+              h('div', { style: { ...S.row, gap: '0.3rem' } }, ...skills.onlyHub.map(n => h('span', { key: n, style: S.chip }, n)))) : null,
+            (skills.diff || []).length ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.2rem' } },
+              h('div', { style: { fontSize: '0.72rem', color: '#d29922' } }, t('skills.diff')),
+              h('div', { style: { ...S.row, gap: '0.3rem' } }, ...skills.diff.map(n => h('span', { key: n, style: S.chip }, n)))) : null,
+            (!(skills.onlyLocalReal || []).length && !(skills.onlyHub || []).length && !(skills.diff || []).length)
+              ? h('p', { style: S.hint }, t('skills.none')) : null) : null,
+          h(Result, { k: 'skTo' }), h(Result, { k: 'skFrom' })),
+        h(Card, { key: 'p', title: t('sec.plugins') },
+          h('div', { style: S.row },
+            h(Btn, { label: t('act.pluginsList'), kind: 'pluginsList', key: 'plList' }),
+            h(Btn, { label: t('act.pluginsInstall'), kind: 'pluginsInstall', key: 'plInst' })),
+          h('p', { style: S.hint }, t('hint.restart')),
+          h(Result, { k: 'plList' }), h(Result, { k: 'plInst' })),
+      ]
 
-      const settingsTab = h('div', { style: S.secFirst },
-        h('h3', { style: S.secTitle }, t('sec.cred')),
-        h('p', { style: { fontSize: '0.78rem', margin: 0 } },
-          cred === undefined ? t('loading')
-            : cred.hasCredential
-              ? h(Fragment, {}, h('span', { style: S.ok }, t('cred.have')), '  ' + (cred.username || '') + (cred.repoHost ? '  ·  ' + cred.repoHost : ''))
-              : h('span', { style: S.bad }, t('cred.none'))),
-        row(
-          h('input', { type: 'text', placeholder: t('cred.user'), value: cUser, disabled: !!busyKind, style: S.input, onChange: e => setCUser(e.target.value) }),
-          h('input', { type: 'password', placeholder: t('cred.token'), value: cToken, disabled: !!busyKind, style: S.input, onChange: e => setCToken(e.target.value) }),
-          btn('cred.save', 'saveCred', 'settings')),
-        busyLine('saveCred'),
-        h('p', S.hint, t('cred.where')),
-        h('p', S.hint, t('hint.token')),
-        h('h3', { style: { ...S.secTitle, marginTop: '0.6rem' } }, t('sec.bootstrap')),
-        h('p', { style: { fontSize: '0.75rem', margin: 0, opacity: 0.75 } }, t('boot.desc')),
-        row(
-          h('input', { type: 'text', placeholder: t('boot.machine'), value: bMachine, disabled: !!busyKind, style: S.input, onChange: e => setBMachine(e.target.value) }),
-          h('input', { type: 'text', placeholder: t('boot.dest'), value: bDest, disabled: !!busyKind, style: { ...S.input, width: '16rem' }, onChange: e => setBDest(e.target.value) })),
-        row(
-          h('input', { type: 'text', placeholder: t('boot.repo'), value: bRepo, disabled: !!busyKind, style: { ...S.input, width: '22rem' }, onChange: e => setBRepo(e.target.value) }),
-          btn('act.bootstrap', 'bootstrap', 'settings', S.btnPrimary)),
-        busyLine('bootstrap'),
-        outBox('settings'))
+      const toolsTab = [
+        h(Card, { key: 't', title: t('sec.tools'), level: tools.missingCore ? 'fail' : (tools.present < tools.total ? 'warn' : 'pass') },
+          h('p', { style: { fontSize: '0.78rem', margin: 0 } },
+            t('tools.summary', { p: tools.present, n: tools.total }) + '   ·   ' + (tools.missingCore ? t('tools.missingCore') : t('tools.allGood'))),
+          h('div', { style: { ...S.row, gap: '0.3rem' } },
+            ...(tools.tools || []).map(x => h('span', {
+              key: x.Key,
+              style: { ...S.chip, opacity: x.Present ? 1 : 0.45, borderColor: x.Present ? 'rgba(46,160,67,0.5)' : 'rgba(209,36,47,0.4)' },
+              title: x.Note || '',
+            }, (x.Present ? '✓ ' : '✗ ') + x.Key + (x.Need !== 'nice' ? ' · ' + t('tools.need.' + x.Need) : '')))),
+          h('div', { style: S.row },
+            h(Btn, { label: t('act.toolsRefresh'), kind: 'toolsRefresh', key: 'tlRefresh' }),
+            h(Btn, { label: t('act.toolsInstall'), kind: 'toolsInstall', key: 'tlInst', primary: true }),
+            h(Btn, { label: t('act.toolsInstallNice'), kind: 'toolsInstallNice', key: 'tlInstNice' })),
+          h('p', { style: S.hint }, t('hint.tools')),
+          h(Result, { k: 'tlInst' }), h(Result, { k: 'tlInstNice' })),
+      ]
 
-      const body = tab === 'overview' ? overview
+      const settingsTab = [
+        h(Card, { key: 'c', title: t('sec.cred'), level: cred.hasCredential ? 'pass' : 'warn' },
+          h('p', { style: { fontSize: '0.78rem', margin: 0 } },
+            cred.hasCredential ? (t('cred.ok') + '  ·  ' + (cred.username || '') + '  ·  ' + (cred.repoHost || '')) : (t('cred.none') + '  ·  ' + t('cred.noneHint'))),
+          h('div', { style: S.row },
+            h('input', { type: 'text', placeholder: 'Gitee 用户名', value: cUser, style: S.input, onChange: e => setCUser(e.target.value) }),
+            h('input', { type: 'password', placeholder: t('cred.token'), value: cToken, style: S.input, onChange: e => setCToken(e.target.value) }),
+            h(Btn, { label: t('act.saveCred'), kind: 'saveCred', key: 'credSave' })),
+          h('p', { style: S.hint }, t('hint.cred')),
+          h('p', { style: S.hint }, t('hint.token')),
+          h(Result, { k: 'credSave' })),
+        h(Card, { key: 'b', title: t('sec.bootstrap') },
+          h('div', { style: S.row },
+            h('input', { type: 'text', placeholder: t('boot.machine'), value: bMachine, style: S.input, onChange: e => setBMachine(e.target.value) }),
+            h('input', { type: 'text', placeholder: t('boot.dest'), value: bDest, style: { ...S.input, width: '15rem' }, onChange: e => setBDest(e.target.value) })),
+          h('div', { style: S.row },
+            h('input', { type: 'text', placeholder: t('boot.repo'), value: bRepo, style: { ...S.input, width: '20rem' }, onChange: e => setBRepo(e.target.value) }),
+            h(Btn, { label: t('act.bootstrap'), kind: 'bootstrap', key: 'bootGo', primary: true })),
+          !cred.hasCredential ? h('p', { style: { ...S.hint, color: '#d29922' } }, t('boot.needCred')) : null,
+          h('p', { style: S.hint }, t('hint.bootstrap')),
+          h(Result, { k: 'bootGo' })),
+      ]
+
+      const body = tab === 'overview' ? overviewTab
         : tab === 'sync' ? syncTab
         : tab === 'backup' ? backupTab
         : tab === 'env' ? envTab
@@ -520,48 +593,59 @@ window.__ModuleLoader__.load({
         : tab === 'tools' ? toolsTab
         : settingsTab
 
-      return h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.9rem', maxWidth: '48rem' } },
-        header,
-        h('div', { style: { paddingTop: '0.6rem' } }, body))
+      if (err) {
+        return shell(h(Card, { title: t('error', { e: err }), level: 'fail' },
+          h('div', { style: S.row }, h(Btn, { label: t('retry'), kind: 'refresh', key: 'retry' }))))
+      }
+
+      return shell(...body)
     }
 
     function localeTag(ctx) {
       try {
-        const snapshot = typeof ctx.locale?.getLocale === 'function' ? ctx.locale.getLocale() : ctx.locale?.getSnapshot?.()
-        const value = snapshot?.active ?? ctx.locale?.locale
-        return typeof value === 'string' && value.startsWith('en') ? 'en' : 'zh'
-      } catch {
-        return 'zh'
-      }
+        const snap = typeof ctx.locale?.getLocale === 'function' ? ctx.locale.getLocale() : ctx.locale?.getSnapshot?.()
+        const v = snap?.active ?? ctx.locale?.locale
+        return typeof v === 'string' && v.startsWith('en') ? 'en' : 'zh'
+      } catch { return 'zh' }
     }
 
     function apply(ctx) {
       const t0 = ctx.locale.bind(NS)
       ctx.effect(() => ctx.locale.register(NS, { zh: DICT.zh, en: DICT.en }), 'dsh-sync-hub: dictionaries')
+      // Resolve dotted keys ('tab.sync', 'tools.need.core') against OUR dict
+      // directly: ctx.locale.bind only resolves flat keys, so a nested lookup
+      // would render the raw key ("tab.sync") into the UI.
+      const tr = (key, args) => {
+        const tag = localeTag(ctx)
+        const table = DICT[tag] || DICT.zh
+        let value
+        if (typeof key === 'string' && key.includes('.')) {
+          value = key.split('.').reduce((acc, part) => (acc && typeof acc === 'object' ? acc[part] : undefined), table)
+        }
+        if (value === undefined) value = table[key]
+        if (value === undefined) {
+          // fall back to the host binding (covers anything we did not inline)
+          try { value = t0(key) } catch { value = key }
+        }
+        return fill(typeof value === 'string' ? value : key, args)
+      }
       ctx.slots.inject('settings.section', () => ctx.slots.register({
-        name: 'settings.section',
-        id: 'sync-hub',
-        order: 36,
-        label: () => t0('nav'),
-        locale: NS,
-      }, props => h(SyncHubPage, { ...props, t: (key, args) => fill(t0(key), args) })))
+        name: 'settings.section', id: 'sync-hub', order: 36,
+        label: () => tr('nav'), locale: NS,
+      }, props => h(SyncHubPage, { ...props, t: tr })))
     }
 
     function fill(text, args) {
       if (typeof text !== 'string' || !args) return text
-      let out = text
-      for (const [k, v] of Object.entries(args)) out = out.replace('{' + k + '}', String(v))
-      return out
+      let s = text
+      for (const [k, v] of Object.entries(args)) s = s.split('{' + k + '}').join(String(v))
+      return s
     }
 
     exports.apply = apply
     exports.inject = inject
     exports.name = 'sync-hub'
-    // MUST return module.exports (an object with apply), NOT module itself.
-    // Returning module => host sees {exports:{...}} with no apply =>
-    // "invalid plugin, expect function or object with an 'apply' method" and
-    // the whole concatenated client bundle is skipped (collateral damage to
-    // every other plugin in the same bundle). Verified 2026-10-13 crash log.
+    // MUST be module.exports (object with apply), never `module` itself.
     return module.exports
   },
 })

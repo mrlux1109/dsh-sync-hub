@@ -243,6 +243,61 @@ function readJsonBody(req) {
   })
 }
 
+/**
+ * Parse a PowerShell console report into structured rows so the card can draw
+ * real UI instead of dumping terminal text. Understands the [PASS]/[FAIL]/
+ * [WARN]/[INFO] convention from _lib.ps1 plus "── section ──" headers.
+ */
+function parseReport(text) {
+  const sections = []
+  let current = { title: '', items: [] }
+  const push = () => { if (current.title || current.items.length) sections.push(current) }
+  for (const rawLine of String(text ?? '').split(/\r?\n/)) {
+    const line = rawLine.replace(/\s+$/, '')
+    if (!line.trim()) continue
+    const head = /^\s*[─-]{2,}\s*(.+?)\s*[─-]{2,}\s*$/.exec(line)
+    if (head) { push(); current = { title: head[1].trim(), items: [] }; continue }
+    const tag = /^\s*\[(PASS|FAIL|WARN|INFO|OK)\]\s*(.*)$/.exec(line)
+    if (tag) {
+      current.items.push({ level: tag[1].toLowerCase(), text: tag[2].trim() })
+      continue
+    }
+    // A plain indented line is its OWN item: the console prints one fact per
+    // line ("机器标识 home" / "中枢路径 D:\..."), so merging them into the
+    // previous item produced a single unreadable blob in the card.
+    current.items.push({ level: 'note', text: line.trim() })
+  }
+  push()
+  return sections
+}
+
+/** Worst level in a section, for a traffic-light dot. */
+function worstLevel(items) {
+  const rank = { fail: 3, warn: 2, info: 1, pass: 0, ok: 0, note: 0 }
+  let worst = 'pass'
+  for (const it of items) if ((rank[it.level] ?? 0) > (rank[worst] ?? 0)) worst = it.level
+  return worst
+}
+
+/** Parse backup.ps1 -List output into clickable rows. */
+function parseBackups(text) {
+  const items = []
+  for (const line of String(text ?? '').split(/\r?\n/)) {
+    const m = /^\s*\[(\d+)\]\s+(\S+)\s+([\d.]+\s*\w+)\s+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})/.exec(line)
+    if (m) items.push({ index: Number(m[1]), name: m[2], size: m[3].replace(/\s+/g, ''), date: m[4] })
+  }
+  return items
+}
+
+/** Parse the toolchain JSON emitted by tools.ps1 -Json. */
+function parseTools(out) {
+  const raw = String(out ?? '')
+  const start = raw.indexOf('[')
+  const end = raw.lastIndexOf(']')
+  if (start < 0 || end <= start) return []
+  try { return JSON.parse(raw.slice(start, end + 1)) } catch { return [] }
+}
+
 /** Ask git for the stored credential for a host. Returns username ONLY; the
  *  password stays inside the child process and is never returned upward. */
 function probeGiteeCredential(repoHost) {
@@ -321,8 +376,72 @@ async function apiHandler(req, res, config) {
       })
     }
     if (method === 'GET' && routePath === '/status') {
-      const r = await runPs(hub, 'status.ps1', [], null)
-      return send(200, result(r.code === 0, r.code, tail(r.out, 20000)))
+      const r = await runPs(hub, 'status.ps1', [], null, { timeoutMs: 90000 })
+      const sections = parseReport(r.out)
+      return send(200, {
+        ok: r.code === 0, code: r.code, text: tail(r.out, 20000),
+        sections, worst: sections.length ? worstLevel(sections.flatMap((s) => s.items)) : 'pass',
+      })
+    }
+    // One round trip for the whole overview: the card used to fire three
+    // requests on mount (info + cred + tools), and /tools alone takes ~2s.
+    if (method === 'GET' && routePath === '/overview') {
+      const [infoR, credR, toolsR, statusR] = await Promise.all([
+        (async () => {
+          const ver = fs.readFileSync(path.join(hub, 'VERSION'), 'utf8').trim()
+          const log = await runGit(hub, ['log', '-1', '--format=%h|%ci|%s'], 20000)
+          const st = await runGit(hub, ['status', '--porcelain'], 20000)
+          let skills = 0
+          try { skills = fs.readdirSync(path.join(hub, 'skills'), { withFileTypes: true }).filter((d) => d.isDirectory()).length } catch { /* noop */ }
+          const [commit, date, subject] = log.code === 0 ? String(log.out).trim().split('|') : ['', '', '']
+          const dirtyLines = st.code === 0 ? st.out.trim().split('\n').filter(Boolean) : []
+          return {
+            ok: true, version: ver, commit, commitDate: date, commitSubject: subject,
+            dirty: st.code === 0 ? dirtyLines.length : -1,
+            dirtyFiles: dirtyLines.slice(0, 12).map((l) => l.trim()),
+            skills, hubPath: hub, machine: os.hostname(),
+          }
+        })(),
+        (async () => {
+          const remoteRes = await runGit(hub, ['remote', 'get-url', 'origin'], 20000)
+          let host = 'gitee.com'
+          try { if (remoteRes.code === 0 && remoteRes.out.trim()) host = new URL(remoteRes.out.trim()).host } catch { /* default */ }
+          const probe = await probeGiteeCredential(host)
+          return { ok: true, repoHost: host, repoUrl: remoteRes.code === 0 ? remoteRes.out.trim() : '', hasCredential: probe.ok, username: probe.ok ? probe.user : '' }
+        })(),
+        (async () => {
+          const r = await runPs(hub, 'tools.ps1', ['-Json'], null, { timeoutMs: 90000 })
+          const list = parseTools(r.out)
+          return { tools: list, present: list.filter((x) => x.Present).length, total: list.length, missingCore: list.filter((x) => !x.Present && x.Need === 'core').length }
+        })(),
+        (async () => {
+          const r = await runPs(hub, 'status.ps1', [], null, { timeoutMs: 90000 })
+          const sections = parseReport(r.out)
+          return { sections, worst: sections.length ? worstLevel(sections.flatMap((s) => s.items)) : 'pass' }
+        })(),
+      ])
+      return send(200, { ok: true, info: infoR, cred: credR, tools: toolsR, status: statusR })
+    }
+    // Recent DSH log lines (read-only): the "what just happened" view.
+    if (method === 'GET' && routePath === '/logs') {
+      const dir = path.join(os.homedir(), 'AppData', 'Roaming', '@deepseek-ai', 'dsh-desktop', 'logs')
+      let files = []
+      try {
+        files = fs.readdirSync(dir).map((n) => {
+          const p = path.join(dir, n)
+          const st = fs.statSync(p)
+          return { name: n, mtime: st.mtimeMs, size: st.size }
+        }).sort((a, b) => b.mtime - a.mtime).slice(0, 10)
+      } catch { /* no logs */ }
+      let tailText = ''
+      if (files.length) {
+        try {
+          const p = path.join(dir, files[0].name)
+          const raw = fs.readFileSync(p, 'utf8')
+          tailText = raw.split(/\r?\n/).slice(-120).join('\n')
+        } catch { /* unreadable */ }
+      }
+      return send(200, { ok: true, dir, files, newest: files.length ? files[0].name : '', tail: tailText })
     }
     if (method === 'POST' && routePath === '/push') {
       const body = await readJsonBody(req)
@@ -389,14 +508,91 @@ async function apiHandler(req, res, config) {
       return run('troubleshoot.ps1', ['-Net'], 120000)
     }
     if (method === 'GET' && routePath === '/backups') {
-      return run('backup.ps1', ['-List'], 60000)
+      const r = await runPs(hub, 'backup.ps1', ['-List'], null, { timeoutMs: 60000 })
+      return send(200, {
+        ok: r.code === 0, code: r.code, text: tail(r.out, 20000),
+        items: parseBackups(r.out),
+      })
+    }
+    // Skill diff detail: which skills are hub-only / local-only / different.
+    if (method === 'GET' && routePath === '/skills') {
+      const hubSkills = path.join(hub, 'skills')
+      const localSkills = path.join(os.homedir(), '.dsh', 'skills')
+      const list = (dir) => {
+        try { return fs.readdirSync(dir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name) } catch { return [] }
+      }
+      const h1 = list(hubSkills)
+      const l1 = list(localSkills)
+      const onlyHub = h1.filter((n) => !l1.includes(n))
+      const onlyLocal = l1.filter((n) => !h1.includes(n))
+      const diff = []
+      for (const n of h1) {
+        if (!l1.includes(n)) continue
+        try {
+          const a = fs.readFileSync(path.join(hubSkills, n, 'SKILL.md'), 'utf8')
+          const b = fs.readFileSync(path.join(localSkills, n, 'SKILL.md'), 'utf8')
+          if (a !== b) diff.push(n)
+        } catch { /* treat unreadable as same */ }
+      }
+      // Names like "@org-xxxx" / "@user_xxxx" are auto-generated placeholders,
+      // not real skills: flag them so the user can tell noise from real work.
+      const junk = (n) => /^@(org|user)[-_]/i.test(n)
+      return send(200, {
+        ok: true, hub: h1.length, local: l1.length, onlyHub, onlyLocal, diff,
+        onlyLocalReal: onlyLocal.filter((n) => !junk(n)),
+        onlyLocalJunk: onlyLocal.filter(junk),
+      })
     }
     if (method === 'POST' && routePath === '/restore') {
       const body = await readJsonBody(req)
-      const name = String(body.name ?? '').trim()
-      if (!name) return send(200, result(false, -1, 'name is required (from /backups list)'))
+      let name = String(body.name ?? '').trim()
+      // "latest-agents" / "latest-profile:desktop" shortcuts so the user never
+      // has to copy a 40-char file name out of the list.
+      if (name === 'latest-agents') return run('backup.ps1', ['-Restore', 'AGENTS'], 60000)
+      if (name.startsWith('latest-profile:')) {
+        const prof = name.slice('latest-profile:'.length).trim()
+        if (!/^[a-z0-9-]+$/i.test(prof)) return send(200, result(false, -1, 'invalid profile name'))
+        return run('backup.ps1', ['-Restore', 'profile', '-Name', prof], 60000)
+      }
+      if (!name) return send(200, result(false, -1, 'name is required (pick a row or use latest-agents)'))
       if (/[\\/]|\.\./.test(name)) return send(200, result(false, -1, 'invalid backup name'))
       return run('backup.ps1', ['-Restore', name], 60000)
+    }
+    // One-key self check: the few things that actually break a machine,
+    // answered as a checklist the card can render directly.
+    if (method === 'GET' && routePath === '/selfcheck') {
+      const checks = []
+      const add = (key, level, detail) => checks.push({ key, level, detail })
+      // git + remote
+      const remote = await runGit(hub, ['remote', 'get-url', 'origin'], 15000)
+      add('remote', remote.code === 0 && remote.out.trim() ? 'pass' : 'fail', remote.code === 0 ? remote.out.trim() : 'no origin remote')
+      // credential
+      let host = 'gitee.com'
+      try { if (remote.out.trim()) host = new URL(remote.out.trim()).host } catch { /* default */ }
+      const cred = await probeGiteeCredential(host)
+      add('credential', cred.ok ? 'pass' : 'warn', cred.ok ? ('stored (user=' + cred.user + ')') : 'not stored — push/clone will fail')
+      // reachability
+      const reach = await runGit(hub, ['ls-remote', '--heads', remote.out.trim() || 'origin'], 30000)
+      add('reachable', reach.code === 0 ? 'pass' : 'fail', reach.code === 0 ? (host + ' reachable') : 'cannot reach remote (see shared 4.12)')
+      // working tree
+      const st = await runGit(hub, ['status', '--porcelain'], 20000)
+      const dirty = st.out.trim() ? st.out.trim().split('\n').length : 0
+      add('tree', dirty === 0 ? 'pass' : 'warn', dirty === 0 ? 'clean' : (dirty + ' uncommitted change(s)'))
+      // identity marker
+      const marker = path.join(os.homedir(), '.dsh', '.sync-hub-machine')
+      let machine = ''
+      try { machine = fs.readFileSync(marker, 'utf8').trim() } catch { /* unset */ }
+      add('identity', machine ? 'pass' : 'warn', machine ? ('machine = ' + machine) : 'machine id not set (run apply)')
+      // plugin half
+      add('plugin', 'pass', 'tools + settings card loaded')
+      // toolchain core
+      const tr = await runPs(hub, 'tools.ps1', ['-Json'], null, { timeoutMs: 90000 })
+      const list = parseTools(tr.out)
+      const missingCore = list.filter((x) => !x.Present && x.Need === 'core')
+      add('toolchain', missingCore.length ? 'fail' : (list.filter((x) => !x.Present).length ? 'warn' : 'pass'),
+        missingCore.length ? ('missing core: ' + missingCore.map((x) => x.Key).join(', '))
+          : (list.filter((x) => !x.Present).length + ' optional missing'))
+      return send(200, { ok: !checks.some((c) => c.level === 'fail'), checks })
     }
     if (method === 'POST' && routePath === '/skills') {
       const body = await readJsonBody(req)
