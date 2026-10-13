@@ -1,7 +1,7 @@
 {
   "name": "dsh-sync-hub",
-  "version": "0.2.2",
-  "description": "sync-hub console tools + settings card for DSH: status/push/pull/version/open-console. 跨机记忆同步中枢插件：非交互安全子集工具 + 设置页卡片。",
+  "version": "0.3.0",
+  "description": "sync-hub console tools + settings card for DSH: sync, backups, sessions, env, plugins, AI toolchain, credentials, new-machine bootstrap. 跨机记忆同步中枢插件：全套控制台功能 + 设置页卡片 + 新机自助接入。",
   "type": "module",
   "main": "index.js",
   "exports": {

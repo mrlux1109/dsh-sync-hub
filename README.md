@@ -1,7 +1,12 @@
 # dsh-sync-hub
 
-跨机记忆同步中枢（sync-hub）的 DSH 插件——把控制台里**非交互、安全**的那部分
-暴露成 5 个模型工具；交互类操作仍走 `同步中枢.bat` 菜单。
+跨机记忆同步中枢（sync-hub）的 DSH 插件——**装一个插件，两台电脑的全部同步工作都在 DSH 里完成，不必再用 bat**。
+
+两条腿：
+1. **模型工具**（对话里用）：`sync_hub_*` 5 个，见下表。
+2. **设置页卡片**（点鼠标）：设置 → 「同步中枢」，覆盖菜单的绝大部分功能
+   （日常同步 / 备份与会话 / 环境维护 / 插件与技能 / **AI 工具链体检+一键装** /
+   Gitee 凭据 / **新机自助接入**）。
 
 ## 工具清单
 
@@ -11,10 +16,25 @@
 | `sync_hub_push` | [1]/[2] | 推送到 Gitee | 参数 `scope`（all/memory/skills/config/sessions）、`message` |
 | `sync_hub_pull` | [3] | 拉取+应用到本机 | 退出码 2=冲突→停下报告，禁止自动解决 |
 | `sync_hub_version` | [V] | 无（只读） | VERSION / 最新提交 / 工作区状态 / 技能数 |
-| `sync_hub_open_console` | 双击 bat | 开窗口 | apply 换身份、一条龙、会话恢复等人操作入口 |
+| `sync_hub_open_console` | 双击 bat | 开窗口 | 换身份/一条龙/冲突处理等人工入口 |
 
-**安全边界**：不包 `apply.ps1`（身份守卫要手输 YES）、不包 [13] 一条龙、不做冲突解决。
-这些必须人来，工具只负责打开控制台窗口。
+**安全边界**：不包 `apply.ps1` 的换身份（要手输 YES）、不包 [13] 一条龙、不做冲突解决；
+这些仍需人工，卡片只提供「打开控制台」按钮。
+
+## 新机器怎么装（三步，之后全在 DSH 里）
+
+```powershell
+# 1) 装 git（没有的话），然后一条命令：
+powershell -ExecutionPolicy Bypass -File install-plugin.ps1 -CloneTo D:\AI\sync-hub -Machine home
+#    没有现成脚本时，先用 -User/-Token 让向导顺手存凭据：
+powershell -ExecutionPolicy Bypass -File install-plugin.ps1 -CloneTo D:\AI\sync-hub -Machine home -User <gitee名> -Token <私人令牌>
+# 2) 重启 DSH
+# 3) 设置 → 同步中枢：以后上传/拉取/装工具/备份都在这里点
+```
+
+`install-plugin.ps1` 做四件事：确保 Gitee 凭据 → clone 中枢 → `apply.ps1`（记忆/技能/配置）
+→ 把本插件装进每个 profile（物理拷贝 + 依赖 + bundles，改前备份 package.json）。
+**已在中枢里的机器**：拉取后 `plugins\dsh-sync-hub\README.md` 同款步骤，或直接跑上面的命令（幂等）。
 
 ## 注册方式（宿主实证 2026-10-13）
 

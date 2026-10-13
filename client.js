@@ -45,6 +45,13 @@ window.__ModuleLoader__.load({
         'sec.backup': '备份与会话',
         'sec.env': '环境维护',
         'sec.plugin': '插件与技能',
+        'sec.tools': 'AI 工具链（git/node/jq… 体检 + 一键装）',
+        'tools.count': '已装 {p}/{n}',
+        'tools.coreMissing': '核心工具缺失，同步会受影响',
+        'act.toolsRefresh': '工具体检',
+        'act.toolsInstall': '补齐缺的',
+        'act.toolsInstallNice': '补齐含可选',
+        'act.restore': '恢复',
         'sec.cred': 'Gitee 凭据（新机一次录入）',
         'sec.bootstrap': '新机器接入（本机还没有中枢仓库时）',
         'act.refresh': '刷新',
@@ -96,6 +103,13 @@ window.__ModuleLoader__.load({
         'sec.backup': 'Backups & sessions',
         'sec.env': 'Environment',
         'sec.plugin': 'Plugins & skills',
+        'sec.tools': 'AI toolchain (git/node/jq… check + install)',
+        'tools.count': '{p}/{n} installed',
+        'tools.coreMissing': 'core tools missing — sync is affected',
+        'act.toolsRefresh': 'Tool check',
+        'act.toolsInstall': 'Install missing',
+        'act.toolsInstallNice': 'Install + optional',
+        'act.restore': 'Restore',
         'sec.cred': 'Gitee credential (enter once)',
         'sec.bootstrap': 'New machine (hub not cloned yet)',
         'act.refresh': 'Refresh',
@@ -191,7 +205,11 @@ window.__ModuleLoader__.load({
         h('span', { style: S.label }, t(label)),
         h('span', { style: S.value }, value))
     }
-    function Section(t, titleKey, kids) {
+    // rest parameter: callers pass the section children as separate arguments
+    // (Section(t,'key', childA, childB)). Taking a single `kids` array here
+    // made every such call spread a React element -> "Spread syntax requires
+    // ...iterable" at render time.
+    function Section(t, titleKey, ...kids) {
       return h('section', { style: S.sec },
         h('h3', { style: S.secTitle }, t(titleKey)), ...kids)
     }
@@ -208,9 +226,13 @@ window.__ModuleLoader__.load({
       const [bDest, setBDest] = useState('')
       const [bRepo, setBRepo] = useState('')
       const [restoreName, setRestoreName] = useState('')
+      const [tools, setTools] = useState(undefined)
 
       const loadCred = useCallback(() => {
         api('/cred').then(setCred).catch(() => setCred({ ok: false }))
+      }, [])
+      const loadTools = useCallback(() => {
+        api('/tools', { timeout: 120_000 }).then(setTools).catch(() => setTools({ ok: false, tools: [] }))
       }, [])
       const load = useCallback(() => {
         setErr('')
@@ -218,7 +240,8 @@ window.__ModuleLoader__.load({
           .then(payload => { setInfo(payload); if (!payload.ok) setErr(payload.notFound ? '' : 'notFound') })
           .catch(e => setErr(String(e?.message ?? e)))
         loadCred()
-      }, [loadCred])
+        loadTools()
+      }, [loadCred, loadTools])
       useEffect(() => { load() }, [load])
 
       const run = useCallback(async (kind, arg) => {
@@ -242,6 +265,9 @@ window.__ModuleLoader__.load({
             case 'skillsFromHub': payload = await post('/skills', { dir: 'fromhub' }, 240_000); break
             case 'pluginsList': payload = await post('/plugins', { action: 'list' }, 120_000); break
             case 'pluginsInstall': payload = await post('/plugins', { action: 'install' }, 600_000); break
+            case 'toolsRefresh': loadTools(); payload = { text: '' }; break
+            case 'toolsInstall': payload = await post('/tools/install', { mode: 'all' }, 900_000); loadTools(); break
+            case 'toolsInstallNice': payload = await post('/tools/install', { mode: 'allnice' }, 1_800_000); loadTools(); break
             case 'saveCred':
               payload = await post('/cred', { username: cUser, token: cToken }, 180_000)
               setCToken(''); loadCred(); break
@@ -260,7 +286,7 @@ window.__ModuleLoader__.load({
         } finally {
           setBusy(false)
         }
-      }, [load, loadCred, cUser, cToken, restoreName, bMachine, bDest, bRepo])
+      }, [load, loadCred, loadTools, cUser, cToken, restoreName, bMachine, bDest, bRepo])
 
       const btn = (labelKey, kind, extraStyle) => h('button', {
         key: labelKey, type: 'button', style: { ...S.btn, ...extraStyle }, disabled: busy,
@@ -325,7 +351,7 @@ window.__ModuleLoader__.load({
         Section(t, 'sec.backup',
           btnRow(btn('act.backups', 'backups'),
             h('input', { type: 'text', placeholder: t('restore.title'), value: restoreName, disabled: busy, style: { ...S.input, width: '16rem' }, onChange: e => setRestoreName(e.target.value) }),
-            btn('act.restore' in {} ? 'act.restore' : 'act.backups', 'restore')),
+            btn('act.restore', 'restore')),
           btnRow(btn('act.sessionsBackup', 'sessionsBackup'), btn('act.sessionsList', 'sessionsList'))),
 
         Section(t, 'sec.env',
@@ -335,6 +361,26 @@ window.__ModuleLoader__.load({
           btnRow(btn('act.skillsToHub', 'skillsToHub'), btn('act.skillsFromHub', 'skillsFromHub')),
           btnRow(btn('act.pluginsList', 'pluginsList'), btn('act.pluginsInstall', 'pluginsInstall')),
           h('p', S.hint, t('hint.restart'))),
+
+        Section(t, 'sec.tools',
+          h('p', { style: { fontSize: '0.78rem', margin: 0 } },
+            tools === undefined ? t('loading')
+              : h(Fragment, {},
+                  h('span', { style: { color: tools.missingCore > 0 ? 'var(--color-danger, #d33)' : 'var(--color-success, #2a9)' } },
+                    t('tools.count').replace('{p}', String(tools.present)).replace('{n}', String(tools.total))),
+                  tools.missingCore > 0 ? '  ·  ' + t('tools.coreMissing') : '')),
+          h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '0.35rem' } },
+            ...(tools && tools.tools ? tools.tools.map(x => h('span', {
+              key: x.Key,
+              style: {
+                fontSize: '0.68rem', padding: '0.1rem 0.45rem', borderRadius: '0.7rem',
+                border: '1px solid var(--color-border, rgba(128,128,128,0.3))',
+                opacity: x.Present ? 1 : 0.45,
+                color: x.Present ? 'var(--color-success, #2a9)' : 'inherit',
+              },
+            }, (x.Present ? '✓ ' : '✗ ') + x.Key)) : [])),
+          btnRow(btn('act.toolsRefresh', 'toolsRefresh'),
+            btn('act.toolsInstall', 'toolsInstall'), btn('act.toolsInstallNice', 'toolsInstallNice'))),
 
         Section(t, 'sec.cred',
           h('p', { style: { fontSize: '0.78rem', margin: 0 } },

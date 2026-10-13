@@ -105,7 +105,12 @@ function tail(s, max = 6000) {
 }
 
 function quote(s) {
-  return "'" + String(s).replace(/'/g, "''") + "'"
+  const str = String(s)
+  // PowerShell parameter names must NOT be quoted: '-Install' quoted becomes a
+  // positional string argument, so the named parameter silently stops binding
+  // (symptom: "[WARN] unknown tool key: -Install"). Bare -Word stays verbatim.
+  if (/^-[A-Za-z][A-Za-z0-9]*$/.test(str)) return str
+  return "'" + str.replace(/'/g, "''") + "'"
 }
 
 /** Run a tools/*.ps1 script; resolves { code, out } with UTF-8 console output.
@@ -455,6 +460,32 @@ async function apiHandler(req, res, config) {
       const ok = r2.code === 0 && r3.code === 0
       return send(200, result(ok, ok ? 0 : -1, steps.join('\n') +
         '\n\n' + (ok ? '中枢已就位: ' + dest + '  ·  重启 DSH 后记忆/技能生效（本插件也会随中枢更新）' : '部分步骤失败，详见上方输出；可用「打开控制台」人工处理')))
+    }
+    if (method === 'GET' && routePath === '/tools') {
+      const r = await runPs(hub, 'tools.ps1', ['-Json'], null, { timeoutMs: 90000 })
+      // be tolerant: any stray progress line before the array must not break us
+      let list = []
+      const raw = String(r.out ?? '')
+      const start = raw.indexOf('[')
+      const end = raw.lastIndexOf(']')
+      if (start >= 0 && end > start) {
+        try { list = JSON.parse(raw.slice(start, end + 1)) } catch { list = [] }
+      }
+      const missingCore = list.filter((x) => !x.Present && x.Need === 'core').length
+      return send(200, {
+        ok: r.code === 0, code: r.code, tools: list,
+        present: list.filter((x) => x.Present).length,
+        total: list.length, missingCore,
+      })
+    }
+    if (method === 'POST' && routePath === '/tools/install') {
+      const body = await readJsonBody(req)
+      const keys = Array.isArray(body.keys) ? body.keys.join(',') : String(body.keys ?? '').trim()
+      const mode = String(body.mode ?? '').trim().toLowerCase()
+      const pass = keys ? ['-Install', keys]
+        : mode === 'allnice' ? ['-InstallAllNice']
+        : ['-InstallAll']
+      return run('tools.ps1', pass, 900000)
     }
     return send(404, { error: 'no such route' })
   } catch (e) {
