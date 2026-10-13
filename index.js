@@ -446,12 +446,31 @@ async function apiHandler(req, res, config) {
     if (method === 'POST' && routePath === '/push') {
       const body = await readJsonBody(req)
       const scope = typeof body.scope === 'string' ? body.scope.trim() : ''
-      const pass = scope && scope !== 'all' ? ['-What', scope] : []
-      const r = await runPs(hub, 'push.ps1', pass, null)
+      const message = typeof body.message === 'string' ? body.message.trim() : ''
+      const pass = []
+      // 'all' (or empty) = whole hub; anything else maps to push.ps1 -What
+      if (scope && scope !== 'all') {
+        if (!/^(memory|skills|config|sessions)(,(memory|skills|config|sessions))*$/.test(scope)) {
+          return send(200, result(false, -1, 'scope must be all | memory | skills | config | sessions'))
+        }
+        pass.push('-What', scope)
+      }
+      if (message) pass.push('-Message', message)
+      const r = await runPs(hub, 'push.ps1', pass, null, { timeoutMs: 300000 })
       return send(200, result(r.code === 0, r.code, tail(r.out, 20000)))
     }
     if (method === 'POST' && routePath === '/pull') {
-      const r = await runPs(hub, 'pull.ps1', [], null)
+      const body = await readJsonBody(req)
+      const pass = []
+      if (body.skipSkills) pass.push('-SkipSkills')
+      if (body.skipProfile) pass.push('-SkipProfile')
+      if (body.force) pass.push('-Force')
+      const r = await runPs(hub, 'pull.ps1', pass, null, { timeoutMs: 300000 })
+      return send(200, result(r.code === 0, r.code, tail(r.out, 20000)))
+    }
+    // manual snapshot: the "back up now" the card was missing
+    if (method === 'POST' && routePath === '/backup/create') {
+      const r = await runPs(hub, 'backup.ps1', ['-Create'], null, { timeoutMs: 90000 })
       return send(200, result(r.code === 0, r.code, tail(r.out, 20000)))
     }
     if (method === 'POST' && routePath === '/console') {

@@ -91,6 +91,29 @@ window.__ModuleLoader__.load({
         'sec.bootstrap': '新机器接入',
 
         'hint.daily': '干活前拉取、干完活上传。冲突会停下并报告，不会自动改。',
+        'sync.whatTitle': '这个页面 = 云端（两台电脑交换）',
+        'sync.what': '把本机的记忆/技能/配置通过 Gitee 与另一台电脑交换。上传 = 本机改动送到云端；拉取 = 把云端的改动拿到本机并生效。',
+        'sync.upTitle': '① 上传到云端',
+        'sync.upHint': '选上传范围后点上传。日常用「全部」即可。',
+        'sync.downTitle': '② 从云端拉取',
+        'sync.downHint': '把另一台电脑的改动拿下来，并应用到本机 DSH。',
+        'sync.stateTitle': '当前状态',
+        'sync.scope': '范围：',
+        'scope.all': '全部（记忆+技能+配置）',
+        'scope.memory': '只记忆',
+        'scope.skills': '只技能',
+        'scope.config': '只配置',
+        'scope.nosession': '记忆+技能+配置（不含会话）',
+        'scope.sessions': '只会话备份',
+        'opt.skipSkills': '跳过技能（只更新记忆/配置）',
+        'opt.skipProfile': '跳过 profile（不改插件链接）',
+        'opt.force': '强制（覆盖本地改动，慎用）',
+        'bk.whatTitle': '这个页面 = 本机（历史撤销点）',
+        'bk.what': '每次改动 AGENTS.md / 插件配置前自动存一份快照，出问题可回滚。这些快照只在本机，不上传云端。',
+        'bk.nowTitle': '立即备份一次',
+        'bk.nowHint': '手动创建一份当前状态的快照（记忆 + 插件配置）。',
+        'bk.listTitle': '历史快照与恢复',
+        'act.backupNow': '立即备份',
         'hint.console': '换机器身份、一条龙、冲突处理这类需要人工确认的，在控制台窗口里做。',
         'hint.backup': '备份永不删除。恢复前会自动把当前文件再备份一次。',
         'hint.sessions': '会话备份含对话记录，凭据类文件永不包含。',
@@ -191,6 +214,29 @@ window.__ModuleLoader__.load({
         'sec.bootstrap': 'New machine',
 
         'hint.daily': 'Pull before work, push after. Conflicts stop and report; nothing is auto-resolved.',
+        'sync.whatTitle': 'This tab = CLOUD (swap between two PCs)',
+        'sync.what': 'Exchanges memory/skills/config with the other computer through Gitee. Upload sends this machine\'s changes to the cloud; Pull brings the cloud\'s changes here and applies them.',
+        'sync.upTitle': '1) Upload to cloud',
+        'sync.upHint': 'Pick a scope, then upload. "All" is fine for daily use.',
+        'sync.downTitle': '2) Pull from cloud',
+        'sync.downHint': 'Fetch the other computer\'s changes and apply them to this DSH.',
+        'sync.stateTitle': 'Current state',
+        'sync.scope': 'Scope:',
+        'scope.all': 'All (memory + skills + config)',
+        'scope.memory': 'Memory only',
+        'scope.skills': 'Skills only',
+        'scope.config': 'Config only',
+        'scope.nosession': 'Memory + skills + config (no sessions)',
+        'scope.sessions': 'Session backups only',
+        'opt.skipSkills': 'Skip skills (memory/config only)',
+        'opt.skipProfile': 'Skip profile (keep plugin links)',
+        'opt.force': 'Force (overwrite local changes — careful)',
+        'bk.whatTitle': 'This tab = LOCAL (undo points)',
+        'bk.what': 'A snapshot is taken automatically before AGENTS.md / plugin config changes, so you can roll back. These live on this machine only — they are not uploaded.',
+        'bk.nowTitle': 'Back up now',
+        'bk.nowHint': 'Take a manual snapshot of the current state (memory + plugin config).',
+        'bk.listTitle': 'Snapshots & restore',
+        'act.backupNow': 'Back up now',
         'hint.console': 'Identity switch, one-stop setup and conflict fixes stay in the console window.',
         'hint.backup': 'Backups are never deleted. Restore backs up the current file first.',
         'hint.sessions': 'Session backups contain chat history; credentials are never included.',
@@ -319,6 +365,11 @@ window.__ModuleLoader__.load({
       const [bMachine, setBMachine] = useState('')
       const [bDest, setBDest] = useState('')
       const [bRepo, setBRepo] = useState('')
+      // sync options (方案 A): upload scope + pull switches
+      const [pushScope, setPushScope] = useState('all')
+      const [pullSkipSkills, setPullSkipSkills] = useState(false)
+      const [pullSkipProfile, setPullSkipProfile] = useState(false)
+      const [pullForce, setPullForce] = useState(false)
 
       const put = useCallback((k, v) => setOut(p => ({ ...p, [k]: v })), [])
 
@@ -341,8 +392,9 @@ window.__ModuleLoader__.load({
             case 'refresh': await loadOverview(); r = { text: '' }; break
             case 'selfcheck': r = await api('/selfcheck', { timeout: 180000 }); setChecks(r.checks || []); break
             case 'status': r = await api('/status', { timeout: 120000 }); break
-            case 'push': r = await post('/push', {}, 300000); await loadOverview(); break
-            case 'pull': r = await post('/pull', undefined, 300000); await loadOverview(); break
+            case 'push': r = await post('/push', { scope: pushScope }, 300000); await loadOverview(); break
+            case 'pull': r = await post('/pull', { skipSkills: pullSkipSkills, skipProfile: pullSkipProfile, force: pullForce }, 300000); await loadOverview(); break
+            case 'backupNow': r = await post('/backup/create', {}, 90000); break
             case 'console': r = await post('/console'); break
             case 'doctor': r = await post('/doctor', {}, 240000); break
             case 'doctorFix': r = await post('/doctor', { fix: true }, 240000); break
@@ -368,7 +420,7 @@ window.__ModuleLoader__.load({
         } catch (e) {
           put(key, '✗ ' + String(e?.message ?? e))
         } finally { setBusy('') }
-      }, [loadOverview, put, cUser, cToken, bMachine, bDest, bRepo])
+      }, [loadOverview, put, cUser, cToken, bMachine, bDest, bRepo, pushScope, pullSkipSkills, pullSkipProfile, pullForce])
 
       const Btn = ({ label, kind, key: outKey, primary, small }) => {
         const isBusy = busy === kind
@@ -452,17 +504,48 @@ window.__ModuleLoader__.load({
         h(Result, { key: 'r', k: 'selfcheck' }),
       ]
 
+      // ── 同步 = 云端（两台电脑通过 Gitee 交换改动） ──────────────────────────
       const syncTab = [
-        h(Card, { key: 'c', title: t('sec.daily'), level: st.worst },
+        h(Card, { key: 'what', title: t('sync.whatTitle') },
+          h('p', { style: { ...S.hint, fontSize: '0.74rem' } }, t('sync.what')),
+          h('p', { style: S.hint }, t('hint.console'))),
+        h(Card, { key: 'up', title: t('sync.upTitle'), level: st.worst },
+          h('p', { style: S.hint }, t('sync.upHint')),
+          h('div', { style: S.row },
+            h('span', { style: { fontSize: '0.74rem', opacity: 0.7 } }, t('sync.scope')),
+            h('select', {
+              style: { ...S.input, width: 'auto' },
+              value: pushScope, disabled: !!busy,
+              onChange: e => setPushScope(e.target.value),
+            },
+              h('option', { value: 'all' }, t('scope.all')),
+              h('option', { value: 'memory' }, t('scope.memory')),
+              h('option', { value: 'skills' }, t('scope.skills')),
+              h('option', { value: 'config' }, t('scope.config')),
+              h('option', { value: 'memory,skills,config' }, t('scope.nosession')),
+              h('option', { value: 'sessions' }, t('scope.sessions')))),
+          h('div', { style: S.row },
+            h(Btn, { label: t('act.push'), kind: 'push', key: 'syncPush', primary: true }),
+            h(Btn, { label: t('act.status'), kind: 'status', key: 'syncStatus' })),
+          h(Result, { k: 'syncPush' }), h(Result, { k: 'syncStatus' })),
+        h(Card, { key: 'down', title: t('sync.downTitle') },
+          h('p', { style: S.hint }, t('sync.downHint')),
+          h('div', { style: S.row },
+            h('label', { style: { ...S.hint, display: 'flex', gap: '0.3rem', alignItems: 'center' } },
+              h('input', { type: 'checkbox', checked: pullSkipSkills, disabled: !!busy, onChange: e => setPullSkipSkills(e.target.checked) }),
+              t('opt.skipSkills')),
+            h('label', { style: { ...S.hint, display: 'flex', gap: '0.3rem', alignItems: 'center' } },
+              h('input', { type: 'checkbox', checked: pullSkipProfile, disabled: !!busy, onChange: e => setPullSkipProfile(e.target.checked) }),
+              t('opt.skipProfile')),
+            h('label', { style: { ...S.hint, display: 'flex', gap: '0.3rem', alignItems: 'center' } },
+              h('input', { type: 'checkbox', checked: pullForce, disabled: !!busy, onChange: e => setPullForce(e.target.checked) }),
+              t('opt.force'))),
           h('div', { style: S.row },
             h(Btn, { label: t('act.pull'), kind: 'pull', key: 'syncPull', primary: true }),
-            h(Btn, { label: t('act.push'), kind: 'push', key: 'syncPush', primary: true }),
-            h(Btn, { label: t('act.status'), kind: 'status', key: 'syncStatus' }),
             h(Btn, { label: t('act.console'), kind: 'console', key: 'syncConsole' })),
-          h('p', { style: S.hint }, t('hint.daily')),
-          h('p', { style: S.hint }, t('hint.console')),
-          h(Result, { k: 'syncPull' }), h(Result, { k: 'syncPush' }), h(Result, { k: 'syncStatus' })),
-        st.sections && st.sections.length ? h(Card, { key: 'st', title: t('act.status'), level: st.worst },
+          h('p', { style: S.hint }, t('hint.pull')),
+          h(Result, { k: 'syncPull' })),
+        st.sections && st.sections.length ? h(Card, { key: 'st', title: t('sync.stateTitle'), level: st.worst },
           ...st.sections.map((sec, i) => h('div', { key: i, style: { display: 'flex', flexDirection: 'column', gap: '0.2rem' } },
             h('div', { style: { fontSize: '0.72rem', opacity: 0.55, marginTop: i ? '0.3rem' : 0 } }, sec.title),
             ...sec.items.map((it, j) => h('div', { key: j, style: { ...S.listRow, alignItems: 'flex-start', background: LEVEL[it.level]?.bg || 'transparent' } },
@@ -470,11 +553,19 @@ window.__ModuleLoader__.load({
               h('span', { style: { whiteSpace: 'pre-wrap' } }, it.text)))))) : null,
       ]
 
+      // ── 备份 = 本机（历史快照，防手滑） ────────────────────────────────────
       const backupTab = [
-        h(Card, { key: 'b', title: t('sec.backup') },
+        h(Card, { key: 'what', title: t('bk.whatTitle') },
+          h('p', { style: { ...S.hint, fontSize: '0.74rem' } }, t('bk.what'))),
+        h(Card, { key: 'now', title: t('bk.nowTitle') },
+          h('p', { style: S.hint }, t('bk.nowHint')),
+          h('div', { style: S.row },
+            h(Btn, { label: t('act.backupNow'), kind: 'backupNow', key: 'bkNow', primary: true })),
+          h(Result, { k: 'bkNow' })),
+        h(Card, { key: 'b', title: t('bk.listTitle') },
           h('div', { style: S.row },
             h(Btn, { label: t('act.backups'), kind: 'backups', key: 'bkList' }),
-            h(Btn, { label: t('act.restoreLatest'), kind: 'restore', key: 'restoreLatest', primary: true })),
+            h(Btn, { label: t('act.restoreLatest'), kind: 'restore', key: 'restoreLatest' })),
           h('p', { style: S.hint }, t('hint.backup')),
           backups === undefined ? null : (backups.length === 0
             ? h('p', { style: S.hint }, t('empty.output'))
