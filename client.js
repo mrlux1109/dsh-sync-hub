@@ -24,7 +24,7 @@ window.__ModuleLoader__.load({
     const module = { exports: {} }
     const exports = module.exports
     const React = require('react')
-    const { createElement: h, Fragment, useState, useEffect, useCallback, useMemo } = React
+    const { createElement: h, Fragment, useState, useEffect, useCallback, useMemo, useRef } = React
 
     const NS = 'settings.syncHub'
     const inject = ['slots', 'locale']
@@ -65,13 +65,15 @@ window.__ModuleLoader__.load({
         'act.net': '网络诊断',
         'act.backups': '备份列表',
         'act.restore': '恢复',
+        'act.delete': '删除',
+        'act.deleteConfirm': '确认删除',
+        'act.cancel': '取消',
         'act.restoreLatest': '恢复最新记忆',
+        'ov.guide': '本页是中枢总览：先看「是否干净 / 凭据 / 工具链」，确认无误再去「同步」页上传或拉取。所有改动在重启 DSH 后完整生效。',
         'act.sessionsBackup': '备份会话',
         'act.sessionsList': '会话列表',
         'act.skillsToHub': '收集新技能',
         'act.skillsFromHub': '安装中枢技能',
-        'act.pluginsList': '插件状态',
-        'act.pluginsInstall': '安装/修复插件',
         'act.toolsRefresh': '重新检测',
         'act.toolsInstall': '补齐必需',
         'act.toolsInstallNice': '补齐全部',
@@ -79,9 +81,9 @@ window.__ModuleLoader__.load({
         'act.bootstrap': '一键接入',
         'act.saveCred': '保存并测试',
 
-        'sec.daily': '日常同步',
         'sec.health': '环境维护',
         'sec.backup': '记忆备份',
+        'sec.schedule': '定时同步',
         'sec.sessions': '会话备份',
         'sec.skills': '技能',
         'sec.plugins': '插件',
@@ -89,8 +91,8 @@ window.__ModuleLoader__.load({
         'sec.cred': 'Gitee 凭据',
         'sec.logs': '运行日志',
         'sec.bootstrap': '新机器接入',
-
-        'hint.daily': '干活前拉取、干完活上传。冲突会停下并报告，不会自动改。',
+        'hint.pull': '拉取会应用到 DSH，重启后生效；冲突会停下并报告。',
+        'hint.pullEta': '拉取通常需 1–3 分钟（首次或差异大时更久），按钮转圈即正在工作，请勿关闭页面。',
         'sync.whatTitle': '这个页面 = 云端（两台电脑交换）',
         'sync.what': '把本机的记忆/技能/配置通过 Gitee 与另一台电脑交换。上传 = 本机改动送到云端；拉取 = 把云端的改动拿到本机并生效。',
         'sync.upTitle': '① 上传到云端',
@@ -123,11 +125,21 @@ window.__ModuleLoader__.load({
         'hint.cred': '令牌存进 Windows 凭据管理器，不写任何文件，也不会回显。',
         'hint.token': '令牌获取：gitee.com → 设置 → 私人令牌（勾 projects）。',
         'hint.bootstrap': '本机还没有中枢仓库时用：填机器名和目标目录，一键克隆+应用+装插件。',
+        'hint.bootstrapEta': '接入流程通常约 25 分钟（克隆+应用+安装插件），期间按钮会持续转圈，请勿关闭页面。',
 
         'tools.summary': '{p}/{n} 已安装',
         'tools.missingCore': '缺少必需工具',
         'tools.allGood': '全部就位',
         'tools.need': { core: '必需', dev: '开发', nice: '可选' },
+
+        'schedule.what': '在 Windows 任务计划程序里建一个无人值守任务：每天 03:00 + 开机触发，自动跑「状态→拉取→推送」。日志写入 ~/.dsh/logs/schedule-日期.log。',
+        'schedule.on': '已开启',
+        'schedule.off': '未开启',
+        'schedule.next': '下次运行：{t}',
+        'schedule.done': '已刷新定时任务状态',
+        'act.scheduleInstall': '开启定时同步',
+        'act.scheduleRemove': '关闭定时同步',
+        'act.scheduleStatus': '查看状态',
 
         'cred.ok': '已保存',
         'cred.none': '未保存',
@@ -153,6 +165,8 @@ window.__ModuleLoader__.load({
         'sk.count': '共 {total} 个，启用 {enabled} 个',
         'sk.invalid': '{n} 个不合法（DSH 会静默跳过）',
         'sk.ro': '（只读）',
+        'sk.needBoth': '技能名和 description 都要填',
+        'sk.needUrl': '请先填网址',
         'sk.filter': '按名称/描述筛选',
         'sk.listTitle': '技能列表',
         'sk.enable': '启用',
@@ -178,6 +192,7 @@ window.__ModuleLoader__.load({
         // ── 插件页 ──────────────────────────────────────────────────────────
         'pl.title': '已安装插件',
         'pl.what': '查看各 profile 已装的插件、链接健康状态，可卸载；市场页可从 npm 搜索并安装新插件。',
+        'pl.guide': '安装 / 更新 / 卸载插件后，必须重启 DSH 才能完整加载；本页操作结果里会标黄提示。',
         'pl.profile': 'profile {name}（{n} 个）',
         'pl.bundled': '已挂载',
         'pl.broken': '链接损坏',
@@ -189,13 +204,31 @@ window.__ModuleLoader__.load({
         'pl.found': '找到 {n} 个',
         'pl.noResult': '没有结果',
         'pl.install': '安装',
+        'pl.hasUpdate': '{n} 个插件有新版本',
+        'pl.allLatest': '全部已是最新',
+        'pl.newVer': '→ {v}',
+        'pl.update': '更新',
+        'pl.featTitle': '推荐插件',
+        'pl.featHint': '精选常用插件，点「安装」即可（已装的会标记）。',
+        'pl.installed': '已安装',
+        'act.plCheck': '检查更新',
+        'act.plUpdateAll': '全部更新',
         'act.plList': '刷新已装',
         'act.plSearch': '搜索市场',
+        'pl.profileSel': '目标 profile：',
+
+        'done.refresh': '已刷新',
 
         'check.pass': '通过',
         'check.warn': '注意',
         'check.fail': '失败',
         'logs.newest': '最新日志：{name}',
+        'logs.pick': '选择日志',
+        'logs.dir': '目录：{dir}',
+        'logs.files': '共 {n} 个日志文件',
+        'sync.conflictTitle': '拉取冲突（需手动处理）',
+        'sync.conflictHint': '检测到合并冲突，以下文件被 git 标记。sync-hub 不会自动解决。请逐个编辑保留正确内容，再按《使用手册.md》FAQ-5 执行（git add <文件> && git rebase --continue），或点右侧按钮打开控制台处理。',
+        'sync.openManual': '查看使用手册',
         'empty.output': '（无输出）',
       },
       en: {
@@ -233,13 +266,15 @@ window.__ModuleLoader__.load({
         'act.net': 'Network check',
         'act.backups': 'Backups',
         'act.restore': 'Restore',
+        'act.delete': 'Delete',
+        'act.deleteConfirm': 'Confirm delete',
+        'act.cancel': 'Cancel',
         'act.restoreLatest': 'Restore newest memory',
+        'ov.guide': '本页是中枢总览：先看「是否干净 / 凭据 / 工具链」，确认无误再去「同步」页上传或拉取。所有改动在重启 DSH 后完整生效。',
         'act.sessionsBackup': 'Backup sessions',
         'act.sessionsList': 'Session list',
         'act.skillsToHub': 'Collect new skills',
         'act.skillsFromHub': 'Install hub skills',
-        'act.pluginsList': 'Plugin status',
-        'act.pluginsInstall': 'Install/repair plugins',
         'act.toolsRefresh': 'Re-detect',
         'act.toolsInstall': 'Install required',
         'act.toolsInstallNice': 'Install all',
@@ -247,7 +282,6 @@ window.__ModuleLoader__.load({
         'act.bootstrap': 'Bootstrap',
         'act.saveCred': 'Save & test',
 
-        'sec.daily': 'Daily sync',
         'sec.health': 'Environment',
         'sec.backup': 'Memory backups',
         'sec.sessions': 'Session backups',
@@ -257,8 +291,10 @@ window.__ModuleLoader__.load({
         'sec.cred': 'Gitee credential',
         'sec.logs': 'Runtime logs',
         'sec.bootstrap': 'New machine',
+        'sec.schedule': 'Timed sync',
 
-        'hint.daily': 'Pull before work, push after. Conflicts stop and report; nothing is auto-resolved.',
+        'hint.pull': 'Pull applies to DSH (restart to take effect); conflicts stop and report.',
+        'hint.pullEta': 'Pull usually takes 1–3 min (longer on first run or big diffs). The spinning button means it is working — keep this page open.',
         'sync.whatTitle': 'This tab = CLOUD (swap between two PCs)',
         'sync.what': 'Exchanges memory/skills/config with the other computer through Gitee. Upload sends this machine\'s changes to the cloud; Pull brings the cloud\'s changes here and applies them.',
         'sync.upTitle': '1) Upload to cloud',
@@ -291,11 +327,21 @@ window.__ModuleLoader__.load({
         'hint.cred': 'The token goes to the Windows Credential Manager — never a file, never echoed.',
         'hint.token': 'Token: gitee.com → Settings → Private Token (projects scope).',
         'hint.bootstrap': 'Use when this machine has no hub clone: name + folder, then clone + apply + install.',
+        'hint.bootstrapEta': 'Bootstrap usually takes ~25 min (clone + apply + install plugins); the button keeps spinning — keep this page open.',
 
         'tools.summary': '{p}/{n} installed',
         'tools.missingCore': 'required tools missing',
         'tools.allGood': 'all present',
         'tools.need': { core: 'required', dev: 'dev', nice: 'optional' },
+
+        'schedule.what': 'Create a Windows Task Scheduler job: daily 03:00 + at logon, running status->pull->push unattended. Logs go to ~/.dsh/logs/schedule-<date>.log.',
+        'schedule.on': 'Enabled',
+        'schedule.off': 'Not enabled',
+        'schedule.next': 'Next run: {t}',
+        'schedule.done': 'Schedule status refreshed',
+        'act.scheduleInstall': 'Enable timed sync',
+        'act.scheduleRemove': 'Disable timed sync',
+        'act.scheduleStatus': 'Status',
 
         'cred.ok': 'stored',
         'cred.none': 'not stored',
@@ -321,6 +367,8 @@ window.__ModuleLoader__.load({
         'sk.count': '{total} total, {enabled} enabled',
         'sk.invalid': '{n} invalid (DSH silently skips them)',
         'sk.ro': ' (read-only)',
+        'sk.needBoth': 'name and description are both required',
+        'sk.needUrl': 'paste a URL first',
         'sk.filter': 'Filter by name/description',
         'sk.listTitle': 'Skill list',
         'sk.enable': 'Enable',
@@ -346,6 +394,7 @@ window.__ModuleLoader__.load({
         // ── plugins tab ─────────────────────────────────────────────────────
         'pl.title': 'Installed plugins',
         'pl.what': 'Installed plugins per profile with link health; uninstall here. The market searches npm and installs new ones.',
+        'pl.guide': 'Install/update/uninstall takes effect only after a DSH restart; results here flag it in amber.',
         'pl.profile': 'profile {name} ({n})',
         'pl.bundled': 'bundled',
         'pl.broken': 'link broken',
@@ -357,13 +406,31 @@ window.__ModuleLoader__.load({
         'pl.found': '{n} found',
         'pl.noResult': 'no results',
         'pl.install': 'Install',
+        'pl.hasUpdate': '{n} plugin(s) have updates',
+        'pl.allLatest': 'all up to date',
+        'pl.newVer': '→ {v}',
+        'pl.update': 'Update',
+        'pl.featTitle': 'Recommended',
+        'pl.featHint': 'Hand-picked plugins; click Install (already-installed ones are marked).',
+        'pl.installed': 'installed',
+        'act.plCheck': 'Check updates',
+        'act.plUpdateAll': 'Update all',
         'act.plList': 'Refresh installed',
         'act.plSearch': 'Search market',
+        'pl.profileSel': 'Target profile:',
+
+        'done.refresh': 'refreshed',
 
         'check.pass': 'pass',
         'check.warn': 'warn',
         'check.fail': 'fail',
         'logs.newest': 'newest log: {name}',
+        'logs.pick': 'choose log',
+        'logs.dir': 'directory: {dir}',
+        'logs.files': '{n} log files',
+        'sync.conflictTitle': 'pull conflict (needs manual fix)',
+        'sync.conflictHint': 'A merge conflict was detected; the files below are marked by git. sync-hub will NOT auto-resolve. Edit each file to keep the correct content, then follow 使用手册.md FAQ-5 (`git add <file> && git rebase --continue`), or open the console to handle it.',
+        'sync.openManual': 'view usage manual',
         'empty.output': '(no output)',
       },
     }
@@ -413,6 +480,7 @@ window.__ModuleLoader__.load({
       btn: { padding: '0.32rem 0.75rem', borderRadius: '0.45rem', fontSize: '0.78rem', border: '1px solid var(--color-border, rgba(128,128,128,0.3))', background: 'var(--color-surface, rgba(128,128,128,0.07))', color: 'inherit', cursor: 'pointer' },
       primary: { background: 'var(--color-accent, #2a6)', color: '#fff', borderColor: 'transparent' },
       input: { padding: '0.32rem 0.55rem', borderRadius: '0.45rem', fontSize: '0.76rem', width: '12rem', border: '1px solid var(--color-border, rgba(128,128,128,0.3))', background: 'var(--color-surface, rgba(128,128,128,0.05))', color: 'inherit' },
+      select: { padding: '0.32rem 0.55rem', borderRadius: '0.45rem', fontSize: '0.76rem', border: '1px solid var(--color-border, rgba(128,128,128,0.3))', background: 'var(--color-surface, rgba(128,128,128,0.05))', color: 'inherit' },
       hint: { fontSize: '0.7rem', opacity: 0.55, margin: 0, lineHeight: 1.5 },
       kv: { display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.3rem 0.75rem', fontSize: '0.78rem', alignItems: 'baseline' },
       kvKey: { opacity: 0.6, whiteSpace: 'nowrap' },
@@ -450,11 +518,18 @@ window.__ModuleLoader__.load({
       const [backups, setBackups] = useState(undefined)
       const [skills, setSkills] = useState(undefined)
       const [logs, setLogs] = useState(undefined)
+      const [logsPick, setLogsPick] = useState('')
+      const [manual, setManual] = useState(undefined)
+      const [syncConflict, setSyncConflict] = useState([])
       const [cUser, setCUser] = useState('')
       const [cToken, setCToken] = useState('')
       const [bMachine, setBMachine] = useState('')
       const [bDest, setBDest] = useState('')
       const [bRepo, setBRepo] = useState('')
+      // backup row pending delete confirmation (second-confirm guard)
+      const [shDelName, setShDelName] = useState('')
+      // timed sync schedule status from /schedule
+      const [sched, setSched] = useState(undefined)
       // sync options (方案 A): upload scope + pull switches
       const [pushScope, setPushScope] = useState('all')
       const [pullSkipSkills, setPullSkipSkills] = useState(false)
@@ -472,6 +547,12 @@ window.__ModuleLoader__.load({
       const [plList, setPlList] = useState(undefined)
       const [plMarket, setPlMarket] = useState(undefined)
       const [plQuery, setPlQuery] = useState('')
+      const [outdated, setOutdated] = useState(undefined)
+      const [featured, setFeatured] = useState(undefined)
+      // selected target profile for install/update/uninstall (defaults from first listed profile)
+      const [plProfile, setPlProfile] = useState('desktop')
+      const [plLoaded, setPlLoaded] = useState(false)
+      const plAutoRef = useRef(false)
 
       const put = useCallback((k, v) => setOut(p => ({ ...p, [k]: v })), [])
 
@@ -484,6 +565,23 @@ window.__ModuleLoader__.load({
 
       useEffect(() => { loadOverview() }, [loadOverview])
 
+      // auto-populate the plugins tab on first open (fixes empty "recommended" on entry)
+      useEffect(() => {
+        if (tab !== 'plugins' || plAutoRef.current) return
+        plAutoRef.current = true
+        setPlLoaded(true)
+        run('plRefresh', 'plRefresh')
+        run('plCheck', 'plCheck')
+      }, [tab])
+
+      // keep the profile selector valid once the installed list arrives
+      useEffect(() => {
+        if (plList && plList.profiles && plList.profiles.length) {
+          const names = plList.profiles.map(p => p.profile)
+          if (!names.includes(plProfile)) setPlProfile(names[0])
+        }
+      }, [plList, plProfile])
+
       // Every kind MUST have a branch here (missing branch = dead button).
       // `arg` carries per-row payloads (skill name/rootId, plugin name/profile).
       const run = useCallback(async (kind, key, arg) => {
@@ -493,17 +591,25 @@ window.__ModuleLoader__.load({
         try {
           let r
           switch (kind) {
-            case 'refresh': await loadOverview(); r = { text: '' }; break
+            case 'refresh': await loadOverview(); r = { text: t('done.refresh') }; break
             case 'selfcheck': r = await api('/selfcheck', { timeout: 180000 }); setChecks(r.checks || []); break
             case 'status': r = await api('/status', { timeout: 120000 }); break
             case 'push': r = await post('/push', { scope: pushScope }, 300000); await loadOverview(); break
-            case 'pull': r = await post('/pull', { skipSkills: pullSkipSkills, skipProfile: pullSkipProfile, force: pullForce }, 300000); await loadOverview(); break
+            case 'pull': r = await post('/pull', { skipSkills: pullSkipSkills, skipProfile: pullSkipProfile, force: pullForce }, 300000); setSyncConflict(r && Array.isArray(r.conflictFiles) ? r.conflictFiles : []); await loadOverview(); break
             case 'backupNow': r = await post('/backup/create', {}, 90000); break
             case 'console': r = await post('/console'); break
             case 'doctor': r = await post('/doctor', {}, 240000); break
             case 'doctorFix': r = await post('/doctor', { fix: true }, 240000); break
             case 'net': r = await post('/net', {}, 180000); break
             case 'backups': r = await api('/backups', { timeout: 90000 }); setBackups(r.items || []); break
+            case 'deleteBackup': r = await post('/backup/delete', { name: a.name }, 60000); await run('backups', 'bkList'); break
+            case 'scheduleStatus': { const s = await api('/schedule', { timeout: 30000 }); setSched(s); r = { text: s.ok ? t('schedule.done') : '' }; break }
+            case 'scheduleToggle': {
+              const installing = !(sched && sched.installed)
+              r = await post('/schedule', { action: installing ? 'install' : 'remove' }, 60000)
+              await run('scheduleStatus', 'sch')
+              break
+            }
             case 'restore': r = await post('/restore', { name: a.name || (key === 'restoreLatest' ? 'latest-agents' : (window.__shRestore || '')) }, 90000); break
             case 'sessionsBackup': r = await post('/sessions', { action: 'backup' }, 600000); break
             case 'sessionsList': r = await post('/sessions', { action: 'list' }, 90000); break
@@ -514,27 +620,29 @@ window.__ModuleLoader__.load({
             case 'skRefresh': {
               const list = await api('/skills/list', { timeout: 60000 })
               setSkList(list)
-              r = { text: list.ok ? '' : String(list.error || '') }
+              r = { text: list.ok ? t('done.refresh') : String(list.error || '') }
+              put('skListRefresh', r.text)
+              return
               break
             }
-            case 'skEnable': r = await post('/skills/toggle', { name: a.name, rootId: a.rootId, enable: true }, 30000); await run('skRefresh', key); break
-            case 'skDisable': r = await post('/skills/toggle', { name: a.name, rootId: a.rootId, enable: false }, 30000); await run('skRefresh', key); break
+            case 'skEnable': r = await post('/skills/toggle', { name: a.name, rootId: a.rootId, enable: true }, 30000); await run('skRefresh', 'skListRefresh'); break
+            case 'skDisable': r = await post('/skills/toggle', { name: a.name, rootId: a.rootId, enable: false }, 30000); await run('skRefresh', 'skListRefresh'); break
             case 'skRead': r = await post('/skills/read', { name: a.name, rootId: a.rootId }, 30000); break
             case 'skImport': {
-              if (!skUrl.trim()) { r = { text: '请先填网址' }; break }
+              if (!skUrl.trim()) { r = { text: t('sk.needUrl') }; break }
               r = await post('/skills/import', { url: skUrl.trim(), name: skName.trim() }, 300000)
               if (r.ok) { setSkUrl(''); setSkName('') }
-              await run('skRefresh', key)
+              await run('skRefresh', 'skListRefresh')
               break
             }
             case 'skCreate': {
-              if (!skNewName.trim() || !skNewDesc.trim()) { r = { text: '技能名和 description 都要填' }; break }
+              if (!skNewName.trim() || !skNewDesc.trim()) { r = { text: t('sk.needBoth') }; break }
               r = await post('/skills/create', { name: skNewName.trim(), description: skNewDesc.trim() }, 30000)
               if (r.ok) { setSkNewName(''); setSkNewDesc('') }
-              await run('skRefresh', key)
+              await run('skRefresh', 'skListRefresh')
               break
             }
-            case 'skTrash': r = await post('/skills/trash', { name: a.name }, 30000); await run('skRefresh', key); break
+            case 'skTrash': r = await post('/skills/trash', { name: a.name }, 30000); await run('skRefresh', 'skListRefresh'); break
             case 'skTrashList': {
               const t = await api('/skills/trash', { timeout: 30000 })
               setTrashList(t)
@@ -546,7 +654,36 @@ window.__ModuleLoader__.load({
             case 'plRefresh': {
               const list = await api('/plugins/list', { timeout: 60000 })
               setPlList(list)
-              r = { text: '' }
+              const f = await api('/plugins/featured', { timeout: 30000 }).catch(() => undefined)
+              if (f) setFeatured(f)
+              r = { text: t('done.refresh') }
+              break
+            }
+            case 'plCheck': {
+              const o = await api('/plugins/outdated', { timeout: 180000 })
+              setOutdated(o)
+              const n = o.outdated || 0
+              r = { text: n ? t('pl.hasUpdate', { n }) : t('pl.allLatest') }
+              break
+            }
+            case 'plUpdate': {
+              r = await post('/plugins/update', { name: a.name, profile: a.profile || plProfile }, 900000)
+              if (r.ok) { await run('plRefresh', key); await run('plCheck', 'plCheck') }
+              break
+            }
+            case 'plUpdateAll': {
+              const o = outdated || await api('/plugins/outdated', { timeout: 180000 })
+              setOutdated(o)
+              const todo = (o.items || []).filter(x => x.outdated)
+              if (!todo.length) { r = { text: t('pl.allLatest') }; break }
+              const lines = []
+              for (const item of todo) {
+                const res = await post('/plugins/update', { name: item.name, profile: item.profile }, 900000)
+                lines.push((res.ok ? '✓ ' : '✗ ') + item.name + (res.ok ? '' : '  ' + String(res.text).split('\n')[0]))
+                if (!res.ok) break   // stop on first failure (usually DSH running)
+              }
+              await run('plRefresh', 'plRefresh')
+              r = { text: lines.join('\n') }
               break
             }
             case 'plSearch': {
@@ -555,13 +692,15 @@ window.__ModuleLoader__.load({
               r = { text: m.ok ? '' : String(m.text || '') }
               break
             }
-            case 'plInstall': r = await post('/plugins/install', { name: a.name, profile: a.profile || 'desktop' }, 900000); break
-            case 'plUninstall': r = await post('/plugins/uninstall', { name: a.name, profile: a.profile || 'desktop' }, 300000); await run('plRefresh', key); break
-            case 'pluginsInstall': r = await post('/plugins', { action: 'install' }, 600000); break
-            case 'toolsRefresh': await loadOverview(); r = { text: '' }; break
+            case 'plInstall': r = await post('/plugins/install', { name: a.name, profile: a.profile || plProfile }, 900000); break
+            case 'plUninstall': r = await post('/plugins/uninstall', { name: a.name, profile: a.profile || plProfile }, 300000); await run('plRefresh', key); break
+            case 'toolsRefresh': await loadOverview(); r = { text: t('done.refresh') }; break
             case 'toolsInstall': r = await post('/tools/install', { mode: 'all' }, 900000); await loadOverview(); break
             case 'toolsInstallNice': r = await post('/tools/install', { mode: 'allnice' }, 1800000); await loadOverview(); break
-            case 'logs': r = await api('/logs', { timeout: 30000 }); setLogs(r); break
+            case 'logs': r = await api('/logs', { timeout: 30000 }); setLogs(r); setLogsPick(r.current || ''); break
+            case 'logsPick': { const name = a.name || logsPick; setLogsPick(name); r = await api('/logs?file=' + encodeURIComponent(name), { timeout: 30000 }); setLogs(r); break }
+            case 'manual': r = await api('/manual', { timeout: 30000 }); setManual(r); break
+            case 'clearManual': setManual(undefined); break
             case 'saveCred': r = await post('/cred', { username: cUser, token: cToken }, 180000); setCToken(''); await loadOverview(); break
             case 'bootstrap': r = await post('/bootstrap', { machine: bMachine, dest: bDest, ...(bRepo.trim() ? { repoUrl: bRepo.trim() } : {}) }, 1500000); break
             default: r = { text: 'unknown action: ' + kind }
@@ -570,27 +709,28 @@ window.__ModuleLoader__.load({
         } catch (e) {
           put(key, '✗ ' + String(e?.message ?? e))
         } finally { setBusy('') }
-      }, [loadOverview, put, cUser, cToken, bMachine, bDest, bRepo, pushScope, pullSkipSkills, pullSkipProfile, pullForce, skUrl, skName, skNewName, skNewDesc, plQuery])
+      }, [loadOverview, put, cUser, cToken, bMachine, bDest, bRepo, pushScope, pullSkipSkills, pullSkipProfile, pullForce, skUrl, skName, skNewName, skNewDesc, plQuery, outdated, plProfile, logsPick, t])
 
-      const Btn = ({ label, kind, key: outKey, primary, small, arg }) => {
+      const Btn = ({ label, kind, out, primary, small, arg }) => {
         const isBusy = busy === kind
         return h('button', {
           type: 'button',
           style: { ...S.btn, ...(primary ? S.primary : {}), ...(small ? { fontSize: '0.72rem', padding: '0.22rem 0.55rem' } : {}), ...(isBusy ? { opacity: 0.65 } : {}) },
           disabled: !!busy,
-          onClick: () => run(kind, outKey || kind, arg),
+          onClick: () => run(kind, out || kind, arg),
         }, isBusy ? (label + ' …') : label)
       }
 
       // result of an action, shown inside the card that owns it
-      const Result = ({ k }) => {
+      const Result = ({ k, restart }) => {
         const text = out[k]
         if (!text) return null
         return h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.3rem' } },
           h('div', { style: { ...S.row, justifyContent: 'space-between' } },
             h('span', { style: { fontSize: '0.7rem', opacity: 0.6 } }, t('output')),
             h('button', { type: 'button', style: { ...S.btn, ...{ fontSize: '0.68rem', padding: '0.15rem 0.45rem' } }, onClick: () => put(k, '') }, t('clear'))),
-          h('pre', { style: S.pre }, text))
+          h('pre', { style: S.pre }, text),
+          restart ? h('div', { style: { ...S.hint, color: '#ffd479', background: 'rgba(255,212,121,0.08)', padding: '0.4rem 0.6rem', borderRadius: '0.4rem' } }, '✅ ' + t('hint.restart')) : null)
       }
 
       const header = h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.6rem' } },
@@ -626,6 +766,7 @@ window.__ModuleLoader__.load({
               h('input', { type: 'text', placeholder: t('boot.repo'), value: bRepo, style: { ...S.input, width: '20rem' }, onChange: e => setBRepo(e.target.value) }),
               h(Btn, { label: t('act.bootstrap'), kind: 'bootstrap', primary: true })),
             h('p', { style: S.hint }, t('hint.bootstrap')),
+            h('p', { style: S.hint }, t('hint.bootstrapEta')),
             h(Result, { k: 'bootstrap' })))
       }
 
@@ -636,6 +777,7 @@ window.__ModuleLoader__.load({
 
       const overviewTab = [
         h(Card, { key: 'kv' },
+          h('p', { style: S.hint }, t('ov.guide')),
           h('div', { style: S.kv },
             h(KV, { k: t('ov.version'), v: 'v' + (info.version || '?') + '   ·   ' + (info.machine || '') }),
             h(KV, { k: t('ov.commit'), v: [info.commit, info.commitDate, info.commitSubject].filter(Boolean).join('  ') }),
@@ -644,14 +786,14 @@ window.__ModuleLoader__.load({
             h(KV, { k: t('sec.cred'), v: cred.hasCredential ? (t('cred.ok') + '  ·  ' + (cred.username || '') + '  ·  ' + (cred.repoHost || '')) : t('cred.none') }),
             h(KV, { k: t('sec.tools'), v: t('tools.summary', { p: tools.present, n: tools.total }) + (tools.missingCore ? '   ·   ' + t('tools.missingCore') : '') })),
           h('div', { style: S.row },
-            h(Btn, { label: t('refresh'), kind: 'refresh', key: 'ovRefresh' }),
-            h(Btn, { label: t('ov.runcheck'), kind: 'selfcheck', key: 'selfcheck' }))),
+            h(Btn, { label: t('refresh'), kind: 'refresh', out: 'ovRefresh' }),
+            h(Btn, { label: t('ov.runcheck'), kind: 'selfcheck', out: 'selfcheck' }))),
         checks ? h(Card, { key: 'chk', title: t('ov.health'), level: checks.some(c => c.level === 'fail') ? 'fail' : (checks.some(c => c.level === 'warn') ? 'warn' : 'pass') },
           ...checks.map(c => h('div', { key: c.key, style: S.listRow },
             h(Dot, { level: c.level }),
             h('span', { style: { minWidth: '5.5rem', opacity: 0.75 } }, c.key),
             h('span', { style: { flex: 1 } }, c.detail)))) : null,
-        h(Result, { key: 'r', k: 'selfcheck' }),
+        h(Result, { key: 'r', k: 'selfcheck' }), h(Result, { key: 'r2', k: 'ovRefresh' }),
       ]
 
       // ── 同步 = 云端（两台电脑通过 Gitee 交换改动） ──────────────────────────
@@ -675,9 +817,9 @@ window.__ModuleLoader__.load({
               h('option', { value: 'memory,skills,config' }, t('scope.nosession')),
               h('option', { value: 'sessions' }, t('scope.sessions')))),
           h('div', { style: S.row },
-            h(Btn, { label: t('act.push'), kind: 'push', key: 'syncPush', primary: true }),
-            h(Btn, { label: t('act.status'), kind: 'status', key: 'syncStatus' })),
-          h(Result, { k: 'syncPush' }), h(Result, { k: 'syncStatus' })),
+            h(Btn, { label: t('act.push'), kind: 'push', out: 'syncPush', primary: true }),
+            h(Btn, { label: t('act.status'), kind: 'status', out: 'syncStatus' })),
+          h(Result, { k: 'syncPush', restart: true }), h(Result, { k: 'syncStatus' })),
         h(Card, { key: 'down', title: t('sync.downTitle') },
           h('p', { style: S.hint }, t('sync.downHint')),
           h('div', { style: S.row },
@@ -691,10 +833,20 @@ window.__ModuleLoader__.load({
               h('input', { type: 'checkbox', checked: pullForce, disabled: !!busy, onChange: e => setPullForce(e.target.checked) }),
               t('opt.force'))),
           h('div', { style: S.row },
-            h(Btn, { label: t('act.pull'), kind: 'pull', key: 'syncPull', primary: true }),
-            h(Btn, { label: t('act.console'), kind: 'console', key: 'syncConsole' })),
+            h(Btn, { label: t('act.pull'), kind: 'pull', out: 'syncPull', primary: true }),
+            h(Btn, { label: t('act.console'), kind: 'console', out: 'syncConsole' })),
           h('p', { style: S.hint }, t('hint.pull')),
-          h(Result, { k: 'syncPull' })),
+          h('p', { style: S.hint }, t('hint.pullEta')),
+          h(Result, { k: 'syncPull', restart: true }), h(Result, { k: 'syncConsole' })),
+        syncConflict.length ? h(Card, { key: 'conflict', title: t('sync.conflictTitle'), level: 'fail' },
+          h('p', { style: S.hint }, t('sync.conflictHint')),
+          h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.25rem' } },
+            ...syncConflict.map((f, i) => h('div', { key: i, style: { ...S.listRow, background: 'rgba(248,81,73,0.12)' } },
+              h('span', { style: { opacity: 0.6, minWidth: '1.6rem' } }, '#' + (i + 1)),
+              h('span', { style: { flex: 1, wordBreak: 'break-all', fontFamily: 'ui-monospace, Menlo, Consolas, monospace' } }, f)))),
+          h('div', { style: S.row },
+            h(Btn, { label: t('sync.openManual'), kind: 'manual', out: 'manual', primary: true }),
+            h(Btn, { label: t('act.console'), kind: 'console', out: 'syncConsole2' }))) : null,
         st.sections && st.sections.length ? h(Card, { key: 'st', title: t('sync.stateTitle'), level: st.worst },
           ...st.sections.map((sec, i) => h('div', { key: i, style: { display: 'flex', flexDirection: 'column', gap: '0.2rem' } },
             h('div', { style: { fontSize: '0.72rem', opacity: 0.55, marginTop: i ? '0.3rem' : 0 } }, sec.title),
@@ -710,12 +862,12 @@ window.__ModuleLoader__.load({
         h(Card, { key: 'now', title: t('bk.nowTitle') },
           h('p', { style: S.hint }, t('bk.nowHint')),
           h('div', { style: S.row },
-            h(Btn, { label: t('act.backupNow'), kind: 'backupNow', key: 'bkNow', primary: true })),
+            h(Btn, { label: t('act.backupNow'), kind: 'backupNow', out: 'bkNow', primary: true })),
           h(Result, { k: 'bkNow' })),
         h(Card, { key: 'b', title: t('bk.listTitle') },
           h('div', { style: S.row },
-            h(Btn, { label: t('act.backups'), kind: 'backups', key: 'bkList' }),
-            h(Btn, { label: t('act.restoreLatest'), kind: 'restore', key: 'restoreLatest' })),
+            h(Btn, { label: t('act.backups'), kind: 'backups', out: 'bkList' }),
+            h(Btn, { label: t('act.restoreLatest'), kind: 'restore', out: 'restoreLatest' })),
           h('p', { style: S.hint }, t('hint.backup')),
           backups === undefined ? null : (backups.length === 0
             ? h('p', { style: S.hint }, t('empty.output'))
@@ -724,16 +876,36 @@ window.__ModuleLoader__.load({
                   h('span', { style: { opacity: 0.5, minWidth: '1.6rem' } }, '#' + b.index),
                   h('span', { style: { flex: 1, wordBreak: 'break-all' } }, b.name),
                   h('span', { style: { opacity: 0.6, whiteSpace: 'nowrap' } }, b.size + '  ' + b.date),
-                  h('button', {
-                    type: 'button', style: { ...S.btn, fontSize: '0.68rem', padding: '0.15rem 0.5rem' },
+                  shDelName === b.name
+                    ? h(Fragment, { key: 'cfm-' + b.name },
+                        h('button', {
+                          type: 'button',
+                          style: { ...S.btn, fontSize: '0.68rem', padding: '0.15rem 0.5rem', background: 'rgba(209,36,47,0.18)', color: '#f85149', borderColor: 'rgba(209,36,47,0.5)' },
+                          disabled: !!busy,
+                          onClick: () => { setShDelName(''); run('deleteBackup', 'bkList', { name: b.name }) },
+                        }, t('act.deleteConfirm')),
+                        h('button', {
+                          type: 'button',
+                          style: { ...S.btn, fontSize: '0.68rem', padding: '0.15rem 0.5rem' },
+                          disabled: !!busy,
+                          onClick: () => setShDelName(''),
+                        }, t('act.cancel')))
+                    : h('button', {
+                        type: 'button', style: { ...S.btn, fontSize: '0.68rem', padding: '0.15rem 0.5rem' },
+                        disabled: !!busy,
+                        onClick: () => { window.__shRestore = b.name; run('restore', 'restoreLatest') },
+                      }, t('act.restore')),
+                  shDelName === b.name ? null : h('button', {
+                    type: 'button',
+                    style: { ...S.btn, fontSize: '0.68rem', padding: '0.15rem 0.5rem', opacity: 0.7 },
                     disabled: !!busy,
-                    onClick: () => { window.__shRestore = b.name; run('restore', 'restoreLatest') },
-                  }, t('act.restore')))))),
+                    onClick: () => setShDelName(b.name),
+                  }, t('act.delete')))))),
           h(Result, { k: 'bkList' }), h(Result, { k: 'restoreLatest' })),
         h(Card, { key: 's', title: t('sec.sessions') },
           h('div', { style: S.row },
-            h(Btn, { label: t('act.sessionsBackup'), kind: 'sessionsBackup', key: 'sessB' }),
-            h(Btn, { label: t('act.sessionsList'), kind: 'sessionsList', key: 'sessL' })),
+            h(Btn, { label: t('act.sessionsBackup'), kind: 'sessionsBackup', out: 'sessB' }),
+            h(Btn, { label: t('act.sessionsList'), kind: 'sessionsList', out: 'sessL' })),
           h('p', { style: S.hint }, t('hint.sessions')),
           h(Result, { k: 'sessB' }), h(Result, { k: 'sessL' })),
       ]
@@ -751,8 +923,9 @@ window.__ModuleLoader__.load({
             (skList.roots ? '   ·   ' + skList.roots.map(r => r.label + (r.writable ? '' : t('sk.ro'))).join(' / ') : ''))
             : h('p', { style: S.hint }, t('loading')),
           h('div', { style: S.row },
-            h(Btn, { label: t('act.skRefresh'), kind: 'skRefresh', key: 'skRefresh', primary: true }),
-            h('input', { type: 'text', placeholder: t('sk.filter'), value: skFilter, style: { ...S.input, width: '11rem' }, onChange: e => setSkFilter(e.target.value) }))),
+            h(Btn, { label: t('act.skRefresh'), kind: 'skRefresh', out: 'skRefresh', primary: true }),
+            h('input', { type: 'text', placeholder: t('sk.filter'), value: skFilter, style: { ...S.input, width: '11rem' }, onChange: e => setSkFilter(e.target.value) })),
+          h(Result, { k: 'skRefresh' }), h(Result, { k: 'skListRefresh' })),
 
         // full inventory: one row per skill, toggle + read + trash
         skList && skList.items ? h(Card, { key: 'list', title: t('sk.listTitle') },
@@ -778,7 +951,7 @@ window.__ModuleLoader__.load({
                 onClick: () => run('skTrash', 'skOp', { name: s.name }),
               }, t('sk.trash')) : null))
           ) : null,
-        h(Result, { k: 'skOp' }),
+        h(Result, { k: 'skOp', restart: true }),
 
         // import from URL / create new
         h(Card, { key: 'add', title: t('sk.addTitle') },
@@ -786,23 +959,23 @@ window.__ModuleLoader__.load({
           h('div', { style: S.row },
             h('input', { type: 'text', placeholder: t('sk.urlPh'), value: skUrl, disabled: !!busy, style: { ...S.input, width: '24rem' }, onChange: e => setSkUrl(e.target.value) }),
             h('input', { type: 'text', placeholder: t('sk.namePh'), value: skName, disabled: !!busy, style: { ...S.input, width: '9rem' }, onChange: e => setSkName(e.target.value) }),
-            h(Btn, { label: t('act.skImport'), kind: 'skImport', key: 'skImport', primary: true })),
+            h(Btn, { label: t('act.skImport'), kind: 'skImport', out: 'skImport', primary: true })),
           h(Result, { k: 'skImport' }),
           h('div', { style: S.row },
             h('input', { type: 'text', placeholder: t('sk.newNamePh'), value: skNewName, disabled: !!busy, style: { ...S.input, width: '10rem' }, onChange: e => setSkNewName(e.target.value) }),
             h('input', { type: 'text', placeholder: t('sk.newDescPh'), value: skNewDesc, disabled: !!busy, style: { ...S.input, width: '20rem' }, onChange: e => setSkNewDesc(e.target.value) }),
-            h(Btn, { label: t('act.skCreate'), kind: 'skCreate', key: 'skCreate' })),
+            h(Btn, { label: t('act.skCreate'), kind: 'skCreate', out: 'skCreate' })),
           h(Result, { k: 'skCreate' })),
 
         // hub sync (cloud side of skills)
         h(Card, { key: 'hub', title: t('sk.hubTitle') },
           h('p', { style: S.hint }, t('hint.skills')),
           h('div', { style: S.row },
-            h(Btn, { label: t('act.skillsToHub'), kind: 'skillsToHub', key: 'skTo', primary: true }),
-            h(Btn, { label: t('act.skillsFromHub'), kind: 'skillsFromHub', key: 'skFrom' }),
-            h(Btn, { label: t('act.skDiff'), kind: 'skillsInfo', key: 'skInfo' })),
+            h(Btn, { label: t('act.skillsToHub'), kind: 'skillsToHub', out: 'skTo', primary: true }),
+            h(Btn, { label: t('act.skillsFromHub'), kind: 'skillsFromHub', out: 'skFrom' }),
+            h(Btn, { label: t('act.skDiff'), kind: 'skillsInfo', out: 'skInfo' })),
           skills ? h(Fragment, {},
-            h('p', { style: { ...S.hint, opacity: 0.75 } }, t('skills.summary', { hub: skills.hub, local: skills.local })),
+            h('p', { style: { ...S.hint, opacity: 0.75 } }, t('skills.summary', { hub: skills.hub ?? '?', local: skills.local ?? '?' })),
             (skills.onlyLocalReal || []).length ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.2rem' } },
               h('div', { style: { fontSize: '0.72rem', opacity: 0.6 } }, t('skills.onlyLocal')),
               h('div', { style: { ...S.row, gap: '0.3rem' } }, ...skills.onlyLocalReal.map(n => h('span', { key: n, style: S.chip }, n)))) : null,
@@ -817,12 +990,12 @@ window.__ModuleLoader__.load({
               h('div', { style: { ...S.row, gap: '0.3rem' } }, ...skills.diff.map(n => h('span', { key: n, style: S.chip }, n)))) : null,
             (!(skills.onlyLocalReal || []).length && !(skills.onlyHub || []).length && !(skills.diff || []).length)
               ? h('p', { style: S.hint }, t('skills.none')) : null) : null,
-          h(Result, { k: 'skTo' }), h(Result, { k: 'skFrom' })),
+          h(Result, { k: 'skTo', restart: true }), h(Result, { k: 'skFrom', restart: true }), h(Result, { k: 'skInfo' })),
 
         // trash
         h(Card, { key: 'trash', title: t('sk.trashTitle') },
-          h('div', { style: S.row }, h(Btn, { label: t('act.skTrashList'), kind: 'skTrashList', key: 'skTrashList' })),
-          trashList ? (trashList.items.length
+          h('div', { style: S.row }, h(Btn, { label: t('act.skTrashList'), kind: 'skTrashList', out: 'skTrashList' })),
+          trashList ? ((trashList.items || []).length
             ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.25rem' } },
                 ...trashList.items.map(x => h('div', { key: x.name, style: S.listRow },
                   h('span', { style: { flex: 1, wordBreak: 'break-all' } }, x.name),
@@ -835,35 +1008,78 @@ window.__ModuleLoader__.load({
       ]
 
       // ── 插件页：已装清单 + npm 市场 + 安装/卸载 ───────────────────────────
+      // ── 插件页 ────────────────────────────────────────────────────────────
+      // 已装清单（含更新检查/更新）+ 推荐 + npm 市场
+      const outdatedMap = {}
+      for (const it of (outdated && outdated.items) || []) outdatedMap[it.profile + '/' + it.name] = it
+
       const pluginsTab = [
         h(Card, { key: 'inst', title: t('pl.title') },
           h('p', { style: S.hint }, t('pl.what')),
+          h('p', { style: S.hint }, t('pl.guide')),
           h('div', { style: S.row },
-            h(Btn, { label: t('act.plList'), kind: 'plRefresh', key: 'plRefresh', primary: true }),
-            h(Btn, { label: t('act.pluginsInstall'), kind: 'pluginsInstall', key: 'plInst' })),
+            h('label', { style: { fontSize: '0.74rem', opacity: 0.7 } }, t('pl.profileSel')),
+            plList && plList.profiles && plList.profiles.length
+              ? h('select', { value: plProfile, disabled: !!busy, style: S.select, onChange: e => setPlProfile(e.target.value) },
+                  ...plList.profiles.map(p => h('option', { key: p.profile, value: p.profile }, p.profile + ' (' + p.items.length + ')')))
+              : h('select', { value: 'desktop', disabled: true, style: S.select }, h('option', { value: 'desktop' }, 'desktop'))),
+          h('div', { style: S.row },
+            h(Btn, { label: t('act.plList'), kind: 'plRefresh', out: 'plRefresh', primary: true }),
+            h(Btn, { label: t('act.plCheck'), kind: 'plCheck', out: 'plCheck' }),
+            h(Btn, { label: t('act.plUpdateAll'), kind: 'plUpdateAll', out: 'plUpdateOut' })),
+          outdated ? h('p', { style: { fontSize: '0.76rem', margin: 0, ...(outdated.outdated ? { color: '#d29922' } : S.ok) } },
+            outdated.outdated ? t('pl.hasUpdate', { n: outdated.outdated }) : t('pl.allLatest')) : null,
           h('p', { style: S.hint }, t('hint.restart')),
           plList && plList.profiles ? h(Fragment, {},
             ...plList.profiles.map(p => h('div', { key: p.profile, style: { display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.3rem' } },
               h('div', { style: { fontSize: '0.74rem', fontWeight: 600, opacity: 0.85 } }, t('pl.profile', { name: p.profile, n: p.items.length })),
-              ...p.items.map(it => h('div', { key: p.profile + it.name, style: S.listRow },
-                h(Dot, { level: it.linkOk ? 'pass' : 'fail' }),
-                h('span', { style: { flex: '1 1 14rem', wordBreak: 'break-all' } }, it.name),
-                h('span', { style: { fontSize: '0.7rem', opacity: 0.7, minWidth: '4rem' } }, it.version || '-'),
-                it.bundled ? h('span', { style: { ...S.chip, fontSize: '0.6rem' } }, t('pl.bundled')) : null,
-                it.linkOk ? null : h('span', { style: { fontSize: '0.66rem', color: '#d1242f' } }, t('pl.broken')),
-                h('button', {
-                  type: 'button', style: { ...S.btn, fontSize: '0.66rem', padding: '0.12rem 0.45rem' }, disabled: !!busy,
-                  onClick: () => run('plUninstall', 'plOp', { name: it.name, profile: p.profile }),
-                }, t('pl.uninstall')))),
+              ...p.items.map(it => {
+                const o = outdatedMap[p.profile + '/' + it.name]
+                return h('div', { key: p.profile + it.name, style: S.listRow },
+                  h(Dot, { level: it.linkOk ? (o && o.outdated ? 'warn' : 'pass') : 'fail' }),
+                  h('span', { style: { flex: '1 1 14rem', wordBreak: 'break-all' } }, it.name),
+                  h('span', { style: { fontSize: '0.7rem', opacity: 0.7, minWidth: '4rem' } }, it.version || '-'),
+                  o && o.outdated ? h('span', { style: { ...S.chip, fontSize: '0.6rem', color: '#d29922', borderColor: 'rgba(210,153,34,0.5)' } },
+                    t('pl.newVer', { v: o.latest })) : null,
+                  it.bundled ? h('span', { style: { ...S.chip, fontSize: '0.6rem' } }, t('pl.bundled')) : null,
+                  it.linkOk ? null : h('span', { style: { fontSize: '0.66rem', color: '#d1242f' } }, t('pl.broken')),
+                  h('button', {
+                    type: 'button', style: { ...S.btn, fontSize: '0.66rem', padding: '0.12rem 0.45rem' }, disabled: !!busy,
+                    onClick: () => run('plUpdate', 'plUpdateOut', { name: it.name, profile: p.profile }),
+                  }, t('pl.update') + (o && o.outdated ? ' (' + t('pl.newVer', { v: o.latest }) + ')' : '')),
+                  h('button', {
+                    type: 'button', style: { ...S.btn, fontSize: '0.66rem', padding: '0.12rem 0.45rem' }, disabled: !!busy,
+                    onClick: () => run('plUninstall', 'plOp', { name: it.name, profile: p.profile }),
+                  }, t('pl.uninstall')))
+              }),
               p.orphanBundles.length ? h('div', { style: { fontSize: '0.66rem', opacity: 0.5 } },
                 t('pl.builtin') + ': ' + p.orphanBundles.join(', ')) : null))) : h('p', { style: S.hint }, t('loading')),
-          h(Result, { k: 'plRefresh' }), h(Result, { k: 'plOp' }), h(Result, { k: 'plInst' })),
+          h(Result, { k: 'plRefresh' }), h(Result, { k: 'plCheck' }), h(Result, { k: 'plUpdateOut', restart: true }),
+          h(Result, { k: 'plOp', restart: true }), h(Result, { k: 'plInst', restart: true })),
+
+        // curated recommendations
+        h(Card, { key: 'feat', title: t('pl.featTitle') },
+          h('p', { style: S.hint }, t('pl.featHint')),
+          ...(featured && featured.items ? featured.items : []).map(f => {
+            const installed = (plList && plList.profiles || []).some(p => p.items.some(it => it.name === f.name))
+            return h('div', { key: f.name, style: S.listRow },
+              h(Dot, { level: installed ? 'pass' : 'info' }),
+              h('span', { style: { flex: '1 1 13rem', wordBreak: 'break-all', fontWeight: 500 } }, f.name),
+              h('span', { style: { flex: '2 1 15rem', fontSize: '0.68rem', opacity: 0.62 } }, f.why),
+              installed
+                ? h('span', { style: { ...S.chip, fontSize: '0.6rem', ...S.ok } }, t('pl.installed'))
+                : h('button', {
+                    type: 'button', style: { ...S.btn, fontSize: '0.66rem', padding: '0.12rem 0.45rem' }, disabled: !!busy,
+                    onClick: () => run('plInstall', 'plInstallOut', { name: f.name, profile: plProfile }),
+                  }, t('pl.install')))
+          })),
+        h(Result, { k: 'plInstallOut', restart: true }),
 
         h(Card, { key: 'mkt', title: t('pl.marketTitle') },
           h('p', { style: S.hint }, t('pl.marketHint')),
           h('div', { style: S.row },
             h('input', { type: 'text', placeholder: t('pl.searchPh'), value: plQuery, disabled: !!busy, style: { ...S.input, width: '16rem' }, onChange: e => setPlQuery(e.target.value) }),
-            h(Btn, { label: t('act.plSearch'), kind: 'plSearch', key: 'plSearch', primary: true })),
+            h(Btn, { label: t('act.plSearch'), kind: 'plSearch', out: 'plSearch', primary: true })),
           plMarket && plMarket.items ? (plMarket.items.length
             ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.25rem' } },
                 h('p', { style: { ...S.hint, opacity: 0.6 } }, t('pl.found', { n: plMarket.total })),
@@ -873,10 +1089,10 @@ window.__ModuleLoader__.load({
                   h('span', { style: { flex: '2 1 14rem', fontSize: '0.68rem', opacity: 0.6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, it.description),
                   h('button', {
                     type: 'button', style: { ...S.btn, fontSize: '0.66rem', padding: '0.12rem 0.45rem' }, disabled: !!busy,
-                    onClick: () => run('plInstall', 'plInstallOut', { name: it.name, profile: 'desktop' }),
+                    onClick: () => run('plInstall', 'plInstallOut', { name: it.name, profile: plProfile }),
                   }, t('pl.install')))))
             : h('p', { style: S.hint }, t('pl.noResult'))) : null,
-          h(Result, { k: 'plSearch' }), h(Result, { k: 'plInstallOut' })),
+          h(Result, { k: 'plSearch' })),
       ]
 
       const toolsTab = [
@@ -890,22 +1106,30 @@ window.__ModuleLoader__.load({
               title: x.Note || '',
             }, (x.Present ? '✓ ' : '✗ ') + x.Key + (x.Need !== 'nice' ? ' · ' + t('tools.need.' + x.Need) : '')))),
           h('div', { style: S.row },
-            h(Btn, { label: t('act.toolsRefresh'), kind: 'toolsRefresh', key: 'tlRefresh' }),
-            h(Btn, { label: t('act.toolsInstall'), kind: 'toolsInstall', key: 'tlInst', primary: true }),
-            h(Btn, { label: t('act.toolsInstallNice'), kind: 'toolsInstallNice', key: 'tlInstNice' })),
+            h(Btn, { label: t('act.toolsRefresh'), kind: 'toolsRefresh', out: 'tlRefresh' }),
+            h(Btn, { label: t('act.toolsInstall'), kind: 'toolsInstall', out: 'tlInst', primary: true }),
+            h(Btn, { label: t('act.toolsInstallNice'), kind: 'toolsInstallNice', out: 'tlInstNice' })),
           h('p', { style: S.hint }, t('hint.tools')),
-          h(Result, { k: 'tlInst' }), h(Result, { k: 'tlInstNice' })),
+          h(Result, { k: 'tlRefresh' }), h(Result, { k: 'tlInst' }), h(Result, { k: 'tlInstNice' })),
         // environment checks live here now: they are all "this machine" concerns
         h(Card, { key: 'e', title: t('sec.health') },
           h('div', { style: S.row },
-            h(Btn, { label: t('act.doctor'), kind: 'doctor', key: 'doc' }),
-            h(Btn, { label: t('act.doctorFix'), kind: 'doctorFix', key: 'docFix', primary: true }),
-            h(Btn, { label: t('act.net'), kind: 'net', key: 'net' })),
+            h(Btn, { label: t('act.doctor'), kind: 'doctor', out: 'doc' }),
+            h(Btn, { label: t('act.doctorFix'), kind: 'doctorFix', out: 'docFix', primary: true }),
+            h(Btn, { label: t('act.net'), kind: 'net', out: 'net' })),
           h(Result, { k: 'doc' }), h(Result, { k: 'docFix' }), h(Result, { k: 'net' })),
         h(Card, { key: 'l', title: t('sec.logs') },
-          h('div', { style: S.row }, h(Btn, { label: t('act.logs'), kind: 'logs', key: 'logs' })),
+          h('div', { style: S.row }, h(Btn, { label: t('act.logs'), kind: 'logs', out: 'logs' })),
           logs ? h(Fragment, {},
-            h('p', { style: S.hint }, t('logs.newest', { name: logs.newest || '-' })),
+            h('p', { style: S.hint }, t('logs.dir', { dir: logs.dir || '-' }) + '  ·  ' + t('logs.files', { n: Array.isArray(logs.files) ? logs.files.length : 0 })),
+            (Array.isArray(logs.files) && logs.files.length > 1) ? h('div', { style: S.row },
+              h('label', { style: { ...S.hint, display: 'flex', gap: '0.3rem', alignItems: 'center' } }, t('logs.pick'),
+              h('select', {
+                value: logsPick, style: S.input, disabled: !!busy,
+                onChange: (e) => run('logsPick', 'logs', { name: e.target.value }),
+              }, ...logs.files.map((f) => h('option', { key: f.name, value: f.name },
+                f.name + '  (' + (f.mtime ? new Date(f.mtime).toLocaleString() : '') + (f.size ? ', ' + f.size + 'B' : '') + ')'))))) : null,
+            h('p', { style: S.hint }, t('logs.newest', { name: logs.current || '-' })),
             h('pre', { style: S.pre }, logs.tail || '')) : null,
           h(Result, { k: 'logs' })),
       ]
@@ -917,7 +1141,7 @@ window.__ModuleLoader__.load({
           h('div', { style: S.row },
             h('input', { type: 'text', placeholder: 'Gitee 用户名', value: cUser, style: S.input, onChange: e => setCUser(e.target.value) }),
             h('input', { type: 'password', placeholder: t('cred.token'), value: cToken, style: S.input, onChange: e => setCToken(e.target.value) }),
-            h(Btn, { label: t('act.saveCred'), kind: 'saveCred', key: 'credSave' })),
+            h(Btn, { label: t('act.saveCred'), kind: 'saveCred', out: 'credSave' })),
           h('p', { style: S.hint }, t('hint.cred')),
           h('p', { style: S.hint }, t('hint.token')),
           h(Result, { k: 'credSave' })),
@@ -927,10 +1151,19 @@ window.__ModuleLoader__.load({
             h('input', { type: 'text', placeholder: t('boot.dest'), value: bDest, style: { ...S.input, width: '15rem' }, onChange: e => setBDest(e.target.value) })),
           h('div', { style: S.row },
             h('input', { type: 'text', placeholder: t('boot.repo'), value: bRepo, style: { ...S.input, width: '20rem' }, onChange: e => setBRepo(e.target.value) }),
-            h(Btn, { label: t('act.bootstrap'), kind: 'bootstrap', key: 'bootGo', primary: true })),
+            h(Btn, { label: t('act.bootstrap'), kind: 'bootstrap', out: 'bootGo', primary: true })),
           !cred.hasCredential ? h('p', { style: { ...S.hint, color: '#d29922' } }, t('boot.needCred')) : null,
           h('p', { style: S.hint }, t('hint.bootstrap')),
           h(Result, { k: 'bootGo' })),
+        h(Card, { key: 'sch', title: t('sec.schedule'), level: sched && sched.installed ? 'pass' : 'info' },
+          h('p', { style: S.hint }, t('schedule.what')),
+          sched ? h('p', { style: { fontSize: '0.78rem', margin: '0 0 0.4rem' } },
+            (sched.installed ? t('schedule.on') : t('schedule.off')) +
+            (sched.next ? '   ·   ' + t('schedule.next', { t: sched.next }) : '')) : null,
+          h('div', { style: S.row },
+            h(Btn, { label: sched && sched.installed ? t('act.scheduleRemove') : t('act.scheduleInstall'), kind: 'scheduleToggle', out: 'sch', primary: !sched || !sched.installed }),
+            h(Btn, { label: t('act.scheduleStatus'), kind: 'scheduleStatus', out: 'sch' })),
+          h(Result, { k: 'sch' })),
       ]
 
       const body = tab === 'overview' ? overviewTab
@@ -943,10 +1176,16 @@ window.__ModuleLoader__.load({
 
       if (err) {
         return shell(h(Card, { title: t('error', { e: err }), level: 'fail' },
-          h('div', { style: S.row }, h(Btn, { label: t('retry'), kind: 'refresh', key: 'retry' }))))
+          h('div', { style: S.row }, h(Btn, { label: t('retry'), kind: 'refresh', out: 'retry' })),
+          h(Result, { k: 'retry' })))
       }
 
-      return shell(...body)
+      const extra = manual ? [h(Card, { key: 'manual', title: (manual.name || t('sync.openManual')), level: 'pass' },
+        h('div', { style: S.row },
+          h(Btn, { label: t('clear'), kind: 'clearManual', out: 'manualClose' })),
+        h('pre', { style: { ...S.pre, maxHeight: '60vh' } }, manual.text || t('empty.output')))] : []
+
+      return shell(...body, ...extra)
     }
 
     function localeTag(ctx) {

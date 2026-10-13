@@ -1,7 +1,7 @@
 /**
  * dsh-sync-hub — sync-hub console tools (Host half).
  *
- * Registers 5 model tools covering the NON-INTERACTIVE safe subset of the
+ * Registers 15 model tools covering the NON-INTERACTIVE safe subset of the
  * sync-hub console (tools/*.ps1). Interactive flows (apply identity guard,
  * 一条龙, conflict resolution, session restore) stay human-only via the
  * 同步中枢.bat console - this plugin never wraps them.
@@ -424,7 +424,9 @@ async function apiHandler(req, res, config) {
       ])
       return send(200, { ok: true, info: infoR, cred: credR, tools: toolsR, status: statusR })
     }
-    // Recent DSH log lines (read-only): the "what just happened" view.
+    // Recent DSH log files + tail. Read-only. ?file=<name> selects a
+    // specific file (must be one of the enumerated names — path-traversal
+    // safe because we only match against the directory listing).
     if (method === 'GET' && routePath === '/logs') {
       const dir = path.join(os.homedir(), 'AppData', 'Roaming', '@deepseek-ai', 'dsh-desktop', 'logs')
       let files = []
@@ -435,15 +437,28 @@ async function apiHandler(req, res, config) {
           return { name: n, mtime: st.mtimeMs, size: st.size }
         }).sort((a, b) => b.mtime - a.mtime).slice(0, 10)
       } catch { /* no logs */ }
+      const reqName = String(url.searchParams.get('file') || '')
+      const current = (reqName && files.some((f) => f.name === reqName)) ? reqName : (files.length ? files[0].name : '')
       let tailText = ''
-      if (files.length) {
+      if (current) {
         try {
-          const p = path.join(dir, files[0].name)
-          const raw = fs.readFileSync(p, 'utf8')
+          const raw = fs.readFileSync(path.join(dir, current), 'utf8')
           tailText = raw.split(/\r?\n/).slice(-120).join('\n')
         } catch { /* unreadable */ }
       }
-      return send(200, { ok: true, dir, files, newest: files.length ? files[0].name : '', tail: tailText })
+      return send(200, { ok: true, dir, files, current, tail: tailText })
+    }
+    // Sync-hub usage manual (hub root 使用手册.md, fallback README.md). Read-only.
+    if (method === 'GET' && routePath === '/manual') {
+      let text = '', name = ''
+      for (const cn of ['使用手册.md', 'README.md']) {
+        const p = path.join(hub, cn)
+        if (fs.existsSync(p)) {
+          try { text = fs.readFileSync(p, 'utf8'); name = cn; break } catch { /* noop */ }
+        }
+      }
+      if (!text) return send(200, { ok: false, code: -1, text: '未找到 使用手册.md / README.md' })
+      return send(200, { ok: true, name, text })
     }
     if (method === 'POST' && routePath === '/push') {
       const body = await readJsonBody(req)
@@ -468,12 +483,44 @@ async function apiHandler(req, res, config) {
       if (body.skipProfile) pass.push('-SkipProfile')
       if (body.force) pass.push('-Force')
       const r = await runPs(hub, 'pull.ps1', pass, null, { timeoutMs: 300000 })
-      return send(200, result(r.code === 0, r.code, tail(r.out, 20000)))
+      // On a merge conflict (exit 2) enumerate the conflicting files so the
+      // card can render them as a structured list instead of raw log soup.
+      let conflictFiles = []
+      if (r.code === 2) {
+        try {
+          const u = await runGit(hub, ['diff', '--name-only', '--diff-filter=U'], 20000)
+          if (u.code === 0) conflictFiles = u.out.split(/\r?\n/).map((s) => s.trim()).filter(Boolean)
+        } catch { /* noop */ }
+      }
+      return send(200, { ...result(r.code === 0, r.code, tail(r.out, 20000)), conflictFiles })
     }
     // manual snapshot: the "back up now" the card was missing
     if (method === 'POST' && routePath === '/backup/create') {
       const r = await runPs(hub, 'backup.ps1', ['-Create'], null, { timeoutMs: 90000 })
       return send(200, result(r.code === 0, r.code, tail(r.out, 20000)))
+    }
+    // delete ONE backup file (guarded on the backend too: no separators / "..")
+    if (method === 'POST' && routePath === '/backup/delete') {
+      const body = await readJsonBody(req)
+      const name = (body && body.name) || ''
+      if (/[\\/]|\.\./.test(name)) return send(200, result(false, -1, 'invalid backup name'))
+      const r = await runPs(hub, 'backup.ps1', ['-Delete', name], null, { timeoutMs: 60000 })
+      return send(200, result(r.code === 0, r.code, tail(r.out, 20000)))
+    }
+    // timed sync via Windows Task Scheduler (code-only; cannot truly run on every host)
+    if (routePath === '/schedule') {
+      if (method === 'GET') {
+        const r = await runPs(hub, 'schedule.ps1', ['-Status'], null, { timeoutMs: 30000 })
+        const installed = /scheduled task present/i.test(r.out)
+        const next = (r.out.match(/next\s*:\s*(.+)/i) || [])[1] || ''
+        return send(200, { ok: true, installed, next: next.trim(), text: tail(r.out, 4000) })
+      }
+      if (method === 'POST') {
+        const body = await readJsonBody(req)
+        const action = (body && body.action) || 'install'
+        const r = await runPs(hub, 'schedule.ps1', ['-' + (action === 'remove' ? 'Remove' : 'Install')], null, { timeoutMs: 60000 })
+        return send(200, result(r.code === 0, r.code, tail(r.out, 20000)))
+      }
     }
     if (method === 'POST' && routePath === '/console') {
       const bat = path.join(hub, '同步中枢.bat')
@@ -771,6 +818,21 @@ async function apiHandler(req, res, config) {
       const r = await plugins.uninstallPlugin({ name: body.name, profile: body.profile })
       return send(200, { ok: r.ok, code: r.ok ? 0 : -1, text: r.text })
     }
+    // outdated check (npm only; local/file/git specs are reported as 'local')
+    if (method === 'GET' && routePath === '/plugins/outdated') {
+      const url = new URL(req.url ?? '/', 'http://localhost')
+      const r = await plugins.checkOutdated({ profile: url.searchParams.get('profile') || '' })
+      return send(200, r)
+    }
+    if (method === 'POST' && routePath === '/plugins/update') {
+      const body = await readJsonBody(req)
+      const r = await plugins.updatePlugin({ name: body.name, profile: body.profile })
+      return send(200, { ok: r.ok, code: r.ok ? 0 : -1, text: r.text })
+    }
+    // curated recommendations for the market row
+    if (method === 'GET' && routePath === '/plugins/featured') {
+      return send(200, { ok: true, items: plugins.FEATURED })
+    }
     return send(404, { error: 'no such route' })
   } catch (e) {
     return send(500, { error: String((e && e.message) ?? e) })
@@ -913,7 +975,209 @@ export function apply(ctx, config) {
     },
   })) registered += 1
 
-  logger.info?.('[dsh-sync-hub] registered ' + registered + '/5 sync tools')
+  // ── P1: expose the rest of the card's safe capability surface as AI tools
+  //    (backup / skills / plugins) so the Agent can drive them too. State-
+  //    changing ones are flagged "confirm first" in their description.
+  const SKILL_TOGGLE_PARAMS = {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: '技能目录名 (kebab-case), 如 my-skill' },
+      rootId: { type: 'string', description: '来源 id: dsh(默认) | agents | 其余只读来源不可改' },
+      enable: { type: 'boolean', description: 'true=启用, false=停用' },
+    },
+    required: ['name', 'enable'],
+    additionalProperties: false,
+  }
+  const SKILL_IMPORT_PARAMS = {
+    type: 'object',
+    properties: {
+      url: { type: 'string', description: 'GitHub 仓库 / .zip / 原始 SKILL.md 的 http(s) 网址' },
+      name: { type: 'string', description: '可选: 指定技能名 (kebab-case); 不填则从 frontmatter 推断' },
+    },
+    required: ['url'],
+    additionalProperties: false,
+  }
+  const SKILL_CREATE_PARAMS = {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: '新技能名 (kebab-case), 如 my-skill' },
+      description: { type: 'string', description: '技能描述 (DSH 靠它决定何时调用, 必填)' },
+      body: { type: 'string', description: '可选: SKILL.md 正文' },
+    },
+    required: ['name', 'description'],
+    additionalProperties: false,
+  }
+  const PLUGIN_PARAMS = {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: '插件包名, 如 @owner/dsh-foo 或 dsh-foo' },
+      profile: { type: 'string', description: 'DSH profile 名, 默认 desktop' },
+    },
+    required: ['name'],
+    additionalProperties: false,
+  }
+
+  if (reg({
+    name: 'sync_hub_backup',
+    description:
+      '手动创建一份本机 DSH 备份 (跑 tools/backup.ps1 -Create): AGENTS.md / profile / 会话等。' +
+      '只读拷贝, 无破坏性。用户说"备份一下/做个备份"时用。',
+    parameters: NO_PARAMS,
+    output: OUT,
+    execute: async (_args, exec) => {
+      const hub = resolveHub(config)
+      if (!hub) return noHub()
+      const r = await runPs(hub, 'backup.ps1', ['-Create'], exec, { timeoutMs: 90000 })
+      return result(r.code === 0, r.code, tail(r.out) || '(no output)')
+    },
+  })) registered += 1
+
+  if (reg({
+    name: 'sync_hub_backup_list',
+    description:
+      '列出已有备份 (跑 tools/backup.ps1 -List), 只读。返回备份名/时间等, 供人工选择或后续恢复。',
+    parameters: NO_PARAMS,
+    output: OUT,
+    execute: async (_args, exec) => {
+      const hub = resolveHub(config)
+      if (!hub) return noHub()
+      const r = await runPs(hub, 'backup.ps1', ['-List'], exec, { timeoutMs: 60000 })
+      return result(r.code === 0, r.code, tail(r.out) || '(no output)')
+    },
+  })) registered += 1
+
+  if (reg({
+    name: 'sync_hub_skill_list',
+    description:
+      '列出本机所有发现的技能 (跨 DSH / 共享 / 其他 Agent 来源), 只读。' +
+      '返回每项的 name / rootLabel / enabled / valid / sizeKB / path。用户问"有哪些技能/某技能启用没"时用。',
+    parameters: NO_PARAMS,
+    output: OUT,
+    execute: async () => {
+      const hub = resolveHub(config)
+      if (!hub) return noHub()
+      const items = skills.listSkills()
+      if (!items.length) return result(true, 0, 'no skills found on this machine')
+      const lines = items.map((s) =>
+        (s.enabled ? '[on ] ' : '[off] ') + s.name + '  (' + s.rootLabel +
+        (s.writable ? '' : ' 只读') + (s.valid ? '' : ' 无效') + ')  ' + s.sizeKB + 'KB  ' + s.path)
+      return result(true, 0, lines.join('\n'))
+    },
+  })) registered += 1
+
+  if (reg({
+    name: 'sync_hub_skill_toggle',
+    description:
+      '启用/停用一个技能 (DSH: SKILL.md <-> SKILL.md.disabled 改名, 完全可逆, 不碰其他 Agent 的文件)。' +
+      '会改变本机 DSH 行为, 调用前先与用户确认。只读来源 (非 dsh/agents) 会被拒绝。',
+    parameters: SKILL_TOGGLE_PARAMS,
+    output: OUT,
+    execute: async (args) => {
+      const hub = resolveHub(config)
+      if (!hub) return noHub()
+      const r = skills.toggleSkill({ name: args.name, rootId: args.rootId || 'dsh', enable: !!args.enable })
+      return result(r.ok, r.ok ? 0 : -1, r.text)
+    },
+  })) registered += 1
+
+  if (reg({
+    name: 'sync_hub_skill_import',
+    description:
+      '从网址导入一个技能到本机 DSH (支持 GitHub 仓库 / .zip / 原始 SKILL.md)。落地到 ~/.dsh/skills。' +
+      '会改变本机, 且可能触发外部网络下载, 调用前先与用户确认来源可信。',
+    parameters: SKILL_IMPORT_PARAMS,
+    output: OUT,
+    execute: async (args) => {
+      const hub = resolveHub(config)
+      if (!hub) return noHub()
+      const r = await skills.importSkillFromUrl({ url: args.url, name: args.name })
+      return result(r.ok, r.ok ? 0 : -1, r.text)
+    },
+  })) registered += 1
+
+  if (reg({
+    name: 'sync_hub_skill_create',
+    description:
+      '在本机 DSH 创建一个新技能脚手架 (写 ~/.dsh/skills/<name>/SKILL.md)。会改变本机文件, 调用前先与用户确认。',
+    parameters: SKILL_CREATE_PARAMS,
+    output: OUT,
+    execute: async (args) => {
+      const hub = resolveHub(config)
+      if (!hub) return noHub()
+      const r = skills.createSkill({ name: args.name, description: args.description, body: args.body })
+      return result(r.ok, r.ok ? 0 : -1, r.text)
+    },
+  })) registered += 1
+
+  if (reg({
+    name: 'sync_hub_plugin_list',
+    description:
+      '列出本机各 DSH profile 已装插件及其链接健康/版本 (读 profile package.json, 只读)。' +
+      '用户问"装了哪些插件/某插件版本"时用。',
+    parameters: NO_PARAMS,
+    output: OUT,
+    execute: async () => {
+      const hub = resolveHub(config)
+      if (!hub) return noHub()
+      const { profiles } = plugins.listInstalled()
+      if (!profiles.length) return result(true, 0, 'no profiles found')
+      const lines = []
+      for (const p of profiles) {
+        lines.push('profile: ' + p.profile)
+        for (const it of p.items) {
+          lines.push('  ' + it.name + '  v' + (it.version || '?') +
+            (it.bundled ? ' [bundled]' : '') + (it.linkOk ? '' : ' [LINK BROKEN]') + '  ' + it.spec)
+        }
+      }
+      return result(true, 0, lines.join('\n'))
+    },
+  })) registered += 1
+
+  if (reg({
+    name: 'sync_hub_plugin_install',
+    description:
+      '往本机 DSH profile 安装一个插件 (调 dsh plugin add, 需联网 npm)。会改变本机并拉取外部包, ' +
+      '调用前先与用户确认包名与来源可信。装完需重启 DSH 生效。',
+    parameters: PLUGIN_PARAMS,
+    output: OUT,
+    execute: async (args) => {
+      const hub = resolveHub(config)
+      if (!hub) return noHub()
+      const r = await plugins.installPlugin({ name: args.name, profile: args.profile || 'desktop' })
+      return result(r.ok, r.ok ? 0 : -1, r.text)
+    },
+  })) registered += 1
+
+  if (reg({
+    name: 'sync_hub_plugin_uninstall',
+    description:
+      '从本机 DSH profile 卸载一个插件 (调 dsh plugin remove)。会改变本机, 调用前先与用户确认。',
+    parameters: PLUGIN_PARAMS,
+    output: OUT,
+    execute: async (args) => {
+      const hub = resolveHub(config)
+      if (!hub) return noHub()
+      const r = await plugins.uninstallPlugin({ name: args.name, profile: args.profile || 'desktop' })
+      return result(r.ok, r.ok ? 0 : -1, r.text)
+    },
+  })) registered += 1
+
+  if (reg({
+    name: 'sync_hub_plugin_update',
+    description:
+      '把本机 DSH profile 的一个插件更新到 npm 最新版 (调 dsh plugin add <pkg>@latest)。会改变本机, ' +
+      '调用前先与用户确认。更新完需重启 DSH 生效。',
+    parameters: PLUGIN_PARAMS,
+    output: OUT,
+    execute: async (args) => {
+      const hub = resolveHub(config)
+      if (!hub) return noHub()
+      const r = await plugins.updatePlugin({ name: args.name, profile: args.profile || 'desktop' })
+      return result(r.ok, r.ok ? 0 : -1, r.text)
+    },
+  })) registered += 1
+
+  logger.info?.('[dsh-sync-hub] registered ' + registered + '/15 sync tools')
 
   // Settings-card backend. ctx.inject defers until webServer exists: plugins
   // load before the browser half publishes it (same pattern as our-free-model
