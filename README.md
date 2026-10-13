@@ -55,6 +55,16 @@ Copy-Item -Recurse '<中枢>\plugins\dsh-sync-hub' "$prof\node_modules\dsh-sync-
 
 卸载 = 从 `bundles` 删一行 + 删 `node_modules\dsh-sync-hub` + 重启（原功能全部不受影响）。
 
+## 设置页卡片（v0.2.0 浏览器半身，已实证）
+
+- **入口**：DSH 设置 → 「同步中枢」分区（settings.section id `sync-hub`，order 36）。
+- **内容**：版本/最新提交/技能数/工作区状态 + 按钮：刷新、查看差异、上传备份、拉取并应用、打开控制台。
+- **通道**：卡片走宿主半身同源 API `/api/sync-hub/{info,status,push,pull,console}`；
+  带 same-origin 围栏（Origin/referer 主机不等于请求主机 → 403），局域网裸调会被拒。
+- **探针实证（2026-10-13）**：mock ctx 注入捕获 → 起真 HTTP 分发 → GET /info 200 真数据、
+  无 Origin 403、POST /console 开窗口成功；5/5 模型工具同场注册正常。
+- **约束不变**：push/pull 之外（换身份/一条龙/冲突处理）仍只能在打开的控制台窗口里人工操作。
+
 ## 验证
 
 重启后新会话里应能看到 5 个 `sync_hub_*` 工具；先问「中枢什么版本」跑 `sync_hub_version`。

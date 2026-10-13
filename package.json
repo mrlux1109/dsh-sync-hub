@@ -1,15 +1,17 @@
 {
   "name": "dsh-sync-hub",
-  "version": "0.1.0",
-  "description": "sync-hub console tools for DSH: status/push/pull/version/open-console. 跨机记忆同步中枢插件，只暴露非交互安全子集。",
+  "version": "0.2.0",
+  "description": "sync-hub console tools + settings card for DSH: status/push/pull/version/open-console. 跨机记忆同步中枢插件：非交互安全子集工具 + 设置页卡片。",
   "type": "module",
   "main": "index.js",
   "exports": {
     ".": "./index.js",
+    "./client": "./client.js",
     "./package.json": "./package.json"
   },
   "files": [
     "index.js",
+    "client.js",
     "cordis.patch.yml",
     "README.md"
   ],
@@ -26,6 +28,11 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": []
     }
   }
 }

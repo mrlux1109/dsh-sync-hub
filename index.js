@@ -158,6 +158,89 @@ function result(ok, code, text) {
   return { ok: !!ok, code: Number(code), text: String(text ?? '') }
 }
 
+/**
+ * Same-origin fence for the settings API. The webServer prefix route is not
+ * covered by the shell's own auth (cf. our-free-model's trust fence), so the
+ * card's POST endpoints (push/pull/console) require the request to come from
+ * the same host the page was served from. The desktop page fetches same-origin
+ * (document.baseURI resolves into this server), so a real card call passes;
+ * a raw LAN caller without a browser page does not.
+ */
+function sameOrigin(req) {
+  try {
+    const origin = req.headers['origin'] || req.headers['referer']
+    if (!origin) return false
+    return new URL(origin).host === String(req.headers['host'] || '').toLowerCase()
+  } catch {
+    return false
+  }
+}
+
+function readJsonBody(req) {
+  return new Promise((resolve) => {
+    let raw = ''
+    req.on('data', (c) => { raw += c; if (raw.length > 65536) { try { req.destroy() } catch { /* noop */ } } })
+    req.on('end', () => { try { resolve(JSON.parse(raw || '{}')) } catch { resolve({}) } })
+    req.on('error', () => resolve({}))
+  })
+}
+
+/** The settings-card backend: { path: handler } under /api/sync-hub. */
+async function apiHandler(req, res, config) {
+  const send = (status, payload) => {
+    res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+    res.end(JSON.stringify(payload))
+  }
+  const url = new URL(req.url ?? '/', 'http://localhost')
+  const routePath = url.pathname.replace(/^\/api\/sync-hub/, '').replace(/\/+$/, '') || '/'
+  const method = String(req.method ?? 'GET').toUpperCase()
+  if (!sameOrigin(req)) return send(403, { error: 'same-origin only' })
+  const hub = resolveHub(config)
+  if (!hub) return send(200, { ok: false, code: -1, text: 'sync-hub not found on this machine (set config.hubPath)' })
+  try {
+    if (method === 'GET' && routePath === '/info') {
+      const ver = fs.readFileSync(path.join(hub, 'VERSION'), 'utf8').trim()
+      const log = await runGit(hub, ['log', '-1', '--format=%h|%ci|%s'])
+      const st = await runGit(hub, ['status', '--porcelain'])
+      let skills = 0
+      try { skills = fs.readdirSync(path.join(hub, 'skills'), { withFileTypes: true }).filter((d) => d.isDirectory()).length } catch { /* noop */ }
+      const [commit, date, subject] = log.code === 0 ? String(log.out).trim().split('|') : ['', '', '']
+      return send(200, {
+        ok: true, version: ver, commit, commitDate: date, commitSubject: subject,
+        dirty: st.code === 0 ? st.out.trim().split('\n').filter(Boolean).length : -1,
+        skills, hubPath: hub, machine: os.hostname(),
+      })
+    }
+    if (method === 'GET' && routePath === '/status') {
+      const r = await runPs(hub, 'status.ps1', [], null)
+      return send(200, result(r.code === 0, r.code, tail(r.out, 20000)))
+    }
+    if (method === 'POST' && routePath === '/push') {
+      const body = await readJsonBody(req)
+      const scope = typeof body.scope === 'string' ? body.scope.trim() : ''
+      const pass = scope && scope !== 'all' ? ['-What', scope] : []
+      const r = await runPs(hub, 'push.ps1', pass, null)
+      return send(200, result(r.code === 0, r.code, tail(r.out, 20000)))
+    }
+    if (method === 'POST' && routePath === '/pull') {
+      const r = await runPs(hub, 'pull.ps1', [], null)
+      return send(200, result(r.code === 0, r.code, tail(r.out, 20000)))
+    }
+    if (method === 'POST' && routePath === '/console') {
+      const bat = path.join(hub, '同步中枢.bat')
+      if (!fs.existsSync(bat)) return send(200, result(false, -1, 'launcher missing: ' + bat))
+      const child = spawn('cmd.exe', ['/d', '/c', 'start', '""', '"' + bat + '"'], {
+        cwd: hub, detached: true, stdio: 'ignore', windowsHide: false,
+      })
+      child.unref()
+      return send(200, result(true, 0, 'console opened: ' + bat))
+    }
+    return send(404, { error: 'no such route' })
+  } catch (e) {
+    return send(500, { error: String((e && e.message) ?? e) })
+  }
+}
+
 export function apply(ctx, config) {
   const logger = ctx.logger ?? console
   if (!ctx.tools || typeof ctx.tools.register !== 'function') {
@@ -295,4 +378,19 @@ export function apply(ctx, config) {
   })) registered += 1
 
   logger.info?.('[dsh-sync-hub] registered ' + registered + '/5 sync tools')
+
+  // Settings-card backend. ctx.inject defers until webServer exists: plugins
+  // load before the browser half publishes it (same pattern as our-free-model
+  // index.js:1402), so a one-shot ctx.get('webServer') here would answer
+  // undefined and the card would have no data source.
+  if (typeof ctx.inject === 'function') {
+    ctx.inject(['webServer'], scoped => {
+      const server = scoped.webServer
+      if (!server || typeof server.register !== 'function') return
+      scoped.effect(() => server.register({
+        kind: 'prefix', path: '/api/sync-hub', handler: (req, res) => apiHandler(req, res, config),
+      }), 'dsh-sync-hub: settings API')
+      logger.info?.('[dsh-sync-hub] settings API mounted at /api/sync-hub')
+    })
+  }
 }
