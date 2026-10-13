@@ -185,6 +185,52 @@ function readJsonBody(req) {
   })
 }
 
+/** Ask git for the stored credential for a host. Returns username ONLY; the
+ *  password stays inside the child process and is never returned upward. */
+function probeGiteeCredential(repoHost) {
+  return new Promise((resolve) => {
+    const child = spawn('git', ['credential', 'fill'], {
+      cwd: os.tmpdir(), windowsHide: true, env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'never' },
+    })
+    let out = ''
+    child.stdout.on('data', (d) => { out += d.toString('utf8') })
+    child.on('error', () => resolve({ ok: false, user: '', err: 'git missing' }))
+    child.on('close', (code) => {
+      if (code !== 0) { resolve({ ok: false, user: '' }); return }
+      const m = /username=(.+)/.exec(out)
+      resolve({ ok: true, user: m ? m[1].trim() : '' })
+    })
+    child.stdin.write('protocol=https\nhost=' + repoHost + '\n\n')
+    child.stdin.end()
+  })
+}
+
+function saveGiteeCredential(repoHost, username, token) {
+  return new Promise((resolve) => {
+    const child = spawn('git', ['credential', 'approve'], {
+      cwd: os.tmpdir(), windowsHide: true, env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'never' },
+    })
+    child.on('error', (e) => resolve({ ok: false, err: String(e.message ?? e) }))
+    child.on('close', (code) => resolve({ ok: code === 0 }))
+    child.stdin.write('protocol=https\nhost=' + repoHost + '\nusername=' + username + '\npassword=' + token + '\n\n')
+    child.stdin.end()
+  })
+}
+
+function rejectGiteeCredential(repoHost, username) {
+  return new Promise((resolve) => {
+    const child = spawn('git', ['credential', 'reject'], {
+      cwd: os.tmpdir(), windowsHide: true, env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'never' },
+    })
+    child.on('error', () => resolve({ ok: false }))
+    child.on('close', (code) => resolve({ ok: code === 0 }))
+    child.stdin.write('protocol=https\nhost=' + repoHost + '\nusername=' + username + '\n\n')
+    child.stdin.end()
+  })
+}
+
+const GITEE_HOST = 'gitee.com'
+
 /** The settings-card backend: { path: handler } under /api/sync-hub. */
 async function apiHandler(req, res, config) {
   const send = (status, payload) => {
@@ -234,6 +280,42 @@ async function apiHandler(req, res, config) {
       })
       child.unref()
       return send(200, result(true, 0, 'console opened: ' + bat))
+    }
+    // ── Gitee credential (git-based auth; the token is write-only: stored into
+    //    the Windows Credential Manager via `git credential approve` and NEVER
+    //    returned to the client) ────────────────────────────────────────────────
+    if (method === 'GET' && routePath === '/cred') {
+      const remoteRes = await runGit(hub, ['remote', 'get-url', 'origin'])
+      let host = 'gitee.com'
+      try {
+        if (remoteRes.code === 0 && remoteRes.out.trim()) host = new URL(remoteRes.out.trim()).host
+      } catch { /* keep default host */ }
+      const probe = await probeGiteeCredential(host)
+      return send(200, {
+        ok: true, repoHost: host,
+        repoUrl: remoteRes.code === 0 ? remoteRes.out.trim() : '',
+        hasCredential: probe.ok, username: probe.ok ? probe.user : '',
+      })
+    }
+    if (method === 'POST' && routePath === '/cred') {
+      const body = await readJsonBody(req)
+      const username = String(body.username ?? '').trim()
+      const token = String(body.token ?? '')
+      if (!username || !token) return send(200, result(false, -1, 'username + token are both required'))
+      const remoteRes = await runGit(hub, ['remote', 'get-url', 'origin'])
+      let host = 'gitee.com'
+      try {
+        if (remoteRes.code === 0 && remoteRes.out.trim()) host = new URL(remoteRes.out.trim()).host
+      } catch { /* keep default host */ }
+      const saved = await saveGiteeCredential(host, username, token)
+      // read back to confirm the manager actually accepted the secret
+      const probe = await probeGiteeCredential(host)
+      const remoteUrl = remoteRes.code === 0 && remoteRes.out.trim() ? remoteRes.out.trim() : ('https://' + host + '/')
+      const reach = await runGit(hub, ['ls-remote', '--heads', remoteUrl])
+      const lines = reach.code === 0 ? reach.out.trim().split('\n').filter(Boolean).length : 0
+      return send(200, result(saved.ok && probe.ok, saved.ok ? 0 : -1,
+        (saved.ok && probe.ok ? 'credential stored (user=' + probe.user + ')' : 'store failed: ' + (saved.err ?? '')) +
+        (reach.code === 0 ? '  ·  ' + host + ' reachable' : '  ·  repo not reachable yet (see shared 4.12)')))
     }
     return send(404, { error: 'no such route' })
   } catch (e) {

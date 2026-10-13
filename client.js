@@ -54,6 +54,14 @@ window.__ModuleLoader__.load({
         'hint.console': '换身份 / 一条龙 / 冲突处理等人操作在窗口里完成。',
         'busy': '执行中…（同步操作可能要十几秒）',
         'confirmPush': '先跑一次「查看差异」再上传？',
+        'cred.title': 'Gitee 凭据（新机上传/拉取一次录入）',
+        'cred.have': '已保存',
+        'cred.none': '未保存 —— push/clone 会失败',
+        'cred.user': 'Gitee 用户名',
+        'cred.token': '私人令牌（只写不回显）',
+        'cred.save': '保存并测试',
+        'cred.where': '令牌存 Windows 凭据管理器（git credential），永不写入任何文件或仓库。',
+        'hint.token': '拿令牌：gitee.com → 设置 → 私人令牌（勾 projects 权限）；新机器也可用菜单 [22] 接入向导。',
       },
       en: {
         'nav': 'Sync Hub',
@@ -76,6 +84,14 @@ window.__ModuleLoader__.load({
         'hint.console': 'Identity switch / first-run setup / conflict fixes stay manual in the window.',
         'busy': 'Running… (sync may take a few tens of seconds)',
         'confirmPush': 'Run Status before pushing?',
+        'cred.title': 'Gitee credential (enter once on a new machine)',
+        'cred.have': 'stored',
+        'cred.none': 'no credential — push/clone will fail',
+        'cred.user': 'Gitee username',
+        'cred.token': 'private token (write-only)',
+        'cred.save': 'Save & test',
+        'cred.where': 'Stored in the Windows Credential Manager via git credential — never written to any file or repo.',
+        'hint.token': 'Token: gitee.com → Settings → Private Token (projects scope). On a fresh machine, menu [22] runs the full wizard.',
       },
     }
 
@@ -114,6 +130,12 @@ window.__ModuleLoader__.load({
         background: 'var(--color-surface, rgba(128,128,128,0.08))',
         color: 'var(--color-text, inherit)', cursor: 'pointer',
       },
+      input: {
+        padding: '0.35rem 0.6rem', borderRadius: '0.5rem', fontSize: '0.78rem', width: '12rem',
+        border: '1px solid var(--color-border, rgba(128,128,128,0.35))',
+        background: 'var(--color-surface, rgba(128,128,128,0.06))',
+        color: 'var(--color-text, inherit)',
+      },
       pre: {
         marginTop: '0.5rem', padding: '0.6rem', borderRadius: '0.5rem', fontSize: '0.72rem',
         whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: '14rem', overflow: 'auto',
@@ -133,13 +155,20 @@ window.__ModuleLoader__.load({
       const [err, setErr] = useState('')
       const [busy, setBusy] = useState(false)
       const [output, setOutput] = useState(undefined)
+      const [cred, setCred] = useState(undefined)
+      const [cUser, setCUser] = useState('')
+      const [cToken, setCToken] = useState('')
 
+      const loadCred = useCallback(() => {
+        api('/cred').then(setCred).catch(() => setCred({ ok: false }))
+      }, [])
       const load = useCallback(() => {
         setErr('')
         api('/info')
           .then(payload => { setInfo(payload); if (!payload.ok) setErr('notFound') })
           .catch(e => setErr(String(e?.message ?? e)))
-      }, [])
+        loadCred()
+      }, [loadCred])
       useEffect(() => { load() }, [load])
 
       const run = useCallback(async (kind) => {
@@ -150,6 +179,11 @@ window.__ModuleLoader__.load({
           if (kind === 'status') payload = await api('/status', { timeout: 90_000 })
           else if (kind === 'pull') payload = await post('/pull', undefined, 180_000)
           else if (kind === 'console') payload = await post('/console')
+          else if (kind === 'saveCred') {
+            payload = await post('/cred', { username: cUser, token: cToken }, 120_000)
+            setCToken('')
+            loadCred()
+          }
           else payload = await post('/push', {}, 180_000)
           setOutput(payload?.text ?? JSON.stringify(payload))
           if (kind === 'pull' || kind === 'push') load()
@@ -158,7 +192,7 @@ window.__ModuleLoader__.load({
         } finally {
           setBusy(false)
         }
-      }, [load])
+      }, [load, loadCred, cUser, cToken])
 
       const button = (key, kind) => h('button', {
         key, type: 'button', style: CARD.btn, disabled: busy,
@@ -191,6 +225,22 @@ window.__ModuleLoader__.load({
 
         busy ? h('p', { style: { fontSize: '0.75rem', opacity: 0.65 } }, t('busy')) : null,
         output !== undefined ? h('pre', { style: CARD.pre }, output) : null,
+
+        h('section', { style: { display: 'flex', flexDirection: 'column', gap: '0.4rem', borderTop: '1px solid var(--color-border, rgba(128,128,128,0.25))', paddingTop: '0.7rem' } },
+          h('h3', { style: { fontSize: '0.85rem', margin: 0 } }, t('cred.title')),
+          cred === undefined
+            ? h('p', { style: { fontSize: '0.75rem', opacity: 0.6 } }, t('loading'))
+            : h('p', { style: { fontSize: '0.78rem', margin: 0 } },
+                cred.hasCredential
+                  ? h(Fragment, {}, h('span', { style: { color: 'var(--color-success, #2a9)' } }, t('cred.have')), '  ' + (cred.username || '') + (cred.repoHost ? '  ·  ' + cred.repoHost : ''))
+                  : h('span', { style: { color: 'var(--color-danger, #d33)' } }, t('cred.none'))),
+          h('div', { style: { display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' } },
+            h('input', { type: 'text', placeholder: t('cred.user'), value: cUser, disabled: busy, style: CARD.input, onChange: e => setCUser(e.target.value) }),
+            h('input', { type: 'password', placeholder: t('cred.token'), value: cToken, disabled: busy, style: CARD.input, onChange: e => setCToken(e.target.value) }),
+            h('button', { type: 'button', style: CARD.btn, disabled: busy || !cUser || !cToken, onClick: () => run('saveCred') }, t('cred.save'))),
+          h('p', { style: { fontSize: '0.68rem', opacity: 0.5, margin: 0 } }, t('cred.where')),
+          h('p', { style: { fontSize: '0.68rem', opacity: 0.5, margin: 0 } }, t('hint.token'))),
+
         h('p', { style: { fontSize: '0.7rem', opacity: 0.55 } }, t('hint.pull')),
         h('p', { style: { fontSize: '0.7rem', opacity: 0.55 } }, t('hint.console')))
     }
@@ -228,6 +278,11 @@ window.__ModuleLoader__.load({
     exports.apply = apply
     exports.inject = inject
     exports.name = 'sync-hub'
-    return module
+    // MUST return module.exports (an object with apply), NOT module itself.
+    // Returning module => host sees {exports:{...}} with no apply =>
+    // "invalid plugin, expect function or object with an 'apply' method" and
+    // the whole concatenated client bundle is skipped (collateral damage to
+    // every other plugin in the same bundle). Verified 2026-10-13 crash log.
+    return module.exports
   },
 })
