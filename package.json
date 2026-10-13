@@ -1,0 +1,31 @@
+{
+  "name": "dsh-sync-hub",
+  "version": "0.1.0",
+  "description": "sync-hub console tools for DSH: status/push/pull/version/open-console. 跨机记忆同步中枢插件，只暴露非交互安全子集。",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "sync-hub",
+    "tool"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

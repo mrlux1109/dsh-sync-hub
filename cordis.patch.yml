@@ -1,0 +1,6 @@
+# dsh-sync-hub bundle patch (same shape as dsh-our-free-model).
+# Host-half only: registers sync-hub model tools, no browser half.
+- insert:
+    - id: sync-hub
+      name: 'dsh-sync-hub'
+      config: {}
