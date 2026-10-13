@@ -88,9 +88,24 @@ const NO_PARAMS = { type: 'object', properties: {}, additionalProperties: false 
 const PUSH_PARAMS = {
   type: 'object',
   properties: {
-    scope: {
-      type: 'string',
-      description: '上传范围: all(默认) | memory | skills | config | sessions',
+    categories: {
+      type: 'array',
+      items: { type: 'string', enum: ['memory', 'skills', 'config', 'plugins', 'sessions', 'dshconfig'] },
+      description: '六类上传范围: memory=记忆, skills=技能, config=配置, plugins=插件清单, sessions=会话备份, dshconfig=DSH运行配置采集。省略或空=全部。',
+    },
+    skills: {
+      type: 'array',
+      items: { type: 'string' },
+      description: '只上传这些技能 (按技能名), 省略=全部技能。仅当 categories 含 skills 时有效。',
+    },
+    sessions: {
+      type: 'array',
+      items: { type: 'string' },
+      description: '只上传这些会话工作区 (按工作区名), 省略=全部。仅当 categories 含 sessions 时有效。',
+    },
+    dshconfig: {
+      type: 'boolean',
+      description: 'true=同时采集本机 DSH 运行配置 (profile 的 package.json/cordis.patch.yml + gitconfig) 一起上传。',
     },
     message: {
       type: 'string',
@@ -100,10 +115,78 @@ const PUSH_PARAMS = {
   additionalProperties: false,
 }
 
+const PULL_PARAMS = {
+  type: 'object',
+  properties: {
+    categories: {
+      type: 'array',
+      items: { type: 'string', enum: ['memory', 'skills', 'config', 'plugins', 'sessions', 'dshconfig'] },
+      description: '六类拉取范围: memory=记忆, skills=技能, config=配置, plugins=插件清单, sessions=会话备份, dshconfig=DSH运行配置写回。省略或空=全部。',
+    },
+    skills: {
+      type: 'array',
+      items: { type: 'string' },
+      description: '只拉取这些技能 (按技能名), 省略=全部技能。仅当 categories 含 skills 时有效。',
+    },
+    sessions: {
+      type: 'array',
+      items: { type: 'string' },
+      description: '只恢复这些会话工作区 (按工作区名), 省略=全部。仅当 categories 含 sessions 时有效。',
+    },
+    dshconfigWriteBack: {
+      type: 'boolean',
+      description: 'true=把中枢里采集的 DSH 运行配置写回本机 (需同机身份三重校验通过)。',
+    },
+    machineId: {
+      type: 'string',
+      description: '会话恢复来源机器标记 (session-backup/<machineId>/)。省略时由后端自动取本机标记。',
+    },
+    force: {
+      type: 'boolean',
+      description: 'true=强制覆盖本地改动 (慎用)',
+    },
+  },
+  additionalProperties: false,
+}
+
 function tail(s, max = 6000) {
   const str = String(s ?? '')
   if (str.length <= max) return str
   return '...(truncated)\n' + str.slice(-max)
+}
+
+const ALL_CATEGORIES = ['memory', 'skills', 'config', 'plugins', 'sessions', 'dshconfig']
+
+/** 把前端传来的 categories（bool 对象或数组）规整成合法的 -What 取值数组。 */
+function normalizeCategories(cats) {
+  if (Array.isArray(cats)) {
+    return cats.filter((c) => ALL_CATEGORIES.includes(String(c).toLowerCase()))
+  }
+  if (cats && typeof cats === 'object') {
+    return ALL_CATEGORIES.filter((c) => cats[c])
+  }
+  return []
+}
+
+/** 把 skills/sessions 选择（数组或逗号串）规整成 push.ps1 -Skills 用的 CSV。 */
+function toCsv(v) {
+  if (Array.isArray(v)) {
+    return v.map((s) => String(s).trim().toLowerCase()).filter(Boolean).join(',')
+  }
+  if (typeof v === 'string') {
+    return v.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean).join(',')
+  }
+  return ''
+}
+
+/** 读取本机 sync-hub 机器标记（session 备份 -From 的 mid），不存在返回 ''。 */
+function readMachineId() {
+  try {
+    const dsh = process.env.DSH_HOME || path.join(os.homedir(), '.dsh')
+    const p = path.join(dsh, '.sync-hub-machine')
+    if (fs.existsSync(p)) return fs.readFileSync(p, 'utf8').trim()
+  } catch { /* noop */ }
+  return ''
 }
 
 function quote(s) {
@@ -462,17 +545,26 @@ async function apiHandler(req, res, config) {
     }
     if (method === 'POST' && routePath === '/push') {
       const body = await readJsonBody(req)
-      const scope = typeof body.scope === 'string' ? body.scope.trim() : ''
-      const message = typeof body.message === 'string' ? body.message.trim() : ''
       const pass = []
-      // 'all' (or empty) = whole hub; anything else maps to push.ps1 -What
-      if (scope && scope !== 'all') {
-        if (!/^(memory|skills|config|sessions)(,(memory|skills|config|sessions))*$/.test(scope)) {
-          return send(200, result(false, -1, 'scope must be all | memory | skills | config | sessions'))
-        }
-        pass.push('-What', scope)
-      }
+      // Six-category push (方案 A 增强): categories[] drives push.ps1 -What;
+      // skills[]/sessions[] narrow per-item; dshconfig also flips the
+      // -DshConfig collector switch (captures LIVE DSH run-config). Empty /
+      // absent categories = whole hub (legacy 'all').
+      const cats = normalizeCategories(body.categories)
+      const skillsSel = toCsv(body.skills)
+      const sessionsSel = toCsv(body.sessions)
+      if (cats.length) pass.push('-What', cats.join(','))
+      if (skillsSel) pass.push('-Skills', skillsSel)
+      if (sessionsSel) pass.push('-Sessions', sessionsSel)
+      if (body.dshconfig) pass.push('-DshConfig')
+      const message = typeof body.message === 'string' ? body.message.trim() : ''
       if (message) pass.push('-Message', message)
+      // Backing-up session history is a separate read-only step that must run
+      // BEFORE the git push so the hub carries the newest conversations.
+      if (cats.includes('sessions')) {
+        await runPs(hub, 'backup-sessions.ps1', ['-Backup', '-IncludeInGit']
+          .concat(sessionsSel ? ['-Sessions', sessionsSel] : []), null, { timeoutMs: 600000 })
+      }
       const r = await runPs(hub, 'push.ps1', pass, null, { timeoutMs: 300000 })
       return send(200, result(r.code === 0, r.code, tail(r.out, 20000)))
     }
@@ -482,6 +574,14 @@ async function apiHandler(req, res, config) {
       if (body.skipSkills) pass.push('-SkipSkills')
       if (body.skipProfile) pass.push('-SkipProfile')
       if (body.force) pass.push('-Force')
+      // Six-category pull: translate to pull.ps1 -What (memory/skills/config
+      // also feed apply.ps1 -Skip*); sessions is git-only. dshconfig write-back
+      // is gated behind an explicit confirmation flag (see apply.ps1).
+      const cats = normalizeCategories(body.categories)
+      const skillsSel = toCsv(body.skills)
+      if (cats.length) pass.push('-What', cats.join(','))
+      if (skillsSel) pass.push('-Skills', skillsSel)
+      if (body.dshconfigWriteBack) pass.push('-DshConfigWriteBack')
       const r = await runPs(hub, 'pull.ps1', pass, null, { timeoutMs: 300000 })
       // On a merge conflict (exit 2) enumerate the conflicting files so the
       // card can render them as a structured list instead of raw log soup.
@@ -491,6 +591,15 @@ async function apiHandler(req, res, config) {
           const u = await runGit(hub, ['diff', '--name-only', '--diff-filter=U'], 20000)
           if (u.code === 0) conflictFiles = u.out.split(/\r?\n/).map((s) => s.trim()).filter(Boolean)
         } catch { /* noop */ }
+      }
+      // Restoring session history is a separate step that runs AFTER the git
+      // pull brought the latest session-backup/<machine>/ down.
+      if (cats.includes('sessions') && r.code === 0) {
+        const from = typeof body.machineId === 'string' ? body.machineId.trim() : ''
+        const restoreArgs = ['-Restore'].concat(from ? ['-From', from] : [])
+          .concat(skillsSel ? [] : [])
+          .concat(sessionsSel ? ['-Sessions', sessionsSel] : [])
+        await runPs(hub, 'backup-sessions.ps1', restoreArgs, null, { timeoutMs: 600000 })
       }
       return send(200, { ...result(r.code === 0, r.code, tail(r.out, 20000)), conflictFiles })
     }
@@ -677,6 +786,27 @@ async function apiHandler(req, res, config) {
       if (!a) return send(200, result(false, -1, 'action must be list | install | update | setlink | restart'))
       const extra = a === 'Install' ? ['-NoRestart'] : []
       return run('plugins.ps1', ['-Action', a].concat(extra), 300000)
+    }
+    // list local session workspaces (for the session multi-select dropdowns)
+    if (method === 'GET' && routePath === '/sessions/list') {
+      const dsh = process.env.DSH_HOME || path.join(os.homedir(), '.dsh')
+      const dir = path.join(dsh, 'sessions')
+      const items = []
+      try {
+        if (fs.existsSync(dir)) {
+          for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+            if (e.isDirectory()) {
+              let count = 0
+              try {
+                count = fs.readdirSync(path.join(dir, e.name))
+                  .filter((f) => f.endsWith('.jsonl') || f.endsWith('.json')).length
+              } catch { /* noop */ }
+              items.push({ name: e.name, files: count })
+            }
+          }
+        }
+      } catch { /* noop */ }
+      return send(200, { ok: true, machineId: readMachineId(), items })
     }
     if (method === 'POST' && routePath === '/sessions') {
       const body = await readJsonBody(req)
@@ -888,17 +1018,27 @@ export function apply(ctx, config) {
     name: 'sync_hub_push',
     description:
       '把本机 sync-hub 改动推送到 Gitee (上传备份)。必须先跑 sync_hub_status 让用户看到差异并确认后再调用。' +
-      'scope 控制上传范围: all=全部(默认), memory=记忆, skills=技能, config=配置, sessions=会话备份。' +
-      'message 是提交说明。用户说"上传/推上去/备份记忆/同步给另一台"时用。',
+      'categories 控制六类上传范围: memory=记忆, skills=技能, config=配置, plugins=插件清单, sessions=会话备份, dshconfig=DSH运行配置采集; ' +
+      '省略或空=全部。skills/sessions 可进一步按名筛选; dshconfig=true 会采集本机运行配置一并上传。message 是提交说明。' +
+      '用户说"上传/推上去/备份记忆/同步给另一台"时用。',
     parameters: PUSH_PARAMS,
     output: OUT,
     execute: async (args, exec) => {
       const hub = resolveHub(config)
       if (!hub) return noHub()
       const pass = []
-      const scope = args && typeof args.scope === 'string' ? args.scope.trim() : ''
-      if (scope && scope !== 'all') pass.push('-What', scope)
+      const cats = normalizeCategories(args && args.categories)
+      const skillsSel = toCsv(args && args.skills)
+      const sessionsSel = toCsv(args && args.sessions)
+      if (cats.length) pass.push('-What', cats.join(','))
+      if (skillsSel) pass.push('-Skills', skillsSel)
+      if (sessionsSel) pass.push('-Sessions', sessionsSel)
+      if (args && args.dshconfig) pass.push('-DshConfig')
       if (args && typeof args.message === 'string' && args.message.trim()) pass.push('-Message', args.message.trim())
+      if (cats.includes('sessions')) {
+        await runPs(hub, 'backup-sessions.ps1', ['-Backup', '-IncludeInGit']
+          .concat(sessionsSel ? ['-Sessions', sessionsSel] : []), exec, { timeoutMs: 600000 })
+      }
       const r = await runPs(hub, 'push.ps1', pass, exec)
       return result(r.code === 0, r.code, tail(r.out) || '(no output)')
     },
@@ -908,15 +1048,30 @@ export function apply(ctx, config) {
     name: 'sync_hub_pull',
     description:
       '从 Gitee 拉取最新 sync-hub 并应用到本机 DSH (记忆/技能/配置; DSH 重启后生效)。' +
+      'categories 控制六类拉取范围: memory=记忆, skills=技能, config=配置, plugins=插件清单, sessions=会话备份, dshconfig=DSH运行配置写回; ' +
+      '省略或空=全部。dshconfigWriteBack=true 会尝试把中枢采集的运行配置写回本机 (需同机身份校验)。' +
       '用户说"拉取/更新记忆/同步下来/另一台改了东西"时用。' +
       '退出码 2 = 合并冲突: 立即停下把冲突文件报告给用户, 禁止自行解决冲突。',
-    parameters: NO_PARAMS,
+    parameters: PULL_PARAMS,
     output: OUT,
-    execute: async (_args, exec) => {
+    execute: async (args, exec) => {
       const hub = resolveHub(config)
       if (!hub) return noHub()
-      const r = await runPs(hub, 'pull.ps1', [], exec)
+      const pass = []
+      const cats = normalizeCategories(args && args.categories)
+      const skillsSel = toCsv(args && args.skills)
+      const sessionsSel = toCsv(args && args.sessions)
+      if (cats.length) pass.push('-What', cats.join(','))
+      if (skillsSel) pass.push('-Skills', skillsSel)
+      if (args && args.dshconfigWriteBack) pass.push('-DshConfigWriteBack')
+      if (args && args.force) pass.push('-Force')
+      const r = await runPs(hub, 'pull.ps1', pass, exec)
       if (r.code === 2) return result(false, 2, conflictText(r.out))
+      if (cats.includes('sessions')) {
+        const from = args && typeof args.machineId === 'string' ? args.machineId.trim() : ''
+        await runPs(hub, 'backup-sessions.ps1', ['-Restore'].concat(from ? ['-From', from] : [])
+          .concat(sessionsSel ? ['-Sessions', sessionsSel] : []), exec, { timeoutMs: 600000 })
+      }
       return result(r.code === 0, r.code, tail(r.out) || '(no output)')
     },
   })) registered += 1

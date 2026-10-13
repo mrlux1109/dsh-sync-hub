@@ -100,14 +100,22 @@ window.__ModuleLoader__.load({
         'sync.downTitle': '② 从云端拉取',
         'sync.downHint': '把另一台电脑的改动拿下来，并应用到本机 DSH。',
         'sync.stateTitle': '当前状态',
-        'sync.scope': '范围：',
-        'scope.all': '全部（记忆+技能+配置）',
-        'scope.memory': '只记忆',
-        'scope.skills': '只技能',
-        'scope.config': '只配置',
-        'scope.nosession': '记忆+技能+配置（不含会话）',
-        'scope.sessions': '只会话备份',
-        'opt.skipSkills': '跳过技能（只更新记忆/配置）',
+        'cat.memory': '记忆',
+        'cat.skills': '技能',
+        'cat.config': '配置',
+        'cat.plugins': '插件清单',
+        'cat.sessions': '会话备份',
+        'cat.dshconfig': 'DSH 运行配置',
+        'cat.all': '全选',
+        'cat.none': '全不选',
+        'sync.pickCat': '选择分类',
+        'sync.pickSkills': '选择技能（默认全部）',
+        'sync.pickSessions': '选择会话工作区（默认全部）',
+        'sync.selAll': '全选',
+        'sync.selClear': '清空',
+        'sync.dshHintPush': '上传时会采集本机 DSH 运行配置（profile 的 package.json / cordis.patch.yml + gitconfig）一并备份',
+        'sync.dshHintPull': '拉取时会把中枢采集的运行配置写回本机（需同机身份三重校验通过）',
+        'sync.advanced': '高级选项',
         'opt.skipProfile': '跳过 profile（不改插件链接）',
         'opt.force': '强制（覆盖本地改动，慎用）',
         'bk.whatTitle': '这个页面 = 本机（历史撤销点）',
@@ -302,14 +310,22 @@ window.__ModuleLoader__.load({
         'sync.downTitle': '2) Pull from cloud',
         'sync.downHint': 'Fetch the other computer\'s changes and apply them to this DSH.',
         'sync.stateTitle': 'Current state',
-        'sync.scope': 'Scope:',
-        'scope.all': 'All (memory + skills + config)',
-        'scope.memory': 'Memory only',
-        'scope.skills': 'Skills only',
-        'scope.config': 'Config only',
-        'scope.nosession': 'Memory + skills + config (no sessions)',
-        'scope.sessions': 'Session backups only',
-        'opt.skipSkills': 'Skip skills (memory/config only)',
+        'cat.memory': 'Memory',
+        'cat.skills': 'Skills',
+        'cat.config': 'Config',
+        'cat.plugins': 'Plugin manifest',
+        'cat.sessions': 'Session backups',
+        'cat.dshconfig': 'DSH runtime config',
+        'cat.all': 'Select all',
+        'cat.none': 'Select none',
+        'sync.pickCat': 'Pick categories',
+        'sync.pickSkills': 'Pick skills (all by default)',
+        'sync.pickSessions': 'Pick session workspaces (all by default)',
+        'sync.selAll': 'All',
+        'sync.selClear': 'Clear',
+        'sync.dshHintPush': 'Upload will also capture this machine\'s DSH runtime config (profile package.json / cordis.patch.yml + gitconfig) into the backup',
+        'sync.dshHintPull': 'Pull will write the hub-captured runtime config back to this machine (requires same-machine triple verification)',
+        'sync.advanced': 'Advanced options',
         'opt.skipProfile': 'Skip profile (keep plugin links)',
         'opt.force': 'Force (overwrite local changes — careful)',
         'bk.whatTitle': 'This tab = LOCAL (undo points)',
@@ -487,6 +503,7 @@ window.__ModuleLoader__.load({
       chip: { fontSize: '0.68rem', padding: '0.12rem 0.45rem', borderRadius: '0.65rem', border: '1px solid var(--color-border, rgba(128,128,128,0.28))', whiteSpace: 'nowrap' },
       listRow: { display: 'flex', gap: '0.5rem', alignItems: 'center', fontSize: '0.76rem', padding: '0.3rem 0.45rem', borderRadius: '0.4rem', background: 'var(--color-surface, rgba(128,128,128,0.05))' },
       pre: { margin: 0, padding: '0.55rem', borderRadius: '0.45rem', fontSize: '0.7rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: '16rem', overflow: 'auto', background: 'var(--color-surface, rgba(128,128,128,0.07))', border: '1px solid var(--color-border, rgba(128,128,128,0.2))', fontFamily: 'ui-monospace, Consolas, monospace' },
+      miniBtn: { padding: '0.18rem 0.55rem', borderRadius: '0.4rem', fontSize: '0.7rem', border: '1px solid var(--color-border, rgba(128,128,128,0.3))', background: 'var(--color-surface, rgba(128,128,128,0.07))', color: 'inherit', cursor: 'pointer' },
     }
 
     const TABS = ['overview', 'sync', 'backup', 'skills', 'plugins', 'tools', 'settings']
@@ -530,11 +547,22 @@ window.__ModuleLoader__.load({
       const [shDelName, setShDelName] = useState('')
       // timed sync schedule status from /schedule
       const [sched, setSched] = useState(undefined)
-      // sync options (方案 A): upload scope + pull switches
-      const [pushScope, setPushScope] = useState('all')
-      const [pullSkipSkills, setPullSkipSkills] = useState(false)
+      // sync options: six categories + skill/session multi-select + dshconfig toggles
+      const ALL_CATS = ['memory', 'skills', 'config', 'plugins', 'sessions', 'dshconfig']
+      const [pushCats, setPushCats] = useState([...ALL_CATS])
+      const [pullCats, setPullCats] = useState([...ALL_CATS])
+      const [pushSkills, setPushSkills] = useState([])       // selected skill names (empty = all)
+      const [pullSkills, setPullSkills] = useState([])
+      const [pushSessions, setPushSessions] = useState([])   // selected workspace names (empty = all)
+      const [pullSessions, setPullSessions] = useState([])
+      const [pushDshConfig, setPushDshConfig] = useState(false)
+      const [pullDshConfigWB, setPullDshConfigWB] = useState(false)
       const [pullSkipProfile, setPullSkipProfile] = useState(false)
       const [pullForce, setPullForce] = useState(false)
+      // multi-select option sources
+      const [skillList, setSkillList] = useState(undefined)  // from /skills/list
+      const [sessionList, setSessionList] = useState(undefined) // from /sessions/list
+      const [machineId, setMachineId] = useState('')
       // skills page
       const [skList, setSkList] = useState(undefined)
       const [skFilter, setSkFilter] = useState('')
@@ -565,6 +593,14 @@ window.__ModuleLoader__.load({
 
       useEffect(() => { loadOverview() }, [loadOverview])
 
+      // load the multi-select sources (skills / sessions / machine id) once
+      useEffect(() => {
+        Promise.all([
+          api('/skills/list', { timeout: 60000 }).then(setSkillList).catch(() => {}),
+          api('/sessions/list', { timeout: 60000 }).then(d => { setSessionList(d && d.items ? d.items : []); if (d && d.machineId) setMachineId(d.machineId) }).catch(() => {}),
+        ])
+      }, [])
+
       // auto-populate the plugins tab on first open (fixes empty "recommended" on entry)
       useEffect(() => {
         if (tab !== 'plugins' || plAutoRef.current) return
@@ -594,8 +630,22 @@ window.__ModuleLoader__.load({
             case 'refresh': await loadOverview(); r = { text: t('done.refresh') }; break
             case 'selfcheck': r = await api('/selfcheck', { timeout: 180000 }); setChecks(r.checks || []); break
             case 'status': r = await api('/status', { timeout: 120000 }); break
-            case 'push': r = await post('/push', { scope: pushScope }, 300000); await loadOverview(); break
-            case 'pull': r = await post('/pull', { skipSkills: pullSkipSkills, skipProfile: pullSkipProfile, force: pullForce }, 300000); setSyncConflict(r && Array.isArray(r.conflictFiles) ? r.conflictFiles : []); await loadOverview(); break
+            case 'push': r = await post('/push', {
+                categories: pushCats,
+                skills: pushSkills,
+                sessions: pushSessions,
+                dshconfig: pushDshConfig,
+                message: a.message || '',
+              }, 300000); await loadOverview(); break
+            case 'pull': r = await post('/pull', {
+                categories: pullCats,
+                skills: pullSkills,
+                sessions: pullSessions,
+                dshconfigWriteBack: pullDshConfigWB,
+                machineId: machineId || undefined,
+                skipProfile: pullSkipProfile,
+                force: pullForce,
+              }, 300000); setSyncConflict(r && Array.isArray(r.conflictFiles) ? r.conflictFiles : []); await loadOverview(); break
             case 'backupNow': r = await post('/backup/create', {}, 90000); break
             case 'console': r = await post('/console'); break
             case 'doctor': r = await post('/doctor', {}, 240000); break
@@ -709,7 +759,7 @@ window.__ModuleLoader__.load({
         } catch (e) {
           put(key, '✗ ' + String(e?.message ?? e))
         } finally { setBusy('') }
-      }, [loadOverview, put, cUser, cToken, bMachine, bDest, bRepo, pushScope, pullSkipSkills, pullSkipProfile, pullForce, skUrl, skName, skNewName, skNewDesc, plQuery, outdated, plProfile, logsPick, t])
+      }, [loadOverview, put, cUser, cToken, bMachine, bDest, bRepo, pushCats, pullCats, pushSkills, pullSkills, pushSessions, pullSessions, pushDshConfig, pullDshConfigWB, machineId, pullSkipProfile, pullForce, skUrl, skName, skNewName, skNewDesc, plQuery, outdated, plProfile, logsPick, t])
 
       const Btn = ({ label, kind, out, primary, small, arg }) => {
         const isBusy = busy === kind
@@ -797,41 +847,85 @@ window.__ModuleLoader__.load({
       ]
 
       // ── 同步 = 云端（两台电脑通过 Gitee 交换改动） ──────────────────────────
+      // 辅助：六类勾选网格（含全选/全不选）
+      const renderCatGrid = (cats, setCats) => {
+        const toggle = (c) => setCats(cats.includes(c) ? cats.filter((x) => x !== c) : [...cats, c])
+        return h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.2rem' } },
+          h('div', { style: S.row },
+            h('span', { style: { ...S.hint, fontWeight: 600 } }, t('sync.pickCat')),
+            h('button', { type: 'button', style: { ...S.miniBtn }, disabled: !!busy, onClick: () => setCats([...ALL_CATS]) }, t('cat.all')),
+            h('button', { type: 'button', style: { ...S.miniBtn }, disabled: !!busy, onClick: () => setCats([]) }, t('cat.none'))),
+          h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '0.6rem 0.9rem' } },
+            ALL_CATS.map((c) => h('label', {
+              key: c,
+              style: { ...S.hint, display: 'flex', gap: '0.3rem', alignItems: 'center', opacity: cats.includes(c) ? 1 : 0.45, cursor: 'pointer' },
+            },
+              h('input', { type: 'checkbox', checked: cats.includes(c), disabled: !!busy, onChange: () => toggle(c) }),
+              t('cat.' + c)))))
+      }
+      // 辅助：技能/会话多选（默认全选=空数组；勾选个别=命名列表）
+      const renderMulti = (label, items, selected, setSelected) => {
+        if (!items || !items.length) return null
+        const names = items.map((it) => it.name)
+        const allOn = selected.length === 0
+        const toggle = (n) => {
+          if (selected.length === 0) { setSelected(names.filter((x) => x !== n)); return }
+          setSelected(selected.includes(n) ? selected.filter((x) => x !== n) : [...selected, n])
+        }
+        const setAll = () => setSelected([])
+        const clearAll = () => setSelected([...names])
+        return h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.3rem' } },
+          h('div', { style: S.row },
+            h('span', { style: { ...S.hint, fontWeight: 600 } }, label),
+            h('button', { type: 'button', style: { ...S.miniBtn }, disabled: !!busy, onClick: setAll }, t('sync.selAll')),
+            h('button', { type: 'button', style: { ...S.miniBtn }, disabled: !!busy, onClick: clearAll }, t('sync.selClear'))),
+          h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '0.4rem 0.8rem', maxHeight: '7.5rem', overflowY: 'auto' } },
+            items.map((it) => {
+              const on = allOn || selected.includes(it.name)
+              return h('label', {
+                key: it.name,
+                style: { ...S.hint, display: 'flex', gap: '0.25rem', alignItems: 'center', opacity: on ? 1 : 0.45, cursor: 'pointer' },
+              },
+                h('input', { type: 'checkbox', checked: on, disabled: !!busy, onChange: () => toggle(it.name) }),
+                it.name)
+            })))
+      }
+
       const syncTab = [
         h(Card, { key: 'what', title: t('sync.whatTitle') },
           h('p', { style: { ...S.hint, fontSize: '0.74rem' } }, t('sync.what')),
           h('p', { style: S.hint }, t('hint.console'))),
         h(Card, { key: 'up', title: t('sync.upTitle'), level: st.worst },
           h('p', { style: S.hint }, t('sync.upHint')),
-          h('div', { style: S.row },
-            h('span', { style: { fontSize: '0.74rem', opacity: 0.7 } }, t('sync.scope')),
-            h('select', {
-              style: { ...S.input, width: 'auto' },
-              value: pushScope, disabled: !!busy,
-              onChange: e => setPushScope(e.target.value),
-            },
-              h('option', { value: 'all' }, t('scope.all')),
-              h('option', { value: 'memory' }, t('scope.memory')),
-              h('option', { value: 'skills' }, t('scope.skills')),
-              h('option', { value: 'config' }, t('scope.config')),
-              h('option', { value: 'memory,skills,config' }, t('scope.nosession')),
-              h('option', { value: 'sessions' }, t('scope.sessions')))),
+          renderCatGrid(pushCats, setPushCats),
+          pushCats.includes('skills') ? renderMulti(t('sync.pickSkills'), skillList && skillList.items ? skillList.items : [], pushSkills, setPushSkills) : null,
+          pushCats.includes('sessions') ? renderMulti(t('sync.pickSessions'), sessionList && sessionList.length ? sessionList : [], pushSessions, setPushSessions) : null,
+          h('label', { key: 'dsh', style: { ...S.hint, display: 'flex', gap: '0.3rem', alignItems: 'center', marginTop: '0.5rem' } },
+            h('input', { type: 'checkbox', checked: pushDshConfig, disabled: !!busy, onChange: (e) => setPushDshConfig(e.target.checked) }),
+            t('cat.dshconfig')),
+          h('p', { style: { ...S.hint, fontSize: '0.72rem', opacity: 0.6 } }, t('sync.dshHintPush')),
           h('div', { style: S.row },
             h(Btn, { label: t('act.push'), kind: 'push', out: 'syncPush', primary: true }),
             h(Btn, { label: t('act.status'), kind: 'status', out: 'syncStatus' })),
           h(Result, { k: 'syncPush', restart: true }), h(Result, { k: 'syncStatus' })),
         h(Card, { key: 'down', title: t('sync.downTitle') },
           h('p', { style: S.hint }, t('sync.downHint')),
-          h('div', { style: S.row },
-            h('label', { style: { ...S.hint, display: 'flex', gap: '0.3rem', alignItems: 'center' } },
-              h('input', { type: 'checkbox', checked: pullSkipSkills, disabled: !!busy, onChange: e => setPullSkipSkills(e.target.checked) }),
-              t('opt.skipSkills')),
-            h('label', { style: { ...S.hint, display: 'flex', gap: '0.3rem', alignItems: 'center' } },
-              h('input', { type: 'checkbox', checked: pullSkipProfile, disabled: !!busy, onChange: e => setPullSkipProfile(e.target.checked) }),
-              t('opt.skipProfile')),
-            h('label', { style: { ...S.hint, display: 'flex', gap: '0.3rem', alignItems: 'center' } },
-              h('input', { type: 'checkbox', checked: pullForce, disabled: !!busy, onChange: e => setPullForce(e.target.checked) }),
-              t('opt.force'))),
+          renderCatGrid(pullCats, setPullCats),
+          pullCats.includes('skills') ? renderMulti(t('sync.pickSkills'), skillList && skillList.items ? skillList.items : [], pullSkills, setPullSkills) : null,
+          pullCats.includes('sessions') ? renderMulti(t('sync.pickSessions'), sessionList && sessionList.length ? sessionList : [], pullSessions, setPullSessions) : null,
+          h('label', { key: 'dshb', style: { ...S.hint, display: 'flex', gap: '0.3rem', alignItems: 'center', marginTop: '0.5rem' } },
+            h('input', { type: 'checkbox', checked: pullDshConfigWB, disabled: !!busy, onChange: (e) => setPullDshConfigWB(e.target.checked) }),
+            t('cat.dshconfig')),
+          h('p', { style: { ...S.hint, fontSize: '0.72rem', opacity: 0.6 } }, t('sync.dshHintPull')),
+          h('details', { style: { marginTop: '0.4rem' } },
+            h('summary', { style: { ...S.hint, cursor: 'pointer' } }, t('sync.advanced')),
+            h('div', { style: S.row, },
+              h('label', { style: { ...S.hint, display: 'flex', gap: '0.3rem', alignItems: 'center' } },
+                h('input', { type: 'checkbox', checked: pullSkipProfile, disabled: !!busy, onChange: e => setPullSkipProfile(e.target.checked) }),
+                t('opt.skipProfile')),
+              h('label', { style: { ...S.hint, display: 'flex', gap: '0.3rem', alignItems: 'center' } },
+                h('input', { type: 'checkbox', checked: pullForce, disabled: !!busy, onChange: e => setPullForce(e.target.checked) }),
+                t('opt.force')))),
           h('div', { style: S.row },
             h(Btn, { label: t('act.pull'), kind: 'pull', out: 'syncPull', primary: true }),
             h(Btn, { label: t('act.console'), kind: 'console', out: 'syncConsole' })),
