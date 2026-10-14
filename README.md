@@ -76,8 +76,25 @@ dsh-sync-hub/
 ```powershell
 node --check client.js          # 语法
 node tests/probe-m2.cjs         # 装载 + 注册 + 渲染断言
-node tests/guard-tests.mjs      # 守卫负例（15 条）
+node tests/guard-tests.mjs      # 守卫负例
+node tests/probe-m4-http.cjs    # HTTP 面端到端
+node tests/check-unused.mjs     # import 自检
 ```
+
+### 关于 client.js 单文件 45KB（为什么不拆）
+
+开发文档 §8.8 曾定"单文件 ≤ 40KB"。落地时重新评估后**维持单文件**，依据三条实测：
+
+1. **官方拆分机制依赖 tsdown 构建**：内核 `client-modules` 文档明确"经 tsdown 拆分的源码
+   `import()` 会编译为 `require.async("./client.<name>.js")`"。零构建插件（本插件与
+   whale-pet 同款）手工拆成 `client.<name>.js` 需自己维护 `require.async` 时序，收益不成比例。
+2. **参照物更大**：官方渠道安装的 whale-pet 其 `client.js` 为 **272KB 单文件**；
+   本插件 45KB 约为其 1/6。
+3. **抖动条件不成立**：memory 4.8 的 Edit 抖动来自"同一文件多处**并行** Edit"。
+   本插件的修改一律是**单次全量 write**（重写而非增量补丁），不触发该条件；
+   每次改动后跑 probe-m2 + guard-tests 回归兜底。
+
+后续若 client.js 超过 ~120KB 或需多人并行编辑，再引入 tsdown 拆分。
 
 ### 卸载
 

@@ -7,13 +7,15 @@
  *     · manifest 声明 dsh.client.inject 拿官方模块（locale/slots/primitives/layout）；
  *     · 侧栏入口走官方 `sidebar.panellist` 插槽（与插件管理器、任务管理器同级）；
  *     · 内容区走官方 `main` keyed 插槽（key = 'sync-hub'，不抢内置 'conversation'）；
- *     · 组件全部用官方 primitives；文案走 ctx.locale 扁平键。
+ *     · 组件全部用官方 primitives；文案走 ctx.locale 扁平键；
+ *     · 数据走宿主半身 `/api/sync-hub`（自带信任围栏），**不再手拼 PowerShell**。
  *
  * 契约铁律（memory 4.17⑦ 实锤，违反即整包黑屏）：
  *   1. factory **必须 return module.exports**，返回 module 本体 = 同 bundle 连坐黑屏；
  *   2. 组件辅助函数收多个子元素用 rest 参数 `(t, key, ...kids)`；
  *   3. 不抢内置插槽 key；注册前 slots.entries 探一次，撞名 fail-fast；
- *   4. 文案只用扁平键（ctx.locale.bind 不解析 'a.b' 嵌套键）。
+ *   4. 文案只用扁平键（ctx.locale.bind 不解析 'a.b' 嵌套键）；
+ *   5. 动作反馈一律就地（memory 4.20），禁止把唯一输出面板放页面最底部。
  *
  * @module client.js
  */
@@ -32,6 +34,9 @@ window.__ModuleLoader__.load({
     const NS = 'syncHub'
     /** 侧栏入口 id 与 main 面板 key —— 两者必须相同（插槽契约：list id 寻址对应面板）。 */
     const PANEL_ID = 'sync-hub'
+    /** 浏览器半身依赖的服务（对应 manifest dsh.client.inject 的四个包）。 */
+    const inject = ['slots', 'locale', 'layout']
+
     /** 六个一级页（开发文档 §4.2，决策 D5）。 */
     const PAGES = [
       { id: 'overview', labelKey: 'page.overview' },
@@ -41,8 +46,6 @@ window.__ModuleLoader__.load({
       { id: 'sessions', labelKey: 'page.sessions' },
       { id: 'maintain', labelKey: 'page.maintain' },
     ]
-    /** 浏览器半身依赖的服务（对应 manifest dsh.client.inject 的四个包）。 */
-    const inject = ['slots', 'locale', 'layout']
 
     /** 扁平键文案表：zh 为真相源，en 必须同键集。 */
     const ZH = {
@@ -56,8 +59,166 @@ window.__ModuleLoader__.load({
       'loading': '读取中…',
       'error': '加载失败：{e}',
       'retry': '重试',
+      'refresh': '刷新',
       'stale': '插件刚更新过，需要重启 DSH 才能加载新面板。',
       'todo.placeholder': '（本页施工中）',
+
+      // 全局状态条
+      'bar.identity': '身份',
+      'bar.ahead': '待推送',
+      'bar.behind': '待拉取',
+      'bar.dirty': '未提交',
+      'bar.credential': '凭据',
+      'bar.schedule': '定时',
+      'bar.on': '开',
+      'bar.off': '关',
+      'bar.ok': '正常',
+      'bar.missing': '缺失',
+      'bar.none': '无',
+
+      // 总览
+      'ov.todo': '接下来做什么',
+      'ov.todo.empty': '一切就绪，没有待办。',
+      'ov.todo.commit': '有 {n} 个改动没提交，另一台电脑收不到',
+      'ov.todo.behind': '远端领先 {n} 个提交，建议先拉取',
+      'ov.todo.credential': 'Gitee 凭据没配，推拉都会失败',
+      'ov.todo.core': '缺必需工具：{list}，同步会受影响',
+      'ov.hub': '中枢',
+      'ov.version': '版本',
+      'ov.branch': '分支',
+      'ov.lastCommit': '最近提交',
+      'ov.skills': '技能',
+      'ov.machines': '机器档案',
+      'ov.tools': '工具链',
+      'ov.machine': '本机',
+      'ov.computer': '计算机名',
+      'ov.dshHome': 'DSH 目录',
+      'ov.recent': '最近动态',
+      'ov.noRecent': '（没有提交记录）',
+      'ov.goSync': '去同步页处理',
+
+      // 健康分（N4）与机器看板（N5）
+      'ov.health': '健康分',
+      'ov.board': '机器看板',
+      'ov.noBoard': '（没有机器档案）',
+      'ov.boardNever': '未见同步记录',
+
+      // 同步
+      'sync.scope': '推送范围',
+      'sync.scopeHint': '日常用「全部」即可；只改了一类就只选那一类，推得更快。',
+      'sync.all': '全部',
+      'sync.none': '全不选',
+      'sync.advanced': '高级选项',
+      'sync.except': '排除范围',
+      'sync.push': '推送到中枢',
+      'sync.pull': '从中枢拉取',
+      'sync.preview': '预演将推送什么',
+      'sync.conflicts': '查看冲突',
+      'sync.previewTitle': '预演结果',
+      'sync.previewEmpty': '所选范围内没有可推送的改动。',
+      'sync.files': '{n} 个文件 · {size}',
+      'sync.resultTitle': '执行结果',
+      'sync.confirmPush': '确认推送这 {n} 个文件？',
+      'sync.confirmPull': '确认拉取并应用到本机？重启 DSH 后生效。',
+      'sync.working': '执行中…',
+      'sync.hint.pull': '拉取会应用到本机；若撞车，冲突解决器会引导你逐文件处理。',
+
+      // N6 一键同步流
+      'flow.title': '一键同步',
+      'flow.hint': '预演 → 确认 → 执行 → 结果，一条流走完，不用跳页。',
+      'flow.start': '开始一键同步',
+      'flow.picked': '已选 {n} 类',
+      'flow.confirm': '确认推送',
+      'flow.done': '已推送 {n} 个文件（{commit}）',
+      'flow.restartHint': '涉及记忆 / 插件的改动，重启 DSH 后完整生效。',
+      'flow.again': '再来一次',
+      'sync.msg.pushed': '已推送 {n} 个文件（{commit}）',
+      'sync.msg.pulled': '已拉取（{commit}）',
+      'sync.msg.noConflict': '当前没有冲突。',
+      'sync.err.secret': '推送被守卫拦截：{e}',
+
+      // 维护
+      'mt.backup': '本机备份快照',
+      'mt.backupHint': '改动 AGENTS.md / 插件配置前的撤销点。只存本机，不上云。',
+      'mt.backupNow': '立即备份',
+      'mt.backups': '历史快照',
+      'mt.backupsEmpty': '（还没有备份）',
+      'mt.restore': '恢复',
+      'mt.delete': '删除',
+      'mt.msg.backed': '已创建 {n} 份快照',
+      'mt.msg.restored': '已恢复 {name}',
+      'mt.msg.preRestore': '原文件已另存为 {name}',
+      'mt.msg.deleted': '已删除 {name}',
+      'mt.msg.restoreFail': '恢复失败：{e}',
+      'mt.tools': '工具链体检',
+      'mt.toolsHint': '必需 / 开发 / 可选三档。缺失只报告，不自动装。',
+      'mt.core': '必需',
+      'mt.dev': '开发',
+      'mt.nice': '可选',
+      'mt.toolsAll': '全部就位',
+      'mt.toolsMissing': '缺 {n} 个：{list}',
+      'mt.schedule': '定时同步',
+      'mt.scheduleHint': 'Windows 任务计划：登录时 + 每天 03:00 自动跑「状态 → 拉取 → 推送」。',
+      'mt.scheduleOn': '已开启',
+      'mt.scheduleOff': '未开启',
+      'mt.scheduleInstall': '开启定时同步',
+      'mt.scheduleRemove': '关闭定时同步',
+      'mt.scheduleNext': '下次运行：{t}',
+      'mt.msg.scheduleOn': '定时任务已创建',
+      'mt.msg.scheduleOff': '定时任务已删除',
+      'mt.credential': 'Gitee 凭据',
+      'mt.credentialOk': '已在 Windows 凭据管理器中（{user}）',
+      'mt.credentialMissing': '未配置。请在「打开控制台」里人工登录，令牌不经过本插件。',
+      'mt.portable': '换机补齐',
+      'mt.portableHint': '新机器 pull 之后：按中枢清单现场拉自研插件源码 + 写 link + 挂 bundles。',
+      'mt.portableRun': '执行补齐（预演）',
+      'mt.portableSpec': '清单：{name} · tag {tag}',
+      'mt.console': '打开控制台',
+      'mt.consoleHint': '换机器身份（要手输 YES）、全自动一条龙、冲突人工处理——这些必须人工确认的流程走 .bat 窗口。',
+      'mt.log': '运行日志',
+      'mt.logPath': '路径：{p}',
+      'mt.openDir': '打开目录',
+
+      // 技能页
+      'sk.summary': '同步概览',
+      'sk.invalidWarn': '⚠ 以下技能目录名不合法（DSH 要求 kebab-case，会静默跳过它们，装了也不生效）',
+      'sk.list': '技能对比（本机 ↔ 中枢）',
+      'sk.filterAll': '全部',
+      'sk.noRows': '（没有匹配的技能）',
+      'sk.local': '本机',
+      'sk.hub': '中枢',
+      'sk.placeholder': '占位/空壳',
+      'sk.scopeTitle': '能力边界',
+      'sk.scopeBody': '本页只做"对比 + 分类"：哪些只在一边、哪些内容不同、哪些是空壳。导入线上技能、回收站、云端增删属写操作，按开发文档排在后续里程碑；需要时请用「打开控制台」或对话里的 sync_hub_* 工具。',
+
+      // 会话页
+      'se.local': '本机会话',
+      'se.localHint': '对话记录只读拷贝进中枢；凭据类文件永不被包含（硬守卫，负例单测覆盖）。',
+      'se.files': '文件',
+      'se.backup': '备份到中枢',
+      'se.hub': '跨机会话备份（只读浏览）',
+      'se.hubHint': '按机器 → 工作区逐层展开，看另一台电脑聊过什么。全程只读，不会改回本机。',
+      'se.noMachines': '（中枢里还没有任何机器的会话备份）',
+      'se.restoreFrom': '恢复到本机（{machine}）',
+      'se.msg.backed': '已备份 {n} 个文件（跳过 {skipped} 个）',
+      'se.msg.restored': '已恢复 {n} 个（跳过已存在 {same} 个，路径映射 {mapped} 个）',
+
+      // 冲突解决器（N1）
+      'cf.title': '拉取撞车 · 冲突解决器',
+      'cf.warn': '⚠ 语义提醒：本栏「对端」是另一台电脑的版本，「本机」是你这台刚提交的版本。选错边会丢内容，请看清再选。',
+      'cf.base': '共同祖先',
+      'cf.remote': '对端（另一台）',
+      'cf.local': '本机（这台）',
+      'cf.emptyStage': '（此阶段无内容）',
+      'cf.useThis': '用这段',
+      'cf.editor': '解决后的内容（可手改；保存即写入工作区文件）',
+      'cf.saveNext': '保存并处理下一个',
+      'cf.saveLast': '保存这个文件',
+      'cf.savedLast': '已保存。全部文件处理完才能收尾。',
+      'cf.finish': '收尾（git add + rebase --continue）',
+      'cf.finishHint': '只 add 你点名保存过的文件，绝不 add -A；仍有未解决冲突时会拒绝收尾。',
+      'cf.finished': '已收尾，rebase 完成。',
+      'cf.open': '打开冲突解决器',
     }
     const EN = {
       'panel': 'Sync Hub',
@@ -70,8 +231,158 @@ window.__ModuleLoader__.load({
       'loading': 'Loading…',
       'error': 'Load failed: {e}',
       'retry': 'Retry',
+      'refresh': 'Refresh',
       'stale': 'The plugin just updated. Restart DSH to load the new panel.',
       'todo.placeholder': '(under construction)',
+      'bar.identity': 'Identity',
+      'bar.ahead': 'Ahead',
+      'bar.behind': 'Behind',
+      'bar.dirty': 'Uncommitted',
+      'bar.credential': 'Credential',
+      'bar.schedule': 'Schedule',
+      'bar.on': 'on',
+      'bar.off': 'off',
+      'bar.ok': 'ok',
+      'bar.missing': 'missing',
+      'bar.none': 'none',
+      'ov.todo': 'Next steps',
+      'ov.todo.empty': 'All clear, nothing to do.',
+      'ov.todo.commit': '{n} uncommitted change(s) — the other machine cannot see them yet',
+      'ov.todo.behind': 'Remote is ahead by {n} commit(s) — pull first',
+      'ov.todo.credential': 'Gitee credential missing — push/pull will fail',
+      'ov.todo.core': 'Missing core tools: {list}',
+      'ov.hub': 'Hub',
+      'ov.version': 'Version',
+      'ov.branch': 'Branch',
+      'ov.lastCommit': 'Last commit',
+      'ov.skills': 'Skills',
+      'ov.machines': 'Machines',
+      'ov.tools': 'Toolchain',
+      'ov.machine': 'Machine',
+      'ov.computer': 'Computer',
+      'ov.dshHome': 'DSH home',
+      'ov.recent': 'Recent activity',
+      'ov.noRecent': '(no commits)',
+      'ov.goSync': 'Open Sync',
+
+      // Health score (N4) & machine board (N5)
+      'ov.health': 'Health',
+      'ov.board': 'Machines',
+      'ov.noBoard': '(no machine profiles)',
+      'ov.boardNever': 'no sync seen',
+      'sync.scope': 'Push scope',
+      'sync.scopeHint': 'Use "All" for daily sync; pick one category when that is all you changed.',
+      'sync.all': 'All',
+      'sync.none': 'None',
+      'sync.advanced': 'Advanced',
+      'sync.except': 'Exclude',
+      'sync.push': 'Push',
+      'sync.pull': 'Pull',
+      'sync.preview': 'Preview',
+      'sync.conflicts': 'Conflicts',
+      'sync.previewTitle': 'Preview',
+      'sync.previewEmpty': 'Nothing to push in the selected scope.',
+      'sync.files': '{n} file(s) · {size}',
+      'sync.resultTitle': 'Result',
+      'sync.confirmPush': 'Push these {n} files?',
+      'sync.confirmPull': 'Pull and apply locally? Restart DSH afterwards.',
+      'sync.working': 'Working…',
+      'sync.hint.pull': 'Pull applies locally; on conflict the resolver walks you through it.',
+
+      // N6 one-shot sync flow
+      'flow.title': 'One-shot sync',
+      'flow.hint': 'Preview → confirm → run → result, all on this page.',
+      'flow.start': 'Start one-shot sync',
+      'flow.picked': '{n} categories selected',
+      'flow.confirm': 'Confirm push',
+      'flow.done': 'Pushed {n} file(s) ({commit})',
+      'flow.restartHint': 'Memory / plugin changes take full effect after restarting DSH.',
+      'flow.again': 'Run again',
+      'sync.msg.pushed': 'Pushed {n} file(s) ({commit})',
+      'sync.msg.pulled': 'Pulled ({commit})',
+      'sync.msg.noConflict': 'No conflicts.',
+      'sync.err.secret': 'Blocked by the secret guard: {e}',
+      'mt.backup': 'Local snapshots',
+      'mt.backupHint': 'Undo points before touching AGENTS.md / plugin config. Local only.',
+      'mt.backupNow': 'Back up now',
+      'mt.backups': 'Snapshots',
+      'mt.backupsEmpty': '(no snapshots yet)',
+      'mt.restore': 'Restore',
+      'mt.delete': 'Delete',
+      'mt.msg.backed': 'Created {n} snapshot(s)',
+      'mt.msg.restored': 'Restored {name}',
+      'mt.msg.preRestore': 'Previous file saved as {name}',
+      'mt.msg.deleted': 'Deleted {name}',
+      'mt.msg.restoreFail': 'Restore failed: {e}',
+      'mt.tools': 'Toolchain',
+      'mt.toolsHint': 'core / dev / nice. Missing tools are reported, never auto-installed.',
+      'mt.core': 'core',
+      'mt.dev': 'dev',
+      'mt.nice': 'nice',
+      'mt.toolsAll': 'All present',
+      'mt.toolsMissing': 'Missing {n}: {list}',
+      'mt.schedule': 'Scheduled sync',
+      'mt.scheduleHint': 'Windows Task Scheduler: logon + daily 03:00, runs status → pull → push.',
+      'mt.scheduleOn': 'Enabled',
+      'mt.scheduleOff': 'Disabled',
+      'mt.scheduleInstall': 'Enable',
+      'mt.scheduleRemove': 'Disable',
+      'mt.scheduleNext': 'Next run: {t}',
+      'mt.msg.scheduleOn': 'Scheduled task created',
+      'mt.msg.scheduleOff': 'Scheduled task removed',
+      'mt.credential': 'Gitee credential',
+      'mt.credentialOk': 'Stored in Windows Credential Manager ({user})',
+      'mt.credentialMissing': 'Not configured. Log in from the console — tokens never pass through this plugin.',
+      'mt.portable': 'Portable setup',
+      'mt.portableHint': 'After a new machine pulls: clone self-built plugin sources, write links, mount bundles.',
+      'mt.portableRun': 'Run setup (dry run)',
+      'mt.portableSpec': 'Spec: {name} · tag {tag}',
+      'mt.console': 'Open console',
+      'mt.consoleHint': 'Identity switch (typed YES), one-shot bootstrap, manual conflict handling.',
+      'mt.log': 'Logs',
+      'mt.logPath': 'Path: {p}',
+      'mt.openDir': 'Open folder',
+
+      // Skills page
+      'sk.summary': 'Sync overview',
+      'sk.invalidWarn': '⚠ These skill folder names are invalid (DSH requires kebab-case and skips them silently — installed but never loaded)',
+      'sk.list': 'Skill comparison (local ↔ hub)',
+      'sk.filterAll': 'All',
+      'sk.noRows': '(no matching skills)',
+      'sk.local': 'local',
+      'sk.hub': 'hub',
+      'sk.placeholder': 'placeholder',
+      'sk.scopeTitle': 'Scope',
+      'sk.scopeBody': 'This page only compares and classifies: which skills exist on one side only, which differ, which are empty shells. Importing, trash and cloud-side edits are write operations scheduled for later milestones; use the console or the sync_hub_* tools meanwhile.',
+
+      // Sessions page
+      'se.local': 'Local sessions',
+      'se.localHint': 'Chat history is copied read-only into the hub; credential files are never included (hard guard, covered by negative tests).',
+      'se.files': 'files',
+      'se.backup': 'Back up to hub',
+      'se.hub': 'Cross-machine session backups (read-only)',
+      'se.hubHint': 'Expand machine → workspace to see what the other computer talked about. Read-only throughout.',
+      'se.noMachines': '(no session backups in the hub yet)',
+      'se.restoreFrom': 'Restore locally ({machine})',
+      'se.msg.backed': 'Backed up {n} file(s) (skipped {skipped})',
+      'se.msg.restored': 'Restored {n} (skipped {same} existing, path-mapped {mapped})',
+
+      // Conflict resolver (N1)
+      'cf.title': 'Pull conflict · resolver',
+      'cf.warn': '⚠ "Remote" is the other machine version, "Local" is what this machine just committed. Picking the wrong side loses content.',
+      'cf.base': 'Common ancestor',
+      'cf.remote': 'Remote (other machine)',
+      'cf.local': 'Local (this machine)',
+      'cf.emptyStage': '(no content in this stage)',
+      'cf.useThis': 'Use this',
+      'cf.editor': 'Resolved content (editable; saving writes it to the working tree)',
+      'cf.saveNext': 'Save & next',
+      'cf.saveLast': 'Save this file',
+      'cf.savedLast': 'Saved. Finish only after every file is resolved.',
+      'cf.finish': 'Finish (git add + rebase --continue)',
+      'cf.finishHint': 'Only adds the files you named; refuses while conflicts remain.',
+      'cf.finished': 'Finished — rebase complete.',
+      'cf.open': 'Open conflict resolver',
     }
 
     /** 简易占位符填充：'x {a} y' + {a:1} → 'x 1 y'。 */
@@ -82,125 +393,1248 @@ window.__ModuleLoader__.load({
       return s
     }
 
-    /**
-     * 侧栏入口图标。
-     * 收 owner 提供的 { size, active }（SidebarPanelIconOwnerProps），
-     * 图标用 primitives 官方语义图标（决策 D18），零维护、与官方视觉一致。
-     */
-    function PanelIcon({ size }) {
-      return h(P.IconCompareSplitOutlineMedium, { size })
+    /** 字节数的人类可读形态。 */
+    function humanBytes(n) {
+      const v = Number(n) || 0
+      if (v < 1024) return `${v} B`
+      if (v < 1024 * 1024) return `${(v / 1024).toFixed(1)} KB`
+      return `${(v / 1024 / 1024).toFixed(1)} MB`
     }
+
+    // ─────────────────── 数据层 ───────────────────
+
+    /** 当前语言（跟随宿主 locale）。 */
+    function localeTag(ctx) {
+      try {
+        const snap = typeof ctx.locale.getLocale === 'function' ? ctx.locale.getLocale() : ctx.locale?.getSnapshot?.()
+        const v = snap?.active ?? ctx.locale?.locale
+        return typeof v === 'string' && v.startsWith('en') ? 'en' : 'zh'
+      } catch { return 'zh' }
+    }
+
+    /**
+     * 造一个带 translate 的运行时（每页共用）。
+     * @param {object} ctx client root context。
+     * @returns {{t: Function, tag: string}}
+     */
+    function makeT(ctx) {
+      const tag = localeTag(ctx)
+      const table = tag === 'en' ? EN : ZH
+      return { t: (key, args) => fill(table[key] ?? key, args), tag }
+    }
+
+    /**
+     * GET 一个 API 路由。
+     * @param {string} route 如 '/overview'。
+     * @returns {Promise<object>}
+     */
+    async function apiGet(route) {
+      const r = await fetch(`/api/sync-hub${route}`, { headers: { accept: 'application/json' } })
+      return r.json()
+    }
+
+    /**
+     * POST 一个 API 路由。
+     * @param {string} route 如 '/sync'。
+     * @param {object} body 请求体。
+     * @returns {Promise<object>}
+     */
+    async function apiPost(route, body) {
+      const r = await fetch(`/api/sync-hub${route}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify(body ?? {}),
+      })
+      return r.json()
+    }
+
+    /** 打开控制台（宿主提供受控入口；与旧版 /console 同语义）。 */
+    async function openConsole() {
+      try { await apiPost('/env', { action: 'console' }) } catch { /* 控制台开不开关不住主界面 */ }
+    }
+
+    // ─────────────────── 通用小组件 ───────────────────
+
+    /** 状态点：level = pass | warn | fail | info。 */
+    function Dot({ level }) {
+      const color = level === 'pass' ? 'var(--dsw-alias-status-success, #22c55e)'
+        : level === 'warn' ? 'var(--dsw-alias-status-warning, #f59e0b)'
+          : level === 'fail' ? 'var(--dsw-alias-status-danger, #ef4444)'
+            : 'var(--dsw-alias-label-tertiary, #888)'
+      return h('span', {
+        'aria-hidden': true,
+        style: {
+          width: 8, height: 8, borderRadius: '50%',
+          background: color, flex: '0 0 auto', display: 'inline-block',
+        },
+      })
+    }
+
+    /** 一行"标签 + 值 + 状态点"。 */
+    function Row({ label, value, level, mono }) {
+      return h('div', {
+        style: {
+          display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0',
+          fontSize: 13, lineHeight: '20px',
+        },
+      },
+        level ? h(Dot, { level }) : null,
+        h('span', { style: { opacity: 0.6, flex: '0 0 auto' } }, label),
+        h('span', {
+          style: {
+            flex: '1 1 auto', textAlign: 'right',
+            fontFamily: mono ? 'ui-monospace, SFMono-Regular, Menlo, monospace' : undefined,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          },
+        }, value),
+      )
+    }
+
+    /** 一张卡片（标题 + 子内容）。 */
+    function Card({ title, hint, children, right }) {
+      return h('section', {
+        style: {
+          border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.08))',
+          borderRadius: 10, padding: '12px 14px', marginBottom: 12,
+          display: 'flex', flexDirection: 'column', gap: 8,
+        },
+      },
+        h('div', { style: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 } },
+          h('h3', { style: { margin: 0, fontSize: 14, fontWeight: 600 } }, title),
+          right ?? null,
+        ),
+        hint ? h('p', { style: { margin: 0, fontSize: 12, opacity: 0.6, lineHeight: '18px' } }, hint) : null,
+        children,
+      )
+    }
+
+    /** 主按钮（就地反馈：busy 时禁用并显示转圈文案）。 */
+    function ActionButton({ label, onClick, busy, tone, disabled, small, title }) {
+      const bg = tone === 'primary'
+        ? 'var(--dsw-alias-button-primary-bg, #2563eb)'
+        : tone === 'danger'
+          ? 'var(--dsw-alias-status-danger, #ef4444)'
+          : 'var(--dsw-alias-bg-fill-subtle, rgba(0,0,0,0.05))'
+      const fg = tone ? '#fff' : 'inherit'
+      return h('button', {
+        type: 'button',
+        title: title ?? undefined,
+        disabled: busy || disabled,
+        onClick,
+        style: {
+          appearance: 'none', border: 'none', cursor: (busy || disabled) ? 'default' : 'pointer',
+          background: bg, color: fg,
+          borderRadius: 8, fontWeight: 500,
+          padding: small ? '4px 10px' : '7px 14px',
+          fontSize: small ? 12 : 13,
+          opacity: (busy || disabled) ? 0.6 : 1,
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+        },
+      }, busy ? h('span', null, '…') : null, label)
+    }
+
+    /** 就地反馈条（memory 4.20：贴在被触发的控件旁）。 */
+    function InlineNote({ tone, children }) {
+      if (!children) return null
+      const color = tone === 'error' ? 'var(--dsw-alias-status-danger, #ef4444)'
+        : tone === 'success' ? 'var(--dsw-alias-status-success, #22c55e)'
+          : 'var(--dsw-alias-label-secondary, #666)'
+      return h('p', {
+        style: {
+          margin: '4px 0 0', fontSize: 12, lineHeight: '18px', color,
+          whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+        },
+      }, children)
+    }
+
+    /** 空态提示。 */
+    function Empty({ children }) {
+      return h('p', { style: { margin: '4px 0', fontSize: 12, opacity: 0.5 } }, children)
+    }
+
+    // ─────────────────── 全局状态条 ───────────────────
+
+    /**
+     * 顶部常驻状态条：任何页都能看到"现在能不能同步"。
+     * @param {object} p { t, data }
+     */
+    function StatusBar({ t, data }) {
+      const st = data?.status ?? {}
+      const items = []
+      items.push({ key: 'ahead', label: t('bar.ahead'), value: st.ahead ?? 0, level: (st.ahead ?? 0) > 0 ? 'warn' : 'pass' })
+      items.push({ key: 'behind', label: t('bar.behind'), value: st.behind ?? 0, level: (st.behind ?? 0) > 0 ? 'warn' : 'pass' })
+      items.push({ key: 'dirty', label: t('bar.dirty'), value: st.dirtyCount ?? 0, level: (st.dirtyCount ?? 0) > 0 ? 'warn' : 'pass' })
+      items.push({
+        key: 'credential',
+        label: t('bar.credential'),
+        value: data?.credential?.haveCredential ? (data.credential.user || t('bar.ok')) : t('bar.missing'),
+        level: data?.credential?.haveCredential ? 'pass' : 'fail',
+      })
+      items.push({
+        key: 'schedule',
+        label: t('bar.schedule'),
+        value: data?.schedule?.installed ? t('bar.on') : t('bar.off'),
+        level: data?.schedule?.installed ? 'pass' : 'info',
+      })
+      return h('div', {
+        style: {
+          display: 'flex', flexWrap: 'wrap', gap: '6px 16px', alignItems: 'center',
+          padding: '6px 20px', fontSize: 12,
+          borderBottom: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.08))',
+          flex: '0 0 auto',
+        },
+        'data-sync-hub-status': 'bar',
+      }, items.map((it) => h('span', {
+        key: it.key,
+        style: { display: 'inline-flex', alignItems: 'center', gap: 5 },
+        title: `${it.label}: ${it.value}`,
+      },
+        h(Dot, { level: it.level }),
+        h('span', { style: { opacity: 0.6 } }, it.label),
+        h('span', { style: { fontWeight: 500 } }, String(it.value)),
+      )))
+    }
+
+    // ─────────────────── 总览页 ───────────────────
+
+    /** 待办驱动（§4.2）：按优先级出 1–3 条，点了直达同步页。 */
+    function buildTodos(t, data) {
+      const list = []
+      const st = data?.status ?? {}
+      if (data?.credential && !data.credential.haveCredential) {
+        list.push({ key: 'credential', level: 'fail', text: t('ov.todo.credential') })
+      }
+      if ((st.behind ?? 0) > 0) {
+        list.push({ key: 'behind', level: 'warn', text: t('ov.todo.behind', { n: st.behind }) })
+      }
+      if ((st.dirtyCount ?? 0) > 0) {
+        list.push({ key: 'commit', level: 'warn', text: t('ov.todo.commit', { n: st.dirtyCount }) })
+      }
+      const missing = data?.tools?.missingCore ?? []
+      if (missing.length > 0) {
+        list.push({ key: 'core', level: 'fail', text: t('ov.todo.core', { list: missing.join('、') }) })
+      }
+      return list.slice(0, 3)
+    }
+
+    /**
+     * 总览页。
+     * @param {object} p { t, data, onGoSync }
+     */
+    function OverviewPage({ t, data, onGoSync }) {
+      const st = data?.status ?? {}
+      const todos = buildTodos(t, data)
+      const recent = data?.recent ?? []
+
+      return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 0 } },
+        // 待办卡
+        h(Card, { title: t('ov.todo') },
+          todos.length === 0
+            ? h(Empty, null, t('ov.todo.empty'))
+            : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
+              todos.map((item) => h('div', {
+                key: item.key,
+                style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 },
+              },
+                h(Dot, { level: item.level }),
+                h('span', { style: { flex: '1 1 auto' } }, item.text),
+                item.key === 'core'
+                  ? null
+                  : h(ActionButton, { label: t('ov.goSync'), small: true, onClick: onGoSync }),
+              )),
+            ),
+        ),
+        // 健康分卡（N4：0–100 单一指标 + 点击拆明细）
+        data?.health?.items?.length
+          ? h(Card, {
+            title: t('ov.health'),
+            right: h('span', {
+              style: {
+                fontSize: 20, fontWeight: 600,
+                color: (data.health.score ?? 0) >= 90 ? 'var(--dsw-alias-status-success, #22c55e)'
+                  : (data.health.score ?? 0) >= 60 ? 'var(--dsw-alias-status-warning, #f59e0b)'
+                    : 'var(--dsw-alias-status-danger, #ef4444)',
+              },
+              'data-sync-hub-health': 'score',
+            }, String(data.health.score ?? 0)),
+          },
+            h('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
+              data.health.items.map((it) => h('div', {
+                key: it.key,
+                style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 },
+              },
+                h(Dot, { level: it.level }),
+                h('span', { style: { flex: '0 0 auto', opacity: 0.7 } }, it.label),
+                h('span', { style: { flex: '1 1 auto', textAlign: 'right', opacity: 0.6 } }, it.reason),
+                h('span', { style: { flex: '0 0 auto', fontVariantNumeric: 'tabular-nums', opacity: 0.8 } }, `${it.got}/${it.max}`),
+              )),
+            ),
+          )
+          : null,
+
+        // 中枢卡
+        h(Card, { title: t('ov.hub') },
+          h(Row, { label: t('ov.version'), value: data?.version ?? '—', mono: true }),
+          h(Row, { label: t('ov.branch'), value: st.branch ?? '—', mono: true }),
+          h(Row, {
+            label: t('ov.lastCommit'),
+            value: st.lastCommit ? `${st.lastCommit.hash} ${st.lastCommit.subject}` : '—',
+            mono: true,
+          }),
+          h(Row, { label: t('ov.skills'), value: data?.inventory?.skills ?? '—' }),
+          h(Row, { label: t('ov.machines'), value: data?.inventory?.machines ?? '—' }),
+          h(Row, {
+            label: t('ov.tools'),
+            value: data?.tools ? `${data.tools.present}/${data.tools.total}` : '—',
+            level: (data?.tools?.missingCore?.length ?? 0) > 0 ? 'fail' : 'pass',
+          }),
+        ),
+        // 本机卡
+        h(Card, { title: t('ov.machine') },
+          h(Row, { label: t('bar.identity'), value: data?.machine?.computer ?? '—', mono: true }),
+          h(Row, { label: t('ov.dshHome'), value: data?.machine?.dshHome ?? '—', mono: true }),
+        ),
+        // 机器看板（N5：另一台上次什么时候同步过）
+        h(Card, { title: t('ov.board') },
+          (data?.board ?? []).length === 0
+            ? h(Empty, null, t('ov.noBoard'))
+            : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
+              (data.board ?? []).map((m) => h('div', {
+                key: m.id,
+                style: {
+                  display: 'flex', alignItems: 'center', gap: 8, fontSize: 13,
+                  padding: '5px 0', borderBottom: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.05))',
+                },
+              },
+                h(Dot, { level: m.lastWhen ? 'pass' : 'info' }),
+                h('span', { style: { flex: '0 0 auto', fontWeight: 500 } }, m.id),
+                h('span', { style: { flex: '0 0 auto', opacity: 0.5, fontSize: 12 } }, m.computer ?? '?'),
+                h('span', {
+                  style: { flex: '1 1 auto', textAlign: 'right', fontSize: 12, opacity: 0.7 },
+                  title: m.lastSubject ?? undefined,
+                }, m.lastWhen ? `${m.lastWhen}${m.lastCommit ? ' · ' + m.lastCommit : ''}` : t('ov.boardNever')),
+              )),
+            ),
+        ),
+
+        // 最近动态
+        h(Card, { title: t('ov.recent') },
+          recent.length === 0
+            ? h(Empty, null, t('ov.noRecent'))
+            : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
+              recent.slice(0, 6).map((c) => h('div', {
+                key: c.hash,
+                style: { display: 'flex', gap: 8, fontSize: 12, alignItems: 'baseline' },
+              },
+                h('span', { style: { opacity: 0.5, fontFamily: 'ui-monospace, monospace', flex: '0 0 auto' } }, c.hash.slice(0, 7)),
+                h('span', {
+                  style: { flex: '1 1 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+                }, c.subject),
+                h('span', { style: { opacity: 0.5, flex: '0 0 auto' } }, c.date),
+              )),
+            ),
+        ),
+      )
+    }
+
+    // ─────────────────── 同步页 ───────────────────
+
+    /** 推送范围（与宿主 SCOPE_PATHS 的键一致）。 */
+    const SCOPES = ['memory', 'skills', 'config', 'sessions', 'dshconfig', 'plugins', 'pluginsrc']
+
+    /**
+     * 同步页：范围多选 + 预演 + 推/拉，反馈全部就地。
+     * @param {object} p { t, data, onRefresh }
+     */
+    function SyncPage({ t, data, onRefresh }) {
+      const [scopes, setScopes] = useState(['memory', 'skills', 'config', 'pluginsrc'])
+      const [except, setExcept] = useState([])
+      const [busy, setBusy] = useState(null)
+      const [note, setNote] = useState(null)
+      const [preview, setPreview] = useState(null)
+      // 冲突文件列表：非空即渲染冲突解决器（拉取撞车或手动查询命中）
+      const [conflicts, setConflicts] = useState([])
+      const [resolverOpen, setResolverOpen] = useState(false)
+
+      const toggle = (key) => {
+        setScopes((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]))
+      }
+
+      const runPreview = async () => {
+        setBusy('preview')
+        setNote(null)
+        const r = await apiPost('/sync', { action: 'preview', scopes, except })
+        setBusy(null)
+        if (!r.ok) { setNote({ tone: 'error', text: r.error }); return }
+        setPreview(r)
+      }
+
+      const runPush = async () => {
+        setBusy('push')
+        setNote(null)
+        const r = await apiPost('/sync', { action: 'push', scopes, except })
+        setBusy(null)
+        if (!r.ok) {
+          setNote({ tone: 'error', text: r.conflict ? r.error : t('sync.err.secret', { e: r.error }) })
+          return
+        }
+        setPreview(null)
+        setNote({ tone: 'success', text: t('sync.msg.pushed', { n: r.fileCount ?? 0, commit: r.commit ?? '' }) })
+        onRefresh()
+      }
+
+      const runPull = async () => {
+        setBusy('pull')
+        setNote(null)
+        const r = await apiPost('/sync', { action: 'pull' })
+        setBusy(null)
+        if (!r.ok) {
+          setNote({ tone: 'error', text: r.error })
+          // 撞车：自动展开冲突解决器（D7 的核心体验）
+          if (r.conflict) {
+            setConflicts(r.conflicts ?? [])
+            setResolverOpen(true)
+          }
+          return
+        }
+        setConflicts([])
+        setResolverOpen(false)
+        setNote({ tone: 'success', text: t('sync.msg.pulled', { commit: r.commit ?? '' }) })
+        onRefresh()
+      }
+
+      const runConflicts = async () => {
+        setBusy('conflicts')
+        const r = await apiPost('/sync', { action: 'conflicts' })
+        setBusy(null)
+        if (!r.ok) { setNote({ tone: 'error', text: r.error }); return }
+        setConflicts(r.conflicts ?? [])
+        setResolverOpen((r.conflicts ?? []).length > 0)
+        if ((r.conflicts ?? []).length === 0) setNote({ tone: 'info', text: t('sync.msg.noConflict') })
+      }
+
+      // N6 一键同步流：预演 → 确认 → 执行 → 结果 → 提示重启，一条流内完成不跳页。
+      const [flow, setFlow] = useState(null) // {stage:'preview'|'confirm'|'running'|'done', ...}
+      const [flowBusy, setFlowBusy] = useState(false)
+
+      const flowPreview = async () => {
+        setFlowBusy(true)
+        const r = await apiPost('/sync', { action: 'preview', scopes, except })
+        setFlowBusy(false)
+        if (!r.ok) { setNote({ tone: 'error', text: r.error }); return }
+        if (!r.files?.length) {
+          setNote({ tone: 'info', text: t('sync.previewEmpty') })
+          return
+        }
+        setFlow({ stage: 'confirm', files: r.files, totalBytes: r.totalBytes })
+      }
+
+      const flowRun = async () => {
+        setFlow({ ...flow, stage: 'running' })
+        const r = await apiPost('/sync', { action: 'push', scopes, except })
+        if (!r.ok) {
+          setNote({ tone: 'error', text: r.conflict ? r.error : t('sync.err.secret', { e: r.error }) })
+          if (r.conflict) { setConflicts(r.conflicts ?? []); setResolverOpen(true) }
+          setFlow(null)
+          return
+        }
+        setFlow({ stage: 'done', fileCount: r.fileCount ?? 0, commit: r.commit ?? '' })
+        setNote({ tone: 'success', text: t('sync.msg.pushed', { n: r.fileCount ?? 0, commit: r.commit ?? '' }) })
+        onRefresh()
+      }
+
+      return h('div', null,
+        // 冲突解决器（撞车时置顶展开）
+        resolverOpen && conflicts.length > 0
+          ? h(ConflictResolver, {
+            t,
+            files: conflicts,
+            onDone: () => { setResolverOpen(false); setConflicts([]); onRefresh() },
+          })
+          : null,
+
+        // N6 一键同步（主路径：一条流内完成）
+        h(Card, { title: t('flow.title'), hint: t('flow.hint') },
+          !flow
+            ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' } },
+              h(ActionButton, {
+                label: t('flow.start'), tone: 'primary',
+                onClick: flowPreview, busy: flowBusy, disabled: scopes.length === 0,
+              }),
+              h('span', { style: { fontSize: 12, opacity: 0.6 } },
+                scopes.length === 0 ? t('sync.pickCat') : t('flow.picked', { n: scopes.length })),
+              h(InlineNote, { tone: note?.tone }, note?.text),
+            )
+            : flow.stage === 'confirm'
+              ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
+                h('p', { style: { margin: 0, fontSize: 13 } },
+                  t('sync.confirmPush', { n: flow.files.length }) + ' · ' + t('sync.files', {
+                    n: flow.files.length, size: humanBytes(flow.totalBytes),
+                  })),
+                h('div', {
+                  style: {
+                    maxHeight: 160, overflow: 'auto', padding: 8, borderRadius: 8, fontSize: 11,
+                    background: 'var(--dsw-alias-bg-fill-subtle, rgba(0,0,0,0.04))',
+                    fontFamily: 'ui-monospace, monospace', lineHeight: '17px',
+                  },
+                },
+                  flow.files.slice(0, 60).map((f) => h('div', { key: f.path }, f.path)),
+                ),
+                h('div', { style: { display: 'flex', gap: 8 } },
+                  h(ActionButton, { label: t('flow.confirm'), tone: 'primary', onClick: flowRun }),
+                  h(ActionButton, { label: t('act.cancel'), onClick: () => setFlow(null) }),
+                ),
+              )
+              : flow.stage === 'running'
+                ? h('p', { style: { margin: 0, fontSize: 13 } }, t('sync.working'))
+                : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
+                  h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 } },
+                    h(Dot, { level: 'pass' }),
+                    h('span', null, t('flow.done', { n: flow.fileCount, commit: flow.commit })),
+                  ),
+                  h('p', { style: { margin: 0, fontSize: 12, opacity: 0.6 } }, t('flow.restartHint')),
+                  h('div', null, h(ActionButton, { label: t('flow.again'), small: true, onClick: () => setFlow(null) })),
+                ),
+        ),
+
+        h(Card, { title: t('sync.scope'), hint: t('sync.scopeHint') },
+          h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6 } },
+            h(ActionButton, {
+              label: t('sync.all'), small: true,
+              onClick: () => setScopes([...SCOPES]),
+            }),
+            h(ActionButton, {
+              label: t('sync.none'), small: true,
+              onClick: () => setScopes([]),
+            }),
+          ),
+          h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 } },
+            SCOPES.map((s) => h('button', {
+              key: s,
+              type: 'button',
+              onClick: () => toggle(s),
+              'aria-pressed': scopes.includes(s),
+              style: {
+                appearance: 'none', cursor: 'pointer', fontSize: 12,
+                padding: '4px 10px', borderRadius: 999,
+                border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.12))',
+                background: scopes.includes(s)
+                  ? 'var(--dsw-alias-button-primary-bg, #2563eb)' : 'transparent',
+                color: scopes.includes(s) ? '#fff' : 'inherit',
+              },
+            }, s)),
+          ),
+          // 就地反馈：预演/推送结果贴在这张卡里
+          h(InlineNote, {
+            tone: note?.tone,
+          }, note?.text),
+        ),
+
+        // 动作卡
+        h(Card, { title: t('sync.resultTitle') },
+          h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 8 } },
+            h(ActionButton, { label: t('sync.preview'), onClick: runPreview, busy: busy === 'preview' }),
+            h(ActionButton, { label: t('sync.push'), tone: 'primary', onClick: runPush, busy: busy === 'push', disabled: scopes.length === 0 }),
+            h(ActionButton, { label: t('sync.pull'), onClick: runPull, busy: busy === 'pull' }),
+            h(ActionButton, { label: t('sync.conflicts'), onClick: runConflicts, busy: busy === 'conflicts', small: true }),
+          ),
+          h('p', { style: { margin: '6px 0 0', fontSize: 12, opacity: 0.6 } }, t('sync.hint.pull')),
+          preview && preview.files?.length > 0
+            ? h('div', {
+              style: {
+                marginTop: 8, padding: 8, borderRadius: 8, fontSize: 12,
+                background: 'var(--dsw-alias-bg-fill-subtle, rgba(0,0,0,0.04))',
+                maxHeight: 200, overflow: 'auto',
+              },
+            },
+              h('div', { style: { fontWeight: 500, marginBottom: 4 } },
+                t('sync.previewTitle') + ' · ' + t('sync.files', {
+                  n: preview.files.length, size: humanBytes(preview.totalBytes),
+                })),
+              preview.files.slice(0, 50).map((f) => h('div', {
+                key: f.path,
+                style: { fontFamily: 'ui-monospace, monospace', opacity: 0.8, lineHeight: '18px' },
+              }, f.path)),
+            )
+            : preview
+              ? h(Empty, null, t('sync.previewEmpty'))
+              : null,
+        ),
+      )
+    }
+
+    // ─────────────────── 维护页 ───────────────────
+
+    /**
+     * 维护页：备份 / 工具链 / 定时 / 凭据 / 换机补齐 / 控制台。
+     * @param {object} p { t, data, onRefresh }
+     */
+    function MaintainPage({ t, data, onRefresh }) {
+      const [backups, setBackups] = useState(null)
+      const [busy, setBusy] = useState(null)
+      const [note, setNote] = useState(null)
+      const [portable, setPortable] = useState(null)
+
+      const loadBackups = useCallback(async () => {
+        const r = await apiGet('/content')
+        if (r.ok) setBackups(r.backups.backups)
+      }, [])
+      useEffect(() => { loadBackups() }, [loadBackups])
+
+      const act = async (action, body) => {
+        setBusy(action)
+        setNote(null)
+        const r = await apiPost('/content', { action, ...(body ?? {}) })
+        setBusy(null)
+        if (!r.ok) { setNote({ tone: 'error', text: t('mt.msg.restoreFail', { e: r.error }) }); return r }
+        return r
+      }
+
+      const doBackup = async () => {
+        const r = await act('backup')
+        if (r?.ok) {
+          setNote({ tone: 'success', text: t('mt.msg.backed', { n: r.created.length }) })
+          loadBackups()
+        }
+      }
+      const doRestore = async (name) => {
+        const r = await act('restore', { name })
+        if (r?.ok) {
+          setNote({
+            tone: 'success',
+            text: t('mt.msg.restored', { name }) + (r.preRestore ? `\n${t('mt.msg.preRestore', { name: r.preRestore })}` : ''),
+          })
+        }
+      }
+      const doDelete = async (name) => {
+        const r = await act('delete', { name })
+        if (r?.ok) {
+          setNote({ tone: 'success', text: t('mt.msg.deleted', { name }) })
+          loadBackups()
+        }
+      }
+
+      const doSchedule = async (action) => {
+        setBusy(action)
+        setNote(null)
+        const r = await apiPost('/env', { action })
+        setBusy(null)
+        if (!r.ok) { setNote({ tone: 'error', text: r.error }); return }
+        setNote({ tone: 'success', text: action === 'schedule-install' ? t('mt.msg.scheduleOn') : t('mt.msg.scheduleOff') })
+        onRefresh()
+      }
+
+      const doPortable = async () => {
+        setBusy('portable')
+        const r = await apiPost('/portable', { action: 'setup', profile: 'desktop', dryRun: true })
+        setBusy(null)
+        setPortable(r)
+      }
+
+      const tools = data?.tools ?? {}
+      const missingAll = [...(tools.missingCore ?? []), ...(tools.missingDev ?? []), ...(tools.missingNice ?? [])]
+
+      return h('div', null,
+        // 备份
+        h(Card, {
+          title: t('mt.backup'), hint: t('mt.backupHint'),
+          right: h(ActionButton, { label: t('mt.backupNow'), tone: 'primary', small: true, onClick: doBackup, busy: busy === 'backup' }),
+        },
+          h(InlineNote, { tone: note?.tone }, note?.text),
+          h('div', { style: { marginTop: 4 } },
+            h('div', { style: { fontSize: 12, opacity: 0.6, marginBottom: 4 } }, t('mt.backups')),
+            !backups
+              ? h(Empty, null, t('loading'))
+              : backups.length === 0
+                ? h(Empty, null, t('mt.backupsEmpty'))
+                : h('div', {
+                  style: {
+                    maxHeight: 220, overflow: 'auto',
+                    border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.08))', borderRadius: 8,
+                  },
+                },
+                  backups.slice(0, 40).map((b) => h('div', {
+                    key: b.name,
+                    style: {
+                      display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px',
+                      fontSize: 12, borderBottom: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.05))',
+                    },
+                  },
+                    h('span', {
+                      style: { flex: '1 1 auto', fontFamily: 'ui-monospace, monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+                    }, b.name),
+                    h('span', { style: { opacity: 0.5, flex: '0 0 auto' } }, humanBytes(b.bytes)),
+                    h(ActionButton, { label: t('mt.restore'), small: true, onClick: () => doRestore(b.name), busy: busy === 'restore' }),
+                    h(ActionButton, { label: t('mt.delete'), small: true, tone: 'danger', onClick: () => doDelete(b.name), busy: busy === 'delete' }),
+                  )),
+                ),
+          ),
+        ),
+
+        // 工具链
+        h(Card, { title: t('mt.tools'), hint: t('mt.toolsHint') },
+          missingAll.length === 0
+            ? h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 } },
+              h(Dot, { level: 'pass' }), h('span', null, t('mt.toolsAll')))
+            : h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 } },
+              h(Dot, { level: (tools.missingCore?.length ?? 0) > 0 ? 'fail' : 'warn' }),
+              h('span', null, t('mt.toolsMissing', { n: missingAll.length, list: missingAll.join('、') }))),
+          h('div', { style: { fontSize: 12, opacity: 0.6 } },
+            `${t('mt.core')} ${(tools.present ?? 0)}/${tools.total ?? 0}`),
+        ),
+
+        // 定时同步
+        h(Card, {
+          title: t('mt.schedule'), hint: t('mt.scheduleHint'),
+          right: data?.schedule?.installed
+            ? h(ActionButton, { label: t('mt.scheduleRemove'), small: true, onClick: () => doSchedule('schedule-remove'), busy: busy === 'schedule-remove' })
+            : h(ActionButton, { label: t('mt.scheduleInstall'), small: true, tone: 'primary', onClick: () => doSchedule('schedule-install'), busy: busy === 'schedule-install' }),
+        },
+          h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 } },
+            h(Dot, { level: data?.schedule?.installed ? 'pass' : 'info' }),
+            h('span', null, data?.schedule?.installed ? t('mt.scheduleOn') : t('mt.scheduleOff')),
+            data?.schedule?.nextRun ? h('span', { style: { opacity: 0.6, fontSize: 12 } }, t('mt.scheduleNext', { t: data.schedule.nextRun })) : null,
+          ),
+        ),
+
+        // 凭据
+        h(Card, { title: t('mt.credential') },
+          h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 } },
+            h(Dot, { level: data?.credential?.haveCredential ? 'pass' : 'fail' }),
+            h('span', null, data?.credential?.haveCredential
+              ? t('mt.credentialOk', { user: data.credential.user })
+              : t('mt.credentialMissing')),
+          ),
+        ),
+
+        // 换机补齐
+        h(Card, { title: t('mt.portable'), hint: t('mt.portableHint') },
+          h('div', { style: { display: 'flex', gap: 8, alignItems: 'center' } },
+            h(ActionButton, { label: t('mt.portableRun'), small: true, onClick: doPortable, busy: busy === 'portable' }),
+          ),
+          portable
+            ? h('div', {
+              style: {
+                marginTop: 6, padding: 8, borderRadius: 8, fontSize: 12,
+                background: 'var(--dsw-alias-bg-fill-subtle, rgba(0,0,0,0.04))',
+              },
+            },
+              portable.steps?.map((s) => h('div', {
+                key: s.step,
+                style: { display: 'flex', gap: 6, alignItems: 'baseline', lineHeight: '18px' },
+              },
+                h('span', { style: { color: s.ok ? 'var(--dsw-alias-status-success, #22c55e)' : 'var(--dsw-alias-status-danger, #ef4444)' } }, s.ok ? '✓' : '✗'),
+                h('span', { style: { opacity: 0.6, flex: '0 0 auto' } }, s.step),
+                h('span', { style: { flex: '1 1 auto' } }, s.detail),
+              )),
+            )
+            : null,
+        ),
+
+        // 控制台 + 日志
+        h(Card, { title: t('mt.console'), hint: t('mt.consoleHint') },
+          h(ActionButton, { label: t('mt.console'), small: true, onClick: openConsole }),
+        ),
+        h(Card, { title: t('mt.log') },
+          h('div', { style: { fontSize: 12, opacity: 0.7, fontFamily: 'ui-monospace, monospace' } },
+            t('mt.logPath', { p: data?.logFile ?? '—' })),
+        ),
+      )
+    }
+
+    // ─────────────────── 技能页 ───────────────────
+
+    /** 差异徽标：四类 + 占位 + 非法。 */
+    const DIFF_LABEL = {
+      'only-local': '仅本机',
+      'only-hub': '仅中枢',
+      differ: '两边不同',
+      identical: '一致',
+    }
+    const DIFF_LEVEL = {
+      'only-local': 'warn',
+      'only-hub': 'info',
+      differ: 'fail',
+      identical: 'pass',
+    }
+
+    /** 一个小徽标。 */
+    function Tag({ text, level }) {
+      const color = level === 'pass' ? 'var(--dsw-alias-status-success, #22c55e)'
+        : level === 'warn' ? 'var(--dsw-alias-status-warning, #f59e0b)'
+          : level === 'fail' ? 'var(--dsw-alias-status-danger, #ef4444)'
+            : 'var(--dsw-alias-label-tertiary, #888)'
+      return h('span', {
+        style: {
+          fontSize: 11, lineHeight: '16px', padding: '1px 6px', borderRadius: 999,
+          border: `1px solid ${color}`, color, flex: '0 0 auto',
+        },
+      }, text)
+    }
+
+    /**
+     * 技能页：本机 ↔ 中枢双列 + 四类差异徽标 + 汇总。
+     * @param {object} p { t, data, onRefresh }
+     */
+    function SkillsPage({ t, data, onRefresh }) {
+      const [skills, setSkills] = useState(null)
+      const [error, setError] = useState(null)
+      const [filter, setFilter] = useState('all')
+
+      const load = useCallback(async () => {
+        setError(null)
+        const r = await apiGet('/skills')
+        if (!r.ok) { setError(r.error); return }
+        setSkills(r)
+      }, [])
+      useEffect(() => { load() }, [load])
+
+      const summary = skills?.summary
+      const rows = (skills?.diff ?? []).filter((d) => (filter === 'all' ? true : d.kind === filter))
+      const invalid = [...(summary?.invalidLocal ?? []), ...(summary?.invalidHub ?? [])]
+
+      return h('div', null,
+        // 汇总卡
+        h(Card, { title: t('sk.summary'), right: h(ActionButton, { label: t('refresh'), small: true, onClick: load }) },
+          error ? h(InlineNote, { tone: 'error' }, t('error', { e: error })) : null,
+          summary
+            ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px 14px', fontSize: 13 } },
+              h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 5 } }, h(Dot, { level: 'pass' }), `一致 ${summary.identical}`),
+              h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 5 } }, h(Dot, { level: 'warn' }), `仅本机 ${summary.onlyLocal}`),
+              h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 5 } }, h(Dot, { level: 'info' }), `仅中枢 ${summary.onlyHub}`),
+              h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 5 } }, h(Dot, { level: 'fail' }), `两边不同 ${summary.differ}`),
+              summary.placeholders > 0
+                ? h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 5 } }, h(Dot, { level: 'info' }), `占位/空壳 ${summary.placeholders}`)
+                : null,
+            )
+            : h(Empty, null, t('loading')),
+          // 非法名警示（DSH 会静默跳过它们，这里必须让人看见）
+          invalid.length > 0
+            ? h(InlineNote, { tone: 'error' },
+              `${t('sk.invalidWarn')}：${invalid.join('、')}`)
+            : null,
+        ),
+
+        // 过滤 + 列表
+        h(Card, { title: t('sk.list') },
+          h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 } },
+            ['all', 'only-local', 'only-hub', 'differ', 'identical'].map((k) => h('button', {
+              key: k,
+              type: 'button',
+              onClick: () => setFilter(k),
+              style: {
+                appearance: 'none', cursor: 'pointer', fontSize: 12,
+                padding: '3px 10px', borderRadius: 999,
+                border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.12))',
+                background: filter === k ? 'var(--dsw-alias-button-primary-bg, #2563eb)' : 'transparent',
+                color: filter === k ? '#fff' : 'inherit',
+              },
+            }, k === 'all' ? t('sk.filterAll') : DIFF_LABEL[k])),
+          ),
+          rows.length === 0
+            ? h(Empty, null, t('sk.noRows'))
+            : h('div', {
+              style: {
+                maxHeight: 360, overflow: 'auto',
+                border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.08))', borderRadius: 8,
+              },
+            },
+              rows.map((d) => h('div', {
+                key: d.name,
+                style: {
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px',
+                  fontSize: 13, borderBottom: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.05))',
+                },
+              },
+                h(Dot, { level: DIFF_LEVEL[d.kind] }),
+                h('span', {
+                  style: { flex: '1 1 auto', fontFamily: 'ui-monospace, monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+                }, d.name),
+                h('span', { style: { fontSize: 11, opacity: 0.5, flex: '0 0 auto' } },
+                  d.local ? `${t('sk.local')}${d.local.sha ? ' ' + d.local.sha : ''}` : '—',
+                  ' / ',
+                  d.hub ? `${t('sk.hub')}${d.hub.sha ? ' ' + d.hub.sha : ''}` : '—'),
+                d.local?.placeholder || d.hub?.placeholder ? h(Tag, { text: t('sk.placeholder'), level: 'info' }) : null,
+                h(Tag, { text: DIFF_LABEL[d.kind], level: DIFF_LEVEL[d.kind] }),
+              )),
+            ),
+        ),
+
+        // 能力边界说明（不假装已有导入/回收站）
+        h(Card, { title: t('sk.scopeTitle') },
+          h('p', { style: { margin: 0, fontSize: 12, opacity: 0.7, lineHeight: '18px' } }, t('sk.scopeBody')),
+        ),
+      )
+    }
+
+    // ─────────────────── 会话页 ───────────────────
+
+    /**
+     * 会话页：跨机会话备份浏览（只读）+ 本机概况 + 备份/恢复动作。
+     * @param {object} p { t, data, onRefresh }
+     */
+    function SessionsPage({ t, data, onRefresh }) {
+      const [info, setInfo] = useState(null)
+      const [error, setError] = useState(null)
+      const [busy, setBusy] = useState(null)
+      const [note, setNote] = useState(null)
+      const [open, setOpen] = useState(null)
+
+      const load = useCallback(async () => {
+        setError(null)
+        const r = await apiGet('/sessions')
+        if (!r.ok) { setError(r.error); return }
+        setInfo(r)
+      }, [])
+      useEffect(() => { load() }, [load])
+
+      const act = async (action, body) => {
+        setBusy(action)
+        setNote(null)
+        const r = await apiPost('/sessions', { action, ...(body ?? {}) })
+        setBusy(null)
+        if (!r.ok) { setNote({ tone: 'error', text: r.error }); return }
+        setNote({
+          tone: 'success',
+          text: action === 'backup'
+            ? t('se.msg.backed', { n: r.copied ?? 0, skipped: r.skipped ?? 0 })
+            : t('se.msg.restored', { n: r.restored ?? 0, same: r.same ?? 0, mapped: r.mapped ?? 0 }),
+        })
+        load()
+        onRefresh()
+      }
+
+      const machines = info?.hub?.machines ?? []
+
+      return h('div', null,
+        h(Card, {
+          title: t('se.local'), hint: t('se.localHint'),
+          right: h(ActionButton, {
+            label: t('se.backup'), tone: 'primary', small: true,
+            onClick: () => act('backup'), busy: busy === 'backup',
+          }),
+        },
+          h(InlineNote, { tone: note?.tone }, note?.text),
+          h('div', { style: { fontSize: 13 } },
+            info?.local
+              ? `${t('se.files')} ${info.local.files} · ${humanBytes(info.local.bytes)}`
+              : t('loading')),
+        ),
+
+        h(Card, { title: t('se.hub'), hint: t('se.hubHint') },
+          machines.length === 0
+            ? h(Empty, null, t('se.noMachines'))
+            : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
+              machines.map((m) => h('div', {
+                key: m.machine,
+                style: {
+                  border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.08))',
+                  borderRadius: 8, padding: '8px 10px',
+                },
+              },
+                h('div', {
+                  style: { display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' },
+                  onClick: () => setOpen(open === m.machine ? null : m.machine),
+                },
+                  h('span', { style: { flex: '1 1 auto', fontWeight: 500, fontSize: 13 } }, m.machine),
+                  h('span', { style: { fontSize: 12, opacity: 0.6 } }, `${t('se.files')} ${m.files} · ${humanBytes(m.bytes)}`),
+                  h('span', { style: { opacity: 0.5, fontSize: 12 } }, open === m.machine ? '▾' : '▸'),
+                ),
+                open === m.machine
+                  ? h('div', { style: { marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 } },
+                    m.workspaces.map((w) => h('div', {
+                      key: w.folder,
+                      style: { fontSize: 12, display: 'flex', gap: 8, alignItems: 'baseline' },
+                    },
+                      h('span', {
+                        style: { flex: '1 1 auto', fontFamily: 'ui-monospace, monospace', opacity: 0.8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+                        title: w.path ?? w.folder,
+                      }, w.path ?? w.folder),
+                      h('span', { style: { opacity: 0.5, flex: '0 0 auto' } }, `${w.files}`),
+                    )),
+                    h('div', { style: { marginTop: 6 } },
+                      h(ActionButton, {
+                        label: t('se.restoreFrom', { machine: m.machine }), small: true,
+                        onClick: () => act('restore', { from: m.machine }),
+                        busy: busy === 'restore',
+                      }),
+                    ),
+                  )
+                  : null,
+              )),
+            ),
+        ),
+      )
+    }
+
+    // ─────────────────── 冲突解决器（N1，D7） ───────────────────
+
+    /**
+     * 三方冲突解决器：base / 对端 / 本机 三栏 + 选边或手写 + 收尾。
+     *
+     * 语义警示（实测坑，2026-10-14 固化在 lib/hub/conflict.js）：
+     *   rebase 场景下 git 阶段索引 :2: 是**对端**、:3: 是**本机**，
+     *   与字面直觉相反。这里按宿主返回的 stage2/stage3 明确标注
+     *   「对端 / 本机」，绝不靠猜。
+     *
+     * @param {object} p { t, files, onDone }
+     */
+    function ConflictResolver({ t, files, onDone }) {
+      const [index, setIndex] = useState(0)
+      const [info, setInfo] = useState(null)
+      const [draft, setDraft] = useState('')
+      const [busy, setBusy] = useState(null)
+      const [note, setNote] = useState(null)
+
+      const file = files[index] ?? null
+
+      const load = useCallback(async (f) => {
+        if (!f) return
+        setBusy('inspect')
+        setNote(null)
+        const r = await apiPost('/sync', { action: 'conflict-inspect', file: f })
+        setBusy(null)
+        if (!r.ok) { setNote({ tone: 'error', text: r.error }); setInfo(null); return }
+        setInfo(r)
+        // 预填：默认用本机内容（stage3），让用户有个起点自己改。
+        setDraft(r.stage3 ?? r.stage2 ?? r.base ?? '')
+      }, [])
+      useEffect(() => { load(file) }, [file, load])
+
+      const pick = (which) => {
+        if (!info) return
+        const v = which === 'base' ? info.base : which === 'remote' ? info.stage2 : info.stage3
+        setDraft(v ?? '')
+      }
+
+      const save = async () => {
+        if (!file) return
+        setBusy('save')
+        setNote(null)
+        const r = await apiPost('/sync', { action: 'conflict-resolve', file, content: draft })
+        setBusy(null)
+        if (!r.ok) { setNote({ tone: 'error', text: r.error }); return }
+        if (index + 1 < files.length) {
+          setIndex(index + 1)
+        } else {
+          setNote({ tone: 'success', text: t('cf.savedLast') })
+        }
+      }
+
+      const finish = async () => {
+        setBusy('finish')
+        setNote(null)
+        const r = await apiPost('/sync', { action: 'conflict-finish', files })
+        setBusy(null)
+        if (!r.ok) { setNote({ tone: 'error', text: r.error }); return }
+        setNote({ tone: 'success', text: t('cf.finished') })
+        onDone()
+      }
+
+      if (!file) return null
+
+      const col = (title, text, onPick) => h('div', {
+        style: {
+          flex: '1 1 0', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4,
+        },
+      },
+        h('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+          h('span', { style: { fontSize: 12, fontWeight: 500 } }, title),
+          onPick ? h(ActionButton, { label: t('cf.useThis'), small: true, onClick: onPick, disabled: text == null }) : null,
+        ),
+        h('pre', {
+          style: {
+            margin: 0, padding: 8, borderRadius: 8, fontSize: 11, lineHeight: '16px',
+            background: 'var(--dsw-alias-bg-fill-subtle, rgba(0,0,0,0.04))',
+            maxHeight: 220, overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+            opacity: text == null ? 0.4 : 1,
+          },
+        }, text == null ? t('cf.emptyStage') : (text || t('cf.emptyStage'))),
+      )
+
+      return h('div', {
+        style: {
+          border: '1px solid var(--dsw-alias-status-danger, #ef4444)',
+          borderRadius: 10, padding: 12, marginBottom: 12,
+        },
+        'data-sync-hub-conflict': 'resolver',
+      },
+        h('div', { style: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginBottom: 8 } },
+          h('h3', { style: { margin: 0, fontSize: 14, fontWeight: 600 } },
+            `${t('cf.title')}（${index + 1}/${files.length}）`),
+          h('span', { style: { fontSize: 12, fontFamily: 'ui-monospace, monospace', opacity: 0.7 } }, file),
+        ),
+
+        h(InlineNote, { tone: 'warn' }, t('cf.warn')),
+
+        busy === 'inspect' || !info
+          ? h(Empty, null, t('loading'))
+          : h('div', { style: { display: 'flex', gap: 10, marginTop: 8 } },
+            col(t('cf.base'), info.base, () => pick('base')),
+            col(t('cf.remote'), info.stage2, () => pick('remote')),
+            col(t('cf.local'), info.stage3, () => pick('local')),
+          ),
+
+        h('div', { style: { marginTop: 10 } },
+          h('div', { style: { fontSize: 12, opacity: 0.6, marginBottom: 4 } }, t('cf.editor')),
+          h('textarea', {
+            value: draft,
+            onChange: (e) => setDraft(e.target.value),
+            rows: 8,
+            spellCheck: false,
+            style: {
+              width: '100%', boxSizing: 'border-box', padding: 8, borderRadius: 8,
+              fontSize: 12, lineHeight: '18px', resize: 'vertical',
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+              border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.12))',
+              background: 'var(--dsw-alias-bg-base, transparent)',
+              color: 'inherit',
+            },
+          }),
+        ),
+
+        h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8, alignItems: 'center' } },
+          h(ActionButton, {
+            label: index + 1 < files.length ? t('cf.saveNext') : t('cf.saveLast'),
+            tone: 'primary', onClick: save, busy: busy === 'save',
+          }),
+          index + 1 >= files.length
+            ? h(ActionButton, { label: t('cf.finish'), tone: 'danger', onClick: finish, busy: busy === 'finish' })
+            : null,
+          h('span', { style: { fontSize: 12, opacity: 0.6 } }, t('cf.finishHint')),
+        ),
+        h(InlineNote, { tone: note?.tone }, note?.text),
+      )
+    }
+
+    // ─────────────────── 施工页（记忆·配置，M6b） ───────────────────
 
     /** 一页占位：施工期给结构反馈，不假装功能已好。 */
     function PageStub({ t, label }) {
-      return h('div', {
-        style: {
-          padding: '24px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 8,
-          alignItems: 'flex-start',
-        },
-        'data-sync-hub-page': 'stub',
-      },
-        h('p', { style: { margin: 0, opacity: 0.6 } }, label),
-        h('p', { style: { margin: 0, opacity: 0.4 } }, t('todo.placeholder')),
+      return h('div', { style: { padding: '24px 0' } },
+        h('p', { style: { margin: 0, opacity: 0.6, fontSize: 13 } }, label),
+        h('p', { style: { margin: '4px 0 0', opacity: 0.4, fontSize: 12 } }, t('todo.placeholder')),
       )
     }
 
-    /** 页头 + 页体。 */
-    function Page({ t, pageId, children }) {
-      const page = PAGES.find((p) => p.id === pageId) ?? PAGES[0]
-      return h('div', {
-        style: {
-          display: 'flex',
-          flexDirection: 'column',
-          minHeight: 0,
-          height: '100%',
-          overflow: 'auto',
-        },
-        'data-sync-hub-page': pageId,
-      },
-        h('div', {
-          style: {
-            padding: '16px 20px 8px',
-            display: 'flex',
-            alignItems: 'baseline',
-            justifyContent: 'space-between',
-          },
-        },
-          h('h2', { style: { margin: 0, fontSize: 16, fontWeight: 600 } }, t(page.labelKey)),
-        ),
-        h('div', { style: { padding: '8px 20px 20px' } }, children),
-      )
-    }
+    // ─────────────────── 面板骨架 ───────────────────
 
     /**
-     * 同步中枢主面板（main 插槽的 key = PANEL_ID 的正文）。
+     * 同步中枢主面板（main 插槽 key = PANEL_ID 的正文）。
      *
      * 标准 props 由框架免费提供：useResource / useWorkspaces / usePanelInfo /
      * useSessions / t / renderSlot；另有本插件 inject 注入的字段。
+     *
+     * @param {object} p 框架 props（含 t）。
      */
-    function SyncHubPanel({ t }) {
+    function SyncHubPanel(p) {
+      const t = typeof p.t === 'function' ? p.t : makeT(p.ctx ?? {}).t
       const [pageId, setPageId] = useState('overview')
+      const [data, setData] = useState(null)
+      const [error, setError] = useState(null)
+      const [loading, setLoading] = useState(true)
+
+      const refresh = useCallback(async () => {
+        setLoading(true)
+        setError(null)
+        try {
+          const r = await apiGet('/overview')
+          if (!r.ok) throw new Error(r.error || 'unknown')
+          setData(r)
+        } catch (e) {
+          setError(String(e?.message ?? e))
+        } finally {
+          setLoading(false)
+        }
+      }, [])
+
+      useEffect(() => { refresh() }, [refresh])
+
+      const goSync = useCallback(() => setPageId('sync'), [])
+
+      const page = PAGES.find((x) => x.id === pageId) ?? PAGES[0]
+
+      let body
+      if (loading && !data) body = h(Empty, null, t('loading'))
+      else if (error && !data) {
+        body = h('div', { style: { display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-start' } },
+          h(InlineNote, { tone: 'error' }, t('error', { e: error })),
+          h(ActionButton, { label: t('retry'), small: true, onClick: refresh }),
+        )
+      } else if (pageId === 'overview') body = h(OverviewPage, { t, data, onGoSync: goSync })
+      else if (pageId === 'sync') body = h(SyncPage, { t, data, onRefresh: refresh })
+      else if (pageId === 'skills') body = h(SkillsPage, { t, data, onRefresh: refresh })
+      else if (pageId === 'sessions') body = h(SessionsPage, { t, data, onRefresh: refresh })
+      else if (pageId === 'maintain') body = h(MaintainPage, { t, data, onRefresh: refresh })
+      else body = h(PageStub, { t, label: t(page.labelKey) })
 
       return h('div', {
         style: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 },
         'data-sync-hub-panel': PANEL_ID,
       },
+        // 全局状态条
+        h(StatusBar, { t, data }),
         // 页签条：固定尺寸，不随内容跳动（memory 4.20）。
         h('div', {
-          role: 'tablist',
-          'aria-label': t('panel'),
+          role: 'tablist', 'aria-label': t('panel'),
           style: {
-            display: 'flex',
-            gap: 4,
-            padding: '8px 20px 0',
+            display: 'flex', gap: 4, padding: '8px 20px 0',
             borderBottom: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.08))',
             flex: '0 0 auto',
           },
-        }, PAGES.map((p) => h('button', {
-          key: p.id,
+        }, PAGES.map((x) => h('button', {
+          key: x.id,
           type: 'button',
           role: 'tab',
-          'aria-selected': pageId === p.id,
-          onClick: () => setPageId(p.id),
+          'aria-selected': pageId === x.id,
+          onClick: () => setPageId(x.id),
           style: {
-            appearance: 'none',
-            border: 'none',
-            background: 'transparent',
-            cursor: 'pointer',
-            padding: '8px 12px',
-            fontSize: 13,
-            lineHeight: '20px',
-            color: pageId === p.id
+            appearance: 'none', border: 'none', background: 'transparent', cursor: 'pointer',
+            padding: '8px 12px', fontSize: 13, lineHeight: '20px',
+            color: pageId === x.id
               ? 'var(--dsw-alias-label-primary, inherit)'
               : 'var(--dsw-alias-label-tertiary, inherit)',
-            borderBottom: pageId === p.id
+            borderBottom: pageId === x.id
               ? '2px solid var(--dsw-alias-border-brand, currentColor)'
               : '2px solid transparent',
           },
-          'data-sync-hub-tab': p.id,
-        }, t(p.labelKey)))),
+          'data-sync-hub-tab': x.id,
+        }, t(x.labelKey)))),
         // 页体
-        h('div', { style: { flex: '1 1 auto', minHeight: 0 } },
-          h(Page, { t, pageId }, h(PageStub, { t, label: t((PAGES.find((p) => p.id === pageId) ?? PAGES[0]).labelKey) })),
+        h('div', {
+          style: { flex: '1 1 auto', minHeight: 0, overflow: 'auto', padding: '12px 20px 20px' },
+          'data-sync-hub-page': pageId,
+        },
+          h('div', { style: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 } },
+            h('h2', { style: { margin: 0, fontSize: 16, fontWeight: 600 } }, t(page.labelKey)),
+            h(ActionButton, { label: t('refresh'), small: true, onClick: refresh, busy: loading }),
+          ),
+          body,
         ),
       )
     }
 
     /**
+     * 侧栏入口图标。
+     * 收 owner 提供的 { size, active }（SidebarPanelIconOwnerProps），
+     * 图标用 primitives 官方语义图标（决策 D18）。
+     */
+    function PanelIcon({ size }) {
+      return h(P.IconCompareSplitOutlineMedium, { size })
+    }
+
+    /**
      * 客户端插件入口。
-     * @param {object} ctx - client root context。
+     * @param {object} ctx client root context。
      */
     function apply(ctx) {
       const t = ctx.locale.bind(NS)
 
-      // ① 文案：扁平键，官方解析（不再手写嵌套 reduce 解析器）。
+      // ① 文案：扁平键，官方解析。
       ctx.effect(() => ctx.locale.register(NS, { zh: ZH, en: EN }), 'sync-hub: dictionaries')
 
       // ② 侧栏入口（与插件管理器 / 任务管理器同一插槽）。
-      //    注册前探测撞名：同一 id 二次注册会 throw，宁可 fail-fast 也不黑屏。
       ctx.effect(() => {
         const taken = (ctx.slots.entries?.('sidebar.panellist') ?? [])
           .some((entry) => entry?.options?.id === PANEL_ID)

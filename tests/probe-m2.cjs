@@ -184,7 +184,28 @@ function main() {
   const zhTable = locale.dicts.get('syncHub').zh
   assert.strictEqual(zhTable['page.overview'], '总览', 'page.overview 必须是中文')
   assert.strictEqual(found.labels[0], '总览', '页签 label 必须解析出中文而非裸键')
-  console.log('[5] 渲染：面板元素树 + 6 页签 + 中文文案解析全部通过')
+  // 全局状态条必须渲染（M5：任何页都能看到能不能同步）
+  assert.ok(found.statusBar, '必须渲染全局状态条（data-sync-hub-status="bar"）')
+  console.log('[5] 渲染：面板元素树 + 6 页签 + 中文文案 + 状态条全部通过')
+
+  // 6) 三个真实页面存在且非占位（M5：总览/同步/维护接真实数据）
+  //    页面组件未导出，故用源码级断言：函数定义存在 + 引用了真实数据字段。
+  const clientSrc = fs.readFileSync(CLIENT, 'utf8')
+  for (const fn of ['OverviewPage', 'SyncPage', 'MaintainPage']) {
+    assert.ok(clientSrc.includes(`function ${fn}(`), `${fn} 必须定义`)
+  }
+  // 真实数据引用：总览消费 status/inventory，同步调 apiPost('/sync')，维护调 /content 与 /env
+  assert.ok(/data\?\.status/.test(clientSrc), '总览必须消费 status 数据（data?.status）')
+  assert.ok(/inventory/.test(clientSrc), '总览必须消费 inventory 数据')
+  assert.ok(/buildTodos/.test(clientSrc), '总览必须有待办驱动（buildTodos）')
+  assert.ok(clientSrc.includes("apiPost('/sync'"), '同步页必须打 /sync 路由')
+  assert.ok(clientSrc.includes("apiGet('/content')"), '维护页必须读 /content 备份列表')
+  assert.ok(clientSrc.includes("apiPost('/env'"), '维护页必须打 /env（定时任务）')
+  // 就地反馈（memory 4.20）：InlineNote 组件必须被页面使用
+  assert.ok(clientSrc.includes('InlineNote'), '必须提供就地反馈组件')
+  // 未建页面保持占位（PageStub），不许假装功能已好
+  assert.ok(clientSrc.includes('PageStub'), '施工页必须显式占位')
+  console.log('[6] 页面：总览/同步/维护 三页接真实数据；技能/记忆/会话 显式占位')
 
   console.log('\nM2 探针全部通过 ✅')
 }
@@ -193,22 +214,35 @@ function registeredOf(slots, name) {
   return slots.registered.filter((r) => r.name === name)
 }
 
-/** 遍历 element 树，收集探针断言所需的特征。 */
+/**
+ * 遍历 element 树，收集探针断言所需的特征。
+ * 函数组件（type 为 function）会被递归调用以取回其元素树 —— 模拟 React 渲染阶段，
+ * 否则 h(StatusBar, …) 只会留下一个"待渲染"占位，断言不到它的 DOM 标记。
+ */
 function collect(tree) {
   const roots = []
   const tabs = []
   const labels = []
+  let statusBar = false
+  const seen = new Set()
   const walk = (el) => {
     if (!el || typeof el !== 'object') return
     if (Array.isArray(el)) { el.forEach(walk); return }
+    if (typeof el.type === 'function') {
+      if (seen.has(el)) return
+      seen.add(el)
+      walk(el.type(el.props ?? {}))
+      return
+    }
     if (el.props?.['data-sync-hub-panel']) roots.push(el)
+    if (el.props?.['data-sync-hub-status'] === 'bar') statusBar = true
     if (el.props?.['data-sync-hub-tab']) tabs.push(el.props['data-sync-hub-tab'])
     if (el.props?.['data-sync-hub-tab'] && el.props?.children) labels.push(el.props.children)
     const kids = el.props?.children
     if (kids) walk(kids)
   }
   walk(tree)
-  return { roots, tabs, labels }
+  return { roots, tabs, labels, statusBar }
 }
 
 main()

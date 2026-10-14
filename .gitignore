@@ -2,3 +2,7 @@ node_modules/
 *.log
 .DS_Store
 Thumbs.db
+
+# 开发期诊断脚本（硬编码本机路径，仅开发用，不进公开仓库）
+tests/_diag*
+tests/check-unused.mjs
