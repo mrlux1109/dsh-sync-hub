@@ -452,13 +452,22 @@ async function apiHandler(req, res, config) {
       const ver = fs.readFileSync(path.join(hub, 'VERSION'), 'utf8').trim()
       const log = await runGit(hub, ['log', '-1', '--format=%h|%ci|%s'])
       const st = await runGit(hub, ['status', '--porcelain'])
-      let skills = 0
-      try { skills = fs.readdirSync(path.join(hub, 'skills'), { withFileTypes: true }).filter((d) => d.isDirectory()).length } catch { /* noop */ }
+      // 同 /overview：技能数按真实口径（含 SKILL.md 才算），空壳单列
+      let skills = 0, skillsShell = 0
+      try {
+        const ents = fs.readdirSync(path.join(hub, 'skills'), { withFileTypes: true }).filter((d) => d.isDirectory())
+        for (const d of ents) {
+          if (fs.existsSync(path.join(hub, 'skills', d.name, 'SKILL.md'))) skills++
+          else skillsShell++
+        }
+      } catch { /* noop */ }
+      let machineId = ''
+      try { machineId = fs.readFileSync(path.join(os.homedir(), '.dsh', '.sync-hub-machine'), 'utf8').trim() } catch { /* unset */ }
       const [commit, date, subject] = log.code === 0 ? String(log.out).trim().split('|') : ['', '', '']
       return send(200, {
         ok: true, version: ver, commit, commitDate: date, commitSubject: subject,
         dirty: st.code === 0 ? st.out.trim().split('\n').filter(Boolean).length : -1,
-        skills, hubPath: hub, machine: os.hostname(),
+        skills, skillsShell, hubPath: hub, machine: os.hostname(), machineId,
       })
     }
     if (method === 'GET' && routePath === '/status') {
@@ -483,8 +492,41 @@ async function apiHandler(req, res, config) {
           const behind = await runGit(hub, ['rev-list', '--count', 'HEAD..@{u}'], 20000)
           const aheadN = ahead.code === 0 ? parseInt(ahead.out.trim(), 10) || 0 : -1
           const behindN = behind.code === 0 ? parseInt(behind.out.trim(), 10) || 0 : -1
-          let skills = 0
-          try { skills = fs.readdirSync(path.join(hub, 'skills'), { withFileTypes: true }).filter((d) => d.isDirectory()).length } catch { /* noop */ }
+          // 技能统计：目录数 != 技能数。旧实现只数目录，把"删剩的空壳"和
+          // skillhub 的 @org-xxx/@user_xxx 占位壳也算成技能，导致两边数字对不上。
+          // 这里统一按真实口径分三类返回，卡片照原样展示，不做二次猜测。
+          let skills = 0, skillsShell = 0
+          try {
+            const ents = fs.readdirSync(path.join(hub, 'skills'), { withFileTypes: true }).filter((d) => d.isDirectory())
+            for (const d of ents) {
+              if (fs.existsSync(path.join(hub, 'skills', d.name, 'SKILL.md'))) skills++
+              else skillsShell++
+            }
+          } catch { /* noop */ }
+          // 本机技能侧（供卡片做"本机 vs 中枢"对照），同样按真实口径
+          let localSkills = 0, localPlaceholder = 0, localShell = 0
+          try {
+            const lroot = path.join(os.homedir(), '.dsh', 'skills')
+            const ents = fs.readdirSync(lroot, { withFileTypes: true }).filter((d) => d.isDirectory())
+            for (const d of ents) {
+              const real = fs.existsSync(path.join(lroot, d.name, 'SKILL.md'))
+              if (real) localSkills++
+              else if (/^@(org|user)[-_]/i.test(d.name)) localPlaceholder++
+              else localShell++
+            }
+          } catch { /* noop */ }
+          // 机器标识（apply.ps1 写入）与本机真实主机名，两者可能不同，一起给出
+          let machineId = ''
+          try { machineId = fs.readFileSync(path.join(os.homedir(), '.dsh', '.sync-hub-machine'), 'utf8').trim() } catch { /* unset */ }
+          // 当前 DSH profile（desktop / web …）
+          let profile = ''
+          try {
+            const pdir = path.join(os.homedir(), '.dsh', 'profiles')
+            const names = fs.readdirSync(pdir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name)
+            if (names.includes('desktop')) profile = 'desktop'
+            else if (names.length === 1) profile = names[0]
+            else if (names.length) profile = names.join(', ')
+          } catch { /* noop */ }
           const [commit, date, subject] = log.code === 0 ? String(log.out).trim().split('|') : ['', '', '']
           const dirtyLines = st.code === 0 ? st.out.trim().split('\n').filter(Boolean) : []
           return {
@@ -492,7 +534,9 @@ async function apiHandler(req, res, config) {
             dirty: st.code === 0 ? dirtyLines.length : -1,
             dirtyFiles: dirtyLines.slice(0, 12).map((l) => l.trim()),
             ahead: aheadN, behind: behindN,
-            skills, hubPath: hub, machine: os.hostname(),
+            skills, skillsShell, localSkills, localPlaceholder, localShell,
+            hubPath: hub, machine: os.hostname(), machineId, profile,
+            node: process.version, platform: process.platform + ' ' + (os.release() || ''),
           }
         })(),
         (async () => {

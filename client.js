@@ -48,6 +48,18 @@ window.__ModuleLoader__.load({
         'ov.commit': '最新提交',
         'ov.skills': '技能',
         'ov.tree': '工作区',
+        'ov.machine': '本机机型',
+        'ov.machineId': '机器标识',
+        'ov.profile': 'DSH profile',
+        'ov.hubPath': '中枢路径',
+        'ov.runtime': '运行环境',
+        'ov.skillsHub': '中枢技能',
+        'ov.skillsLocal': '本机技能',
+        'ov.skillsNone': '无',
+        'ov.shellNote': '空壳 {n}',
+        'ov.holderNote': '占位 {n}',
+        'ov.skillsEqual': '两边一致',
+        'ov.skillsDiff': '两边差 {n} 个',
         'ov.clean': '干净',
         'ov.dirty': '{n} 个改动待提交',
         'ov.health': '健康检查',
@@ -347,6 +359,18 @@ window.__ModuleLoader__.load({
         'ov.commit': 'Last commit',
         'ov.skills': 'Skills',
         'ov.tree': 'Working tree',
+        'ov.machine': 'This machine',
+        'ov.machineId': 'Machine id',
+        'ov.profile': 'DSH profile',
+        'ov.hubPath': 'Hub path',
+        'ov.runtime': 'Runtime',
+        'ov.skillsHub': 'Hub skills',
+        'ov.skillsLocal': 'Local skills',
+        'ov.skillsNone': 'none',
+        'ov.shellNote': '{n} shell',
+        'ov.holderNote': '{n} placeholder',
+        'ov.skillsEqual': 'in agreement',
+        'ov.skillsDiff': 'differ by {n}',
         'ov.clean': 'clean',
         'ov.dirty': '{n} pending change(s)',
         'ov.health': 'Health',
@@ -1211,10 +1235,32 @@ window.__ModuleLoader__.load({
         h(Card, { key: 'kv' },
           h('p', { style: S.hint }, t('ov.guide')),
           h('div', { style: S.kv },
-            h(KV, { k: t('ov.version'), v: 'v' + (info.version || '?') + '   ·   ' + (info.machine || '') }),
+            h(KV, { k: t('ov.version'), v: 'v' + (info.version || '?') }),
+            h(KV, { k: t('ov.machine'), v: (info.machine || '?') + (info.platform ? '   ·   ' + info.platform : '') }),
+            h(KV, { k: t('ov.machineId'), v: info.machineId || t('ov.skillsNone') }),
+            h(KV, { k: t('ov.profile'), v: info.profile || '?' }),
+            h(KV, { k: t('ov.hubPath'), v: info.hubPath || '?' }),
+            h(KV, { k: t('ov.runtime'), v: 'Node ' + (info.node || '?') }),
             h(KV, { k: t('ov.commit'), v: [info.commit, info.commitDate, info.commitSubject].filter(Boolean).join('  ') }),
-            h(KV, { k: t('ov.skills'), v: String(info.skills ?? '?') }),
-            h(KV, { k: t('ov.tree'), v: info.dirty === 0 ? t('ov.clean') : t('ov.dirty', { n: info.dirty }) }),
+            h(KV, {
+              k: t('ov.skills'),
+              v: (() => {
+                // 说清三个数各是什么，避免"51 / 52 / 47 对不上"的困惑：
+                // 真技能=有 SKILL.md；空壳=删剩的目录；占位=skillhub 的 @xxx 命名空间
+                const hubN = info.skills ?? '?'
+                const locN = info.localSkills ?? '?'
+                const hubExtra = []
+                if (info.skillsShell) hubExtra.push(t('ov.shellNote', { n: info.skillsShell }))
+                const locExtra = []
+                if (info.localPlaceholder) locExtra.push(t('ov.holderNote', { n: info.localPlaceholder }))
+                if (info.localShell) locExtra.push(t('ov.shellNote', { n: info.localShell }))
+                const same = (info.skills != null && info.localSkills != null && info.skills === info.localSkills)
+                return t('ov.skillsHub') + ' ' + hubN + (hubExtra.length ? '（' + hubExtra.join(' · ') + '）' : '')
+                  + '   ·   ' + t('ov.skillsLocal') + ' ' + locN + (locExtra.length ? '（' + locExtra.join(' · ') + '）' : '')
+                  + '   ·   ' + (same ? t('ov.skillsEqual') : t('ov.skillsDiff', { n: Math.abs((info.skills || 0) - (info.localSkills || 0)) }))
+              })(),
+            }),
+            h(KV, { k: t('ov.tree'), v: (info.dirty === 0 ? t('ov.clean') : t('ov.dirty', { n: info.dirty })) + (info.ahead > 0 ? '   ·   ' + t('ov.ahead', { n: info.ahead }) : '') + (info.behind > 0 ? '   ·   ' + t('ov.behind', { n: info.behind }) : '') }),
             h(KV, { k: t('sec.cred'), v: cred.hasCredential ? (t('cred.ok') + '  ·  ' + (cred.username || '') + '  ·  ' + (cred.repoHost || '')) : t('cred.none') }),
             h(KV, { k: t('sec.tools'), v: t('tools.summary', { p: tools.present, n: tools.total }) + (tools.missingCore ? '   ·   ' + t('tools.missingCore') : '') })),
           h('div', { style: S.row },
