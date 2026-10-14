@@ -154,7 +154,10 @@ console.log('身份守卫（lib/hub/apply.js，G1 指纹 + G2 换身份 YES 联�
   process.env.DSH_HOME = fake
   // 重新 import，让模块读到新的 DSH_HOME。
   const applyMod = await import(`../lib/hub/apply.js?guard=${Date.now()}`)
-  const hub = resolveHubPath({}).path
+  // 注意：这里的 hub 路径必须**显式**取本机中枢，不能用 resolveHubPath()——
+  // 它会读 <DSH_HOME>/sync-hub-path 偏好，而本用例刚把 DSH_HOME 指到了
+  // 假目录（里面没有偏好文件）→ 返回 null → 后续 git -C null 全炸。
+  const hub = 'D:\\【AI智能】\\sync-hub'
 
   await test('G1 指纹不符（shop 档案打家机）→ REFUSED', async () => {
     const r = applyMod.identityGuard(hub, 'shop', { dryRun: true })

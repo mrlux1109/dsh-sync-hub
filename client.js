@@ -103,6 +103,23 @@ window.__ModuleLoader__.load({
       'ov.noBoard': '（没有机器档案）',
       'ov.boardNever': '未见同步记录',
 
+      // 首次运行引导（onboarding）
+      'ob.title': '欢迎使用同步中枢',
+      'ob.subtitle': '先把「中枢仓库」（两台电脑之间同步记忆/技能/配置的 git 仓库）指给插件。指好之后，这里会变成同步面板。',
+      'ob.checking': '检测中…',
+      'ob.credOk': '凭据已配置（{user}）',
+      'ob.credMissing': 'Gitee 凭据未配置（克隆私有仓库前需要）',
+      'ob.credHint': '凭据配置方法：在普通终端手动 git clone 一次你的私有中枢，凭据管理器会弹出 Gitee 登录窗口；令牌在 gitee.com → 设置 → 私人令牌（勾 projects）。令牌只进 Windows 凭据管理器，不经过本插件。',
+      'ob.pathLabel': '中枢仓库的完整路径（已克隆过）或想克隆到的位置',
+      'ob.pathPlaceholder': '例如 D:\\AI\\sync-hub',
+      'ob.useExisting': '使用这个目录',
+      'ob.clone': '克隆中枢到这个目录',
+      'ob.needGit': '先安装 Git for Windows',
+      'ob.saved': '路径已保存，面板已就绪。',
+      'ob.savedButIncomplete': '路径已记住：{p}。该目录还不是完整中枢（缺 VERSION 或 tools/），功能会部分降级，等你补齐后自动恢复。',
+      'ob.cloned': '克隆完成：{p}。面板已就绪。',
+      'ob.explain': '判定标准：目录里有 VERSION 和 tools/ 两个条目即视为中枢。默认仓库地址是作者的 Gitee 模板，可在克隆时换成你自己的私有仓库地址（在输入框填目标目录，克隆动作会用默认地址；私有仓库请先用终端 git clone 一次建立凭据，再点「使用这个目录」）。',
+
       // 同步
       'sync.scope': '推送范围',
       'sync.scopeHint': '日常用「全部」即可；只改了一类就只选那一类，推得更快。',
@@ -270,6 +287,23 @@ window.__ModuleLoader__.load({
       'ov.board': 'Machines',
       'ov.noBoard': '(no machine profiles)',
       'ov.boardNever': 'no sync seen',
+
+      // Onboarding
+      'ob.title': 'Welcome to Sync Hub',
+      'ob.subtitle': 'Point the plugin at your "hub repository" — the git repo that syncs memory / skills / config between your machines. Once set, this becomes the sync panel.',
+      'ob.checking': 'checking…',
+      'ob.credOk': 'Credential configured ({user})',
+      'ob.credMissing': 'Gitee credential missing (needed before cloning a private repo)',
+      'ob.credHint': 'To set up credentials: git clone your private hub once in a normal terminal — the credential manager will pop the Gitee login. Token: gitee.com → Settings → Private tokens (check projects). Tokens only ever live in Windows Credential Manager, never in this plugin.',
+      'ob.pathLabel': 'Full path of your hub repository (already cloned) or where to clone it',
+      'ob.pathPlaceholder': 'e.g. D:\\AI\\sync-hub',
+      'ob.useExisting': 'Use this directory',
+      'ob.clone': 'Clone hub into this directory',
+      'ob.needGit': 'Install Git for Windows first',
+      'ob.saved': 'Path saved — panel is ready.',
+      'ob.savedButIncomplete': 'Path remembered: {p}. That directory is not a complete hub yet (missing VERSION or tools/) — features degrade until you fill it in.',
+      'ob.cloned': 'Cloned: {p}. Panel is ready.',
+      'ob.explain': 'A directory counts as a hub when it contains VERSION and tools/. The default clone address is the author\'s Gitee template; for your own private repo, git clone once in a terminal to establish credentials, then click "Use this directory".',
       'sync.scope': 'Push scope',
       'sync.scopeHint': 'Use "All" for daily sync; pick one category when that is all you changed.',
       'sync.all': 'All',
@@ -1520,6 +1554,111 @@ window.__ModuleLoader__.load({
 
     // ─────────────────── 面板骨架 ───────────────────
 
+    // ─────────────────── 首次运行引导（onboarding） ───────────────────
+
+    /**
+     * 首次运行向导：没有中枢时，整面板换成它。
+     * 两步：① 指路径（已有中枢）或 ② 克隆（还没有）；凭据缺失时先提示。
+     *
+     * @param {object} p { t, onReady } —— onReady 在配置完成后回调（触发重载）。
+     */
+    function Onboarding({ t, onReady }) {
+      const [info, setInfo] = useState(null)
+      const [hubPath, setHubPath] = useState('')
+      const [busy, setBusy] = useState(null)
+      const [note, setNote] = useState(null)
+
+      useEffect(() => {
+        apiGet('/onboarding').then((r) => {
+          if (r.ok) {
+            setInfo(r)
+            setHubPath(r.savedPath ?? r.hubPath ?? '')
+          }
+        }).catch((e) => setNote({ tone: 'error', text: String(e?.message ?? e) }))
+      }, [])
+
+      const savePath = async () => {
+        setBusy('save')
+        setNote(null)
+        const r = await apiPost('/onboarding', { action: 'save-path', path: hubPath })
+        setBusy(null)
+        if (!r.ok) { setNote({ tone: 'error', text: r.error }); return }
+        if (r.resolved?.needsOnboarding) {
+          setNote({ tone: 'warn', text: t('ob.savedButIncomplete', { p: r.resolved.hub }) })
+          return
+        }
+        setNote({ tone: 'success', text: t('ob.saved') })
+        onReady()
+      }
+
+      const clone = async () => {
+        setBusy('clone')
+        setNote(null)
+        const r = await apiPost('/onboarding', { action: 'clone', target: hubPath })
+        setBusy(null)
+        if (!r.ok) {
+          setNote({ tone: 'error', text: r.error + (r.hint ? `\n${r.hint}` : '') })
+          return
+        }
+        setNote({ tone: 'success', text: t('ob.cloned', { p: r.target }) })
+        onReady()
+      }
+
+      const gitOk = Boolean(info?.git)
+      const credOk = Boolean(info?.credential?.haveCredential)
+
+      return h('div', {
+        style: { maxWidth: 560, margin: '0 auto', paddingTop: 24 },
+        'data-sync-hub-onboarding': 'wizard',
+      },
+        h('h2', { style: { margin: '0 0 4px', fontSize: 17, fontWeight: 600 } }, t('ob.title')),
+        h('p', { style: { margin: '0 0 16px', fontSize: 13, opacity: 0.7, lineHeight: '20px' } }, t('ob.subtitle')),
+
+        // 环境体检行
+        h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px 16px', marginBottom: 16, fontSize: 13 } },
+          h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 5 } },
+            h(Dot, { level: gitOk ? 'pass' : 'fail' }), `git ${info?.git ?? t('ob.checking')}`),
+          h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 5 } },
+            h(Dot, { level: credOk ? 'pass' : 'warn' }),
+            credOk ? t('ob.credOk', { user: info.credential.user }) : t('ob.credMissing')),
+        ),
+        !credOk
+          ? h(InlineNote, { tone: 'warn' }, t('ob.credHint'))
+          : null,
+
+        // 路径输入 + 两个动作
+        h('div', { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
+          h('label', { style: { fontSize: 12, opacity: 0.7 } }, t('ob.pathLabel')),
+          h('input', {
+            value: hubPath,
+            onChange: (e) => setHubPath(e.target.value),
+            placeholder: t('ob.pathPlaceholder'),
+            spellCheck: false,
+            style: {
+              padding: '8px 10px', borderRadius: 8, fontSize: 13,
+              border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.12))',
+              background: 'var(--dsw-alias-bg-base, transparent)',
+              color: 'inherit', fontFamily: 'ui-monospace, monospace',
+            },
+          }),
+          h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 8 } },
+            h(ActionButton, {
+              label: t('ob.useExisting'), tone: 'primary',
+              onClick: savePath, busy: busy === 'save',
+              disabled: !hubPath.trim(),
+            }),
+            h(ActionButton, {
+              label: t('ob.clone'), onClick: clone, busy: busy === 'clone',
+              disabled: !hubPath.trim() || !gitOk,
+              title: gitOk ? undefined : t('ob.needGit'),
+            }),
+          ),
+          h(InlineNote, { tone: note?.tone }, note?.text),
+          h('p', { style: { margin: '8px 0 0', fontSize: 12, opacity: 0.55, lineHeight: '18px' } }, t('ob.explain')),
+        ),
+      )
+    }
+
     /**
      * 同步中枢主面板（main 插槽 key = PANEL_ID 的正文）。
      *
@@ -1534,14 +1673,23 @@ window.__ModuleLoader__.load({
       const [data, setData] = useState(null)
       const [error, setError] = useState(null)
       const [loading, setLoading] = useState(true)
+      const [needsOnboarding, setNeedsOnboarding] = useState(false)
 
       const refresh = useCallback(async () => {
         setLoading(true)
         setError(null)
         try {
           const r = await apiGet('/overview')
-          if (!r.ok) throw new Error(r.error || 'unknown')
-          setData(r)
+          if (r.ok) {
+            setNeedsOnboarding(false)
+            setData(r)
+          } else if (r.stage === 'no-hub') {
+            // 没中枢：进入首次运行引导，而不是亮一片"—"
+            setNeedsOnboarding(true)
+            setData(null)
+          } else {
+            throw new Error(r.error || 'unknown')
+          }
         } catch (e) {
           setError(String(e?.message ?? e))
         } finally {
@@ -1554,6 +1702,14 @@ window.__ModuleLoader__.load({
       const goSync = useCallback(() => setPageId('sync'), [])
 
       const page = PAGES.find((x) => x.id === pageId) ?? PAGES[0]
+
+      // 首次运行：整面板换成向导（不渲染页签与状态条，避免一片"—"误导）
+      if (needsOnboarding && !loading) {
+        return h('div', {
+          style: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'auto' },
+          'data-sync-hub-panel': PANEL_ID,
+        }, h(Onboarding, { t, onReady: refresh }))
+      }
 
       let body
       if (loading && !data) body = h(Empty, null, t('loading'))

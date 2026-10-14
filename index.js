@@ -19,7 +19,7 @@
 
 import { resolveHubPath, readHubVersion } from './lib/hub-paths.js'
 import { createApiHandler } from './lib/api.js'
-import { rejectionFor } from './lib/trust.js'
+import { rejectionFor, connectionAdmissionView } from './lib/trust.js'
 
 /** 宿主半身依赖。 */
 export const inject = ['tools']
@@ -35,6 +35,7 @@ const state = {
   hub: null,
   hubSource: 'none',
   version: null,
+  needsOnboarding: false,
 }
 
 /**
@@ -61,6 +62,7 @@ function ensureHub(config) {
   state.hub = resolved.path
   state.hubSource = resolved.source
   state.version = resolved.path ? readHubVersion(resolved.path) : null
+  state.needsOnboarding = resolved.needsOnboarding === true
   return state.hub
 }
 
@@ -74,16 +76,28 @@ export function apply(ctx, config = {}) {
   const log = loggerOf(ctx)
   const hub = ensureHub(config)
   config.__hubSource = state.hubSource
+  config.__needsOnboarding = state.needsOnboarding === true
+
+  /** 引导动作（save-path / clone）成功后的状态写回：本进程内立即生效。 */
+  const setHub = (resolved) => {
+    state.hub = resolved.path
+    state.hubSource = resolved.source
+    state.needsOnboarding = resolved.needsOnboarding === true
+    state.version = resolved.path ? readHubVersion(resolved.path) : null
+    config.__hubSource = state.hubSource
+    config.__needsOnboarding = state.needsOnboarding
+    log.info(`中枢状态更新：${state.hub ?? '(无)'}（${state.hubSource}）`)
+  }
 
   if (hub) {
     log.info(`中枢已识别（${state.hubSource}）：${hub}，VERSION ${state.version ?? '未知'}`)
   } else {
-    log.warn('未找到中枢仓库；同步面板会显示引导，其余功能降级')
+    log.warn('未找到中枢仓库；面板将进入首次运行引导')
   }
 
-  // ① 把 API 暴露成 Cordis 服务：其他插件可 ctx.get('syncHub') 复用，
+  // ① 把 API 暴露成 Cordis 服务：其他插件可 ctx.get(NAME) 复用，
   //    浏览器半身经 HTTP 打同一份处理器。
-  const api = createApiHandler({ hubPath: () => state.hub, config })
+  const api = createApiHandler({ hubPath: () => state.hub, config, setHub })
   const service = {
     name: NAME,
     hubPath: () => state.hub,
@@ -91,6 +105,11 @@ export function apply(ctx, config = {}) {
     api,
   }
   try { ctx.provide(NAME, service) } catch { /* 已提供过则忽略，保证幂等 */ }
+
+  // 围栏的 connection 视图：每请求从插件自身上下文重读（参考实现同款）。
+  // connection 由浏览器半身晚于插件发布，一次性读取会永久冻死在"不存在"。
+  const optionalRead = (name) => (typeof ctx.get === 'function' ? ctx.get(name) : undefined)
+  const fenceConnection = connectionAdmissionView(() => optionalRead('connection'))
 
   // ② HTTP 挂载：必须用 ctx.inject 拿 webServer（插件加载早于它出现）。
   if (typeof ctx.inject === 'function') {
@@ -105,10 +124,10 @@ export function apply(ctx, config = {}) {
         path: API_PREFIX,
         handler: (req, res) => {
           // 信任围栏：本前缀比 /api 长，会跑到 connection 门禁之前。
-          const connection = typeof scoped.get === 'function'
-            ? () => { try { return scoped.get('connection') } catch { return undefined } }
-            : undefined
-          const status = rejectionFor(req, connection, (d) => {
+          // ⚠️ 必须用 ctx.get（插件自身上下文）每请求重读 connection，并经
+          // connectionAdmissionView 适配：scoped 上下文上没有 connection；
+          // 直接透传原服务会在形态不符时被 catch 判成 503（2026-10-14 实锤）。
+          const status = rejectionFor(req, fenceConnection, (d) => {
             log.warn(`拒绝请求：${d.source}/${d.reason}`)
           })
           if (status !== undefined) {
