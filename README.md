@@ -1,117 +1,85 @@
 # dsh-sync-hub
 
-跨机记忆同步中枢（sync-hub）的 DSH 插件——**装一个插件，两台电脑的同步 + 技能 + 插件管理都在 DSH 里完成，不必再用 bat**。
+DSH **同步中枢**插件：侧栏入口 + 六页信息面板，两台电脑的 AI 记忆 / 技能 / 配置同步。
 
-两条腿：
-1. **模型工具**（对话里用）：`sync_hub_*` 5 个，见下表。
-2. **设置页卡片**（点鼠标）：设置 → 「同步中枢」，**7 个标签页**：
+> v2.0 是标准 DSH 客户端插件的彻底重写版（旧版是 bat 演化出的"设置页 8 Tab 应用"）。
+> 开发文档：`D:\[AI智能]\工作空间\DSH\DSH同步中枢插件-标准重构开发文档.md`（唯一真相源）。
 
-| 标签页 | 内容 |
-|---|---|
-| 概览 | 版本/提交/技能数/工作区状态 + 一键自检（7 项带结论） |
-| 同步 | **云端**：上传（6 档范围）/ 拉取（跳过技能/profile/强制）/ 状态 |
-| 备份 | **本机**：立即备份 / 历史快照（每行可恢复）/ 会话备份 |
-| **技能** | 本机技能列表（可筛选）、**启用/停用**、**线上导入**、新建、删除进回收站 |
-| **插件** | 已装清单（版本/挂载/链接健康）、卸载、**npm 市场搜索 + 安装** |
-| 工具链 | AI 工具体检 + 一键装、体检/网络诊断、运行日志 |
-| 设置 | Gitee 凭据、新机自助接入 |
+## 两条轨道（互不干扰）
 
-## 技能页（v0.7.0 新增）
+| 轨道 | 仓库 | 内容 |
+|---|---|---|
+| **代码** | `github.com/mrlux1109/dsh-sync-hub`（public） | 本插件源码 |
+| **数据** | `gitee.com/mrlux/ai-sync-hub`（private） | 记忆 / 技能 / 配置 / 会话备份 / 插件清单 |
 
-参考 @michengai/dsh-skills-manager 的思路但**刻意更简单**——只做同步中枢需要的：
+public 仓库**不含任何 token**；Gitee 令牌只存 Windows 凭据管理器。
 
-- **跨 Agent 扫描**：DSH / Shared Agent / Trae / Trae CN / WorkBuddy / Qoder / Claude / Codex /
-  Cursor / Copilot / CC Switch。**只有 DSH 与 Shared Agent 可写**，其余只读展示（不碰别人文件）。
-- **启用/停用**：DSH 只在 `SKILL.md` 存在时才加载技能，所以停用 = 重命名
-  `SKILL.md` ↔ `SKILL.md.disabled`。**完全可逆**，不会删任何内容。
-- **线上导入**（填网址）：自动识别 GitHub 仓库 / GitHub 子目录 / `.zip` / 原始 `SKILL.md` 链接；
-  同名技能绝不覆盖。
-- **新建技能**：校验 kebab-case 名 + 必填 description。
-- **删除**：移进 `~/.dsh/skills-trash`（永不硬删），可恢复。
+## 安装（官方通道）
 
-## 插件页（v0.7.0 新增）
+设置 → 插件 → **添加插件** → 贴仓库地址：
 
-- **已装清单**：读各 profile 的 `dependencies` + `dsh.profile.bundles`，标版本/是否挂载/链接是否损坏。
-- **npm 市场**：搜 `dsh-plugin` 关键词，一键安装。
-- **安装前会检测 DSH 是否在运行**——运行中 pnpm 被锁，会明确提示先退出。
-
-## 工具清单
-
-| 工具 | 对应菜单 | 副作用 | 说明 |
-|---|---|---|---|
-| `sync_hub_status` | [6] | 无（只读） | 本机/中枢/Gitee 差异；push 前必跑 |
-| `sync_hub_push` | [1]/[2] | 推送到 Gitee | 参数 `scope`（all/memory/skills/config/sessions）、`message` |
-| `sync_hub_pull` | [3] | 拉取+应用到本机 | 退出码 2=冲突→停下报告，禁止自动解决 |
-| `sync_hub_version` | [V] | 无（只读） | VERSION / 最新提交 / 工作区状态 / 技能数 |
-| `sync_hub_open_console` | 双击 bat | 开窗口 | 换身份/一条龙/冲突处理等人工入口 |
-
-**安全边界**：不包 `apply.ps1` 的换身份（要手输 YES）、不包 [13] 一条龙、不做冲突解决；
-这些仍需人工，卡片只提供「打开控制台」按钮。
-
-## 新机器怎么装（三步，之后全在 DSH 里）
-
-```powershell
-# 1) 装 git（没有的话），然后一条命令：
-powershell -ExecutionPolicy Bypass -File install-plugin.ps1 -CloneTo D:\AI\sync-hub -Machine home
-#    没有现成脚本时，先用 -User/-Token 让向导顺手存凭据：
-powershell -ExecutionPolicy Bypass -File install-plugin.ps1 -CloneTo D:\AI\sync-hub -Machine home -User <gitee名> -Token <私人令牌>
-# 2) 重启 DSH
-# 3) 设置 → 同步中枢：以后上传/拉取/装工具/备份都在这里点
+```
+https://github.com/mrlux1109/dsh-sync-hub
 ```
 
-`install-plugin.ps1` 做四件事：确保 Gitee 凭据 → clone 中枢 → `apply.ps1`（记忆/技能/配置）
-→ 把本插件装进每个 profile（物理拷贝 + 依赖 + bundles，改前备份 package.json）。
-**已在中枢里的机器**：拉取后 `plugins\dsh-sync-hub\README.md` 同款步骤，或直接跑上面的命令（幂等）。
+安装源按网络情况选（大陆选「中国大陆镜像源」）。
 
-## 注册方式（宿主实证 2026-10-13）
+> ⚠️ **安装 / 更新前请完全退出 DSH**，否则 pnpm 被锁、安装会失败。
+> ⚠️ 官方弹窗明示"暂不支持自动更新"：升级 = 先卸载旧版，再贴地址装新版。
+>    每次发版都会 bump `version` 并打 tag，卸载重装后版本号变化即可确认生效。
 
-- `package.json` → `dsh.bundle.patch: ./cordis.patch.yml`
-- `cordis.patch.yml` → `insert: id=sync-hub`
-- `index.js` → `export const inject = ['tools']` + `export function apply(ctx, config)`
-- **零外部依赖裸注册**：直接 `ctx.tools.register(裸对象)`（与 MCP 桥接 `createMcpToolDefinition` 同款），
-  `parameters`/`output.schema` 用**标准 JSON Schema**（`required` 是数组）。
-  ⚠️ 实测：第三方插件目录 `import('@deepseek-ai/dsh-tools')` 报 ERR_MODULE_NOT_FOUND
-  （宿主只给 dsh-llm/credentials/cordis/schemastery 供解析通道），所以**不要用 defineTool**。
-- 校验底线：`register()` 只强制 `output.render` 是函数 + `output.schema` 过
-  `assertSupportedJsonSchema`（子集：type/oneOf/properties/required/additionalProperties/items/enum/const + 注解）。
+## 装好后长什么样
 
-## 已验证（Electron-as-node 探针，家机实测）
+- **左侧栏**多一个「同步中枢」图标（与「插件」「任务管理」同级），点击后**中间整列**是同步中枢面板。
+- 面板顶部一条**全局状态条**：机器身份 · 待推送 N · 待拉取 M · 凭据状态 · 定时任务 · 健康分。
+- 六个一级页：**总览 / 同步 / 技能 / 记忆·配置 / 会话 / 维护**（按内容域分，每域内"本机 ↔ 云端"双列）。
+- 动作反馈一律**就地**显示在按钮旁，不滚页、不倾倒终端文本。
+- 拉取撞车有**三方冲突解决器**（base / 本机 / 云端 三栏，选边或合并，自动 git 收尾），不必再手工跑 `git add && git rebase --continue`。
+- 「打开控制台」按钮仍在——换机器身份（要手输 YES）、全自动一条龙、冲突人工处理这类**必须人工确认**的流程保留 `.bat` 窗口作安全网。
 
-- `loadProfileDirectory`：18 层含 dsh-sync-hub，skipped 为空，bundle 目录解析正确
-- `apply(mockCtx)`：5 个 `sync_hub_*` 全部注册成功；5/5 schema 过宿主真校验器
-- `sync_hub_version.execute` 实跑返回真实数据；`output.render` 产出 `[{type:'text',...}]`
+## 与旧版（v0.11.0 设置页卡片）的关系
 
-## 中枢路径解析
+- v2.0 上线后**双入口过渡一个版本**：旧设置卡片降级为一张只读跳转卡（"请用侧栏同步中枢"），
+  不再承载任何动作；v2.1 起删除。**旧版 8 Tab 代码整段删除**，不做遮蔽保留。
 
-按顺序：`config.hubPath` → `env SYNC_HUB_PATH` → 候选
-`D:\【AI智能】\sync-hub`（家机）/ `D:\AI\sync-hub`（店机）/ `~/sync-hub`。
-判定标准：目录里同时有 `VERSION` 和 `tools/status.ps1`。
+## 开发者说明
 
-## 本机安装（两台机器各做一次）
+### 结构
 
-```powershell
-# 1) 源码已在中枢 plugins/dsh-sync-hub（随 git 同步）
-# 2) 实体拷贝到 profile
-$prof = "$env:USERPROFILE\.dsh\profiles\desktop"
-Copy-Item -Recurse '<中枢>\plugins\dsh-sync-hub' "$prof\node_modules\dsh-sync-hub"
-# 3) profile package.json 加两项（改前备份）：
-#    dependencies."dsh-sync-hub" = "file:C:/Users/<用户>/.dsh/profiles/desktop/node_modules/dsh-sync-hub"
-#    dsh.profile.bundles += "dsh-sync-hub"
-# 4) 重启 DSH 桌面版生效
+```
+dsh-sync-hub/
+├─ package.json          # manifest：dsh.client.inject 声明四个官方包
+├─ cordis.patch.yml      # insert: id=sync-hub, name=dsh-sync-hub
+├─ index.js              # 宿主半身：服务提供 + 路径解析（M3 起挂 HTTP 与工具）
+├─ client.js             # 浏览器半身：ModuleLoader + 侧栏/main 插槽
+├─ lib/
+│  ├─ exec.js            # 执行层唯一出口：git 直调 + Node fs，不 spawn powershell
+│  ├─ hub-paths.js       # 中枢路径解析（config → env → 候选）
+│  └─ hub/
+│     └─ status.js       # 状态聚合（带 G1–G5 守卫清单）
+└─ tests/
+   ├─ probe-m2.cjs       # 装载 + 渲染探针（L2/L3）
+   └─ guard-tests.mjs    # 守卫负例单测（L3b）
 ```
 
-卸载 = 从 `bundles` 删一行 + 删 `node_modules\dsh-sync-hub` + 重启（原功能全部不受影响）。
+### 标准契约（写代码前必读）
 
-## 设置页卡片（v0.2.0 浏览器半身，已实证）
+1. `client.js` 的 factory **必须 `return module.exports`**——返回 `module` 本体会让内核判 invalid，**同 bundle 的其他插件连坐黑屏**。
+2. `dsh.client.inject` 声明官方包名（不钉版本），才能 `require('@deepseek-ai/dsh-client-ui-primitives')` 等。
+3. 侧栏入口 `sidebar.panellist` 的 **id 必须等于** `main` 插槽的 **key**（本插件均为 `sync-hub`）。
+4. 文案走 `ctx.locale.bind(NS)` + `register(NS, {zh, en})`，**扁平键**（嵌套键不会解析）。
+5. `webServer` 必须用 `ctx.inject(['webServer'], …)` 拿，一次性 `ctx.get()` 会拿到 undefined。
+6. 执行层只 spawn `git` 与系统程序（`schtasks` 等），**不 spawn powershell**；参数一律数组、不拼字符串。
 
-- **入口**：DSH 设置 → 「同步中枢」分区（settings.section id `sync-hub`，order 36）。
-- **内容**：版本/最新提交/技能数/工作区状态 + 按钮：刷新、查看差异、上传备份、拉取并应用、打开控制台。
-- **通道**：卡片走宿主半身同源 API `/api/sync-hub/{info,status,push,pull,console}`；
-  带 same-origin 围栏（Origin/referer 主机不等于请求主机 → 403），局域网裸调会被拒。
-- **探针实证（2026-10-13）**：mock ctx 注入捕获 → 起真 HTTP 分发 → GET /info 200 真数据、
-  无 Origin 403、POST /console 开窗口成功；5/5 模型工具同场注册正常。
-- **约束不变**：push/pull 之外（换身份/一条龙/冲突处理）仍只能在打开的控制台窗口里人工操作。
+### 本地验证
 
-## 验证
+```powershell
+node --check client.js          # 语法
+node tests/probe-m2.cjs         # 装载 + 注册 + 渲染断言
+node tests/guard-tests.mjs      # 守卫负例（15 条）
+```
 
-重启后新会话里应能看到 5 个 `sync_hub_*` 工具；先问「中枢什么版本」跑 `sync_hub_version`。
+### 卸载
+
+从 `dsh.profile.bundles` 删 `dsh-sync-hub` 一行、删 `node_modules/dsh-sync-hub`、重启 DSH。
+旧功能（其他插件、模型工具）不受影响。

@@ -1,7 +1,7 @@
 {
   "name": "dsh-sync-hub",
-  "version": "0.11.0",
-  "description": "sync-hub console tools + settings card for DSH: sync, backups, sessions, env, plugins, AI toolchain, credentials, new-machine bootstrap. 跨机记忆同步中枢插件：全套控制台功能 + 设置页卡片 + 新机自助接入。",
+  "version": "2.0.0",
+  "description": "DSH 同步中枢：侧栏入口 + 六页信息面板。两台电脑的 AI 记忆 / 技能 / 配置同步。数据走 Gitee 私有中枢，插件代码走 GitHub 发布。",
   "type": "module",
   "main": "index.js",
   "exports": {
@@ -12,8 +12,10 @@
   "files": [
     "index.js",
     "client.js",
+    "lib",
     "cordis.patch.yml",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "license": "MIT",
   "engines": {
@@ -23,7 +25,7 @@
     "dsh-plugin",
     "deepseek-harness",
     "sync-hub",
-    "tool"
+    "sidebar-panel"
   ],
   "dsh": {
     "bundle": {
@@ -31,8 +33,13 @@
     },
     "client": {
       "platform": "web",
-      "immediately": true,
-      "inject": []
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-ui-primitives",
+        "@deepseek-ai/dsh-client-ui-layout"
+      ],
+      "immediately": false
     }
   }
 }

@@ -1,5 +1,7 @@
-# dsh-sync-hub bundle patch (same shape as dsh-our-free-model).
-# Host-half only: registers sync-hub model tools, no browser half.
+# dsh-sync-hub bundle patch — 只插入本插件一行，不替换任何官方组件。
+# 官方安装通道：设置 → 插件 → 添加插件，贴 GitHub 仓库地址
+# （github.com/mrlux1109/dsh-sync-hub），CLI 会自动把本包
+# reconcile 进 profile 的 dsh.profile.bundles 并合并此 patch。
 - insert:
     - id: sync-hub
       name: 'dsh-sync-hub'
