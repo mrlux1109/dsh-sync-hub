@@ -42,7 +42,7 @@ window.__ModuleLoader__.load({
         retry: '重试',
         error: '连接失败：{e}',
         state: { pass: '正常', warn: '注意', fail: '异常', info: '信息' },
-        tab: { overview: '概览', sync: '同步', backup: '备份', skills: '技能', plugins: '插件', tools: '工具链', settings: '设置' },
+        tab: { overview: '概览', sync: '同步', files: '云端文件', backup: '备份', skills: '技能', plugins: '插件', tools: '工具链', settings: '设置' },
 
         'ov.version': '版本',
         'ov.commit': '最新提交',
@@ -106,13 +106,16 @@ window.__ModuleLoader__.load({
         'cat.plugins': '插件清单',
         'cat.sessions': '会话备份',
         'cat.dshconfig': 'DSH 运行配置',
+        'cat.pluginsrc': '插件源码',
         'cat.all': '全选',
         'cat.none': '全不选',
+        'sync.noneScope': '（未选任何范围 —— 不会推送）',
         'sync.pickCat': '选择分类',
         'sync.pickSkills': '选择技能（默认全部）',
         'sync.pickSessions': '选择会话工作区（默认全部）',
         'sync.selAll': '全选',
         'sync.selClear': '清空',
+        'sync.pickCount': '已选 {n} / {total}',
         'sync.dshHintPush': '上传时会采集本机 DSH 运行配置（profile 的 package.json / cordis.patch.yml + gitconfig）一并备份',
         'sync.dshHintPull': '拉取时会把中枢采集的运行配置写回本机（需同机身份三重校验通过）',
         'sync.advanced': '高级选项',
@@ -191,6 +194,83 @@ window.__ModuleLoader__.load({
         'sk.hubTitle': '与中枢同步',
         'sk.trashTitle': '回收站',
         'sk.trashEmpty': '回收站是空的',
+        'sk.hubDelete': '从云端移除',
+        'sk.hubEdit': '编辑正文',
+        'sk.hubDeleteConfirm': '确认从云端（Gitee 中枢）删除技能「{name}」？此操作会提交并推送，另一台机器下次拉取后将同样删除。',
+        'sk.hubDeleteWarn': '说明：仅删除云端仓库中的该技能目录，git 历史仍保留可回溯；本机其他目录的副本不受影响，不会硬清。',
+        'sk.hubDeleteConfirmBtn': '确认从云端删除',
+        'sk.hubUpload': '上传到云端',
+        'sk.hubUploadConfirm': '确认把本机技能「{name}」上传到云端（Gitee 中枢）？此操作会提交并推送，另一台机器下次拉取后将获得该技能。',
+        'sk.hubUploadWarn': '说明：仅上传该技能目录；若云端已存在同名技能会被拒绝（不覆盖）。git 历史完整保留。',
+        'sk.hubUploadConfirmBtn': '确认上传到云端',
+        'sk.hubSkip': '占位/停用项，不上传',
+        'hub.title': '云端文件（记忆 · 配置 · 技能正文）',
+        'hub.hint': '左侧列表是中枢里可查看/可编辑的文本（白名单）。点一个文件在右侧打开编辑。保存 = 写入中枢工作区并本地提交，不会自动推送；另一台机器要等你点「上传备份/推送」后才会收到。',
+        'hub.grpMemory': '共享记忆',
+        'hub.grpMachine': '机器档案',
+        'hub.grpConfig': '配置',
+        'hub.grpSkill': '技能正文（SKILL.md）',
+        'hub.ph': '在此编辑文件内容…',
+        'hub.pick': '从左侧选一个文件开始。',
+        'hub.noFiles': '（还没有列表，点上方「刷新列表」）',
+        'hub.unsaved': '有未保存的修改。',
+        'hub.changed': '共 {n} 行 · 已保存：{dirty}',
+        'hub.dirtyYes': '是',
+        'hub.dirtyNo': '否',
+        'hub.searchPh': '搜索文件名 / 技能名…',
+        'hub.onlyDirty': '只显示有改动（{n}）',
+        'hub.dirtyTag': '已改动',
+        'hub.closeTab': '关闭此标签',
+        'hub.summary': '已载入 {total} 个文件 · 本地改动 {dirty} 个',
+        'hub.hintShort': '点左侧文件在右侧打开 · 可同时开多个标签',
+        'hub.safety': '安全说明：仅白名单内文件可编辑；JSON 会先校验语法；保存前旧版本自动归档到 backups-archive/；若另一台机器改过同一文件，保存会被拒绝并要求先拉取。',
+        'hub.loaded': '已载入 {n} 个文件',
+        'hub.opened': '已打开：{path}',
+        'hub.reloaded': '已重新载入磁盘内容（放弃未保存修改）',
+        'hub.needPick': '请先在左侧选一个文件',
+        'hub.noChange': '内容无变化，未保存',
+        'hub.saveConfirm': '确认保存对「{path}」的修改？\n将写入中枢工作区并本地提交（不自动推送），旧版本会归档。',
+        'hub.saveCancelled': '已取消保存',
+        'act.hubRefresh': '刷新列表',
+        'act.hubSave': '保存',
+        'act.hubReload': '放弃并重载',
+        'sync.presetTitle': '同步预设',
+        'sync.presetHint': '日常一键同步用哪几类。改完只存本机（localStorage），不会同步给另一台。',
+        'sync.presetSaved': '预设已保存。',
+        'sync.presetMemory': '📝 只推记忆',
+        'sync.presetLight': '🎯 记忆+配置+插件源码',
+        'sync.presetSkills': '🧩 只推技能',
+        'sync.presetFull': '📦 全量（含会话备份）',
+        'ov.stateDirty': '{n} 个改动未提交',
+        'ov.stateAhead': '{n} 个提交待推送',
+        'ov.stateBehind': '远端领先 {n} 个提交（建议先拉取）',
+        'ov.stateDirtyWhy': '未提交的文件：',
+        'ov.stateHint': '这些改动还没进 git，所以另一台机器收不到。点「一键同步」即可提交并推送。',
+        'ov.stateIdle': '工作区干净，与远端一致。',
+        'act.syncNow': '一键同步',
+        'act.syncPreview': '预演将推送什么',
+        'act.pullNow': '从云端拉取',
+        'pf.title': '同步前自检',
+        'pf.scope': '推送范围',
+        'pf.size': '体积',
+        'pf.sessions': '会话备份',
+        'pf.behind': '远端状态',
+        'pf.cred': 'Gitee 凭据',
+        'pf.dirty': '范围外改动',
+        'pf.done': '自检完成。',
+        'pf.summary': '本次将推送 {n} 个文件，共 {size}。',
+        'act.preflight': '同步前自检',
+        'sess.title': '历史对话浏览（只读）',
+        'sess.hint': '换机前想知道「另一台电脑聊过什么」，在这里看。按机器 → 工作区 → 会话逐层展开；点「查看」读对话摘要。全程只读，绝不改回去。',
+        'sess.open': '查看',
+        'sess.empty': '（这台机器没有会话备份，或还没拉取。先在「从云端拉取」里勾上会话备份）',
+        'sess.viewing': '会话：{title}',
+        'act.sessBrowse': '列出历史对话',
+        'sync.nowNothing': '所选范围内没有可推送的改动。',
+        'sync.nowConfirm': '确认同步以下 {n} 个文件（{size}）？\n范围：{cats}\n将提交并推送到 Gitee，另一台机器拉取后生效。',
+        'sync.nowCancelled': '已取消同步。',
+        'sync.nowRetry': '预演失败，请重试或去「同步」tab 手动推送。',
+        'cancel': '取消',
         'act.skRefresh': '刷新列表',
         'act.skImport': '导入',
         'act.skCreate': '新建',
@@ -199,6 +279,14 @@ window.__ModuleLoader__.load({
 
         // ── 插件页 ──────────────────────────────────────────────────────────
         'pl.title': '已安装插件',
+        'pl.portTitle': '换机补齐（自研插件）',
+        'pl.portHint': '插件同步只带「清单」：pull 之后本机不会自动重新 clone。「换机补齐」按中枢 config/plugin.txt 现场拉源码 + 写 link + 重装依赖。npm 插件的安装走下方市场/已装列表，不受这里影响。',
+        'pl.portSpec': '中枢指定：{name}  tag = {tag}',
+        'pl.portCloned': '源码已 clone',
+        'pl.portLinked': 'profile 已链接',
+        'pl.portNeedFix': '状态不一致：pull 拿到的清单和本机实际状态对不上，点「换机补齐」补齐。',
+        'pl.portOk': '本机与中枢一致，无需补齐。',
+        'pl.portUnchecked': '点上面的「检查状态」读取中枢 config/plugin.txt 与本机克隆/链接状态。',
         'pl.what': '查看各 profile 已装的插件、链接健康状态，可卸载；市场页可从 npm 搜索并安装新插件。',
         'pl.guide': '安装 / 更新 / 卸载插件后，必须重启 DSH 才能完整加载；本页操作结果里会标黄提示。',
         'pl.profile': 'profile {name}（{n} 个）',
@@ -220,6 +308,8 @@ window.__ModuleLoader__.load({
         'pl.featHint': '精选常用插件，点「安装」即可（已装的会标记）。',
         'pl.installed': '已安装',
         'act.plCheck': '检查更新',
+        'act.plSpec': '检查状态',
+        'act.plPortable': '换机补齐',
         'act.plUpdateAll': '全部更新',
         'act.plList': '刷新已装',
         'act.plSearch': '搜索市场',
@@ -251,7 +341,7 @@ window.__ModuleLoader__.load({
         retry: 'Retry',
         error: 'Connection failed: {e}',
         state: { pass: 'OK', warn: 'Warning', fail: 'Failed', info: 'Info' },
-        tab: { overview: 'Overview', sync: 'Sync', backup: 'Backup', skills: 'Skills', plugins: 'Plugins', tools: 'Toolchain', settings: 'Settings' },
+        tab: { overview: 'Overview', sync: 'Sync', files: 'Cloud files', backup: 'Backup', skills: 'Skills', plugins: 'Plugins', tools: 'Toolchain', settings: 'Settings' },
 
         'ov.version': 'Version',
         'ov.commit': 'Last commit',
@@ -316,8 +406,10 @@ window.__ModuleLoader__.load({
         'cat.plugins': 'Plugin manifest',
         'cat.sessions': 'Session backups',
         'cat.dshconfig': 'DSH runtime config',
+        'cat.pluginsrc': 'Plugin source',
         'cat.all': 'Select all',
         'cat.none': 'Select none',
+        'sync.noneScope': '(no scope selected — nothing will be pushed)',
         'sync.pickCat': 'Pick categories',
         'sync.pickSkills': 'Pick skills (all by default)',
         'sync.pickSessions': 'Pick session workspaces (all by default)',
@@ -401,6 +493,83 @@ window.__ModuleLoader__.load({
         'sk.hubTitle': 'Sync with hub',
         'sk.trashTitle': 'Trash',
         'sk.trashEmpty': 'trash is empty',
+        'sk.hubDelete': 'Remove from hub',
+        'sk.hubEdit': 'Edit text',
+        'sk.hubDeleteConfirm': 'Remove skill "{name}" from the cloud (Gitee hub)? This commits and pushes; the other machine will delete it on next pull.',
+        'sk.hubDeleteWarn': 'Note: only the skill folder in the hub repo is removed; git history is kept for recovery; local copies on this machine are untouched and not hard-deleted.',
+        'sk.hubDeleteConfirmBtn': 'Confirm cloud delete',
+        'sk.hubUpload': 'Upload to hub',
+        'sk.hubUploadConfirm': 'Upload local skill "{name}" to the cloud (Gitee hub)? This commits and pushes; the other machine gets it on next pull.',
+        'sk.hubUploadWarn': 'Note: only that skill folder is uploaded; an existing hub skill with the same name is refused (no overwrite). Git history is fully kept.',
+        'sk.hubUploadConfirmBtn': 'Confirm upload to hub',
+        'sk.hubSkip': 'placeholder/disabled, skipped',
+        'hub.title': 'Cloud files (memory · config · skill text)',
+        'hub.hint': 'The left list is the whitelist of hub text files you can view/edit. Click one to open it on the right. Save writes into the hub working tree and commits locally — it never pushes; the other machine only sees it after you run the upload/push button.',
+        'hub.grpMemory': 'Shared memory',
+        'hub.grpMachine': 'Machine files',
+        'hub.grpConfig': 'Config',
+        'hub.grpSkill': 'Skill text (SKILL.md)',
+        'hub.ph': 'Edit the file content here…',
+        'hub.pick': 'Pick a file on the left to start.',
+        'hub.noFiles': '(no list yet — click Refresh list)',
+        'hub.unsaved': 'You have unsaved changes.',
+        'hub.changed': '{n} lines · saved: {dirty}',
+        'hub.dirtyYes': 'yes',
+        'hub.dirtyNo': 'no',
+        'hub.searchPh': 'Search file / skill name…',
+        'hub.onlyDirty': 'Only dirty ({n})',
+        'hub.dirtyTag': 'modified',
+        'hub.closeTab': 'Close this tab',
+        'hub.summary': 'Loaded {total} files · {dirty} modified locally',
+        'hub.hintShort': 'Click a file on the left to open it · multiple tabs supported',
+        'hub.safety': 'Safety: only whitelisted files are editable; JSON is syntax-checked before save; the previous version is archived to backups-archive/; if the other machine changed the same file, the save is refused and you must pull first.',
+        'hub.loaded': 'Loaded {n} files',
+        'hub.opened': 'Opened: {path}',
+        'hub.reloaded': 'Reloaded from disk (unsaved edits discarded)',
+        'hub.needPick': 'Pick a file on the left first',
+        'hub.noChange': 'No changes to save',
+        'hub.saveConfirm': 'Save your edits to "{path}"?\nThis writes into the hub working tree and commits locally (no auto-push); the previous version is archived.',
+        'hub.saveCancelled': 'Save cancelled',
+        'act.hubRefresh': 'Refresh list',
+        'act.hubSave': 'Save',
+        'act.hubReload': 'Discard & reload',
+        'sync.presetTitle': 'Sync presets',
+        'sync.presetHint': 'Which categories one-tap sync uses. Saved on this machine only (localStorage), not synced.',
+        'sync.presetSaved': 'Preset saved.',
+        'sync.presetMemory': '📝 Memory only',
+        'sync.presetLight': '🎯 Memory + config + plugin source',
+        'sync.presetSkills': '🧩 Skills only',
+        'sync.presetFull': '📦 Full (incl. session backups)',
+        'ov.stateDirty': '{n} uncommitted change(s)',
+        'ov.stateAhead': '{n} commit(s) to push',
+        'ov.stateBehind': 'remote is ahead by {n} (pull first)',
+        'ov.stateDirtyWhy': 'Uncommitted files: ',
+        'ov.stateHint': 'These edits are not in git yet, so the other machine cannot see them. Click One-tap sync to commit and push.',
+        'ov.stateIdle': 'Working tree clean and in sync with the remote.',
+        'act.syncNow': 'One-tap sync',
+        'act.syncPreview': 'Preview push',
+        'act.pullNow': 'Pull from cloud',
+        'pf.title': 'Pre-sync check',
+        'pf.scope': 'Push scope',
+        'pf.size': 'Size',
+        'pf.sessions': 'Session backups',
+        'pf.behind': 'Remote state',
+        'pf.cred': 'Gitee credential',
+        'pf.dirty': 'Out-of-scope edits',
+        'pf.done': 'Self-check done.',
+        'pf.summary': 'Will push {n} file(s), {size} total.',
+        'act.preflight': 'Pre-sync check',
+        'sess.title': 'Browse past conversations (read-only)',
+        'sess.hint': 'Before switching machines, see what the other PC talked about. Expand machine -> workspace -> session; click Open to read the digest. Strictly read-only.',
+        'sess.open': 'Open',
+        'sess.empty': '(no session backups for this machine yet, or not pulled. Enable session backups in Pull from cloud first)',
+        'sess.viewing': 'Session: {title}',
+        'act.sessBrowse': 'List past conversations',
+        'sync.nowNothing': 'Nothing to push in the selected scopes.',
+        'sync.nowConfirm': 'Sync these {n} file(s) ({size})?\nScope: {cats}\nIt commits and pushes to Gitee; the other machine gets it on next pull.',
+        'sync.nowCancelled': 'Sync cancelled.',
+        'sync.nowRetry': 'Preview failed - retry or use the Sync tab manually.',
+        'cancel': 'Cancel',
         'act.skRefresh': 'Refresh list',
         'act.skImport': 'Import',
         'act.skCreate': 'Create',
@@ -409,6 +578,14 @@ window.__ModuleLoader__.load({
 
         // ── plugins tab ─────────────────────────────────────────────────────
         'pl.title': 'Installed plugins',
+        'pl.portTitle': 'Bring this machine in line (bundled plugin)',
+        'pl.portHint': 'Plugin sync carries the MANIFEST only: after a pull this machine does not re-clone. "Bring in line" clones from the hub config/plugin.txt + writes the link + reinstalls deps. npm plugins install via the market / installed list below.',
+        'pl.portSpec': 'Hub spec: {name}  tag = {tag}',
+        'pl.portCloned': 'source cloned',
+        'pl.portLinked': 'profile linked',
+        'pl.portNeedFix': 'Out of sync: the pulled manifest and this machine differ. Click "Bring in line".',
+        'pl.portOk': 'This machine already matches the hub.',
+        'pl.portUnchecked': 'Click "Check state" to read the hub config/plugin.txt plus this machine\'s clone/link state.',
         'pl.what': 'Installed plugins per profile with link health; uninstall here. The market searches npm and installs new ones.',
         'pl.guide': 'Install/update/uninstall takes effect only after a DSH restart; results here flag it in amber.',
         'pl.profile': 'profile {name} ({n})',
@@ -430,6 +607,8 @@ window.__ModuleLoader__.load({
         'pl.featHint': 'Hand-picked plugins; click Install (already-installed ones are marked).',
         'pl.installed': 'installed',
         'act.plCheck': 'Check updates',
+        'act.plSpec': 'Check state',
+        'act.plPortable': 'Bring in line',
         'act.plUpdateAll': 'Update all',
         'act.plList': 'Refresh installed',
         'act.plSearch': 'Search market',
@@ -506,7 +685,26 @@ window.__ModuleLoader__.load({
       miniBtn: { padding: '0.18rem 0.55rem', borderRadius: '0.4rem', fontSize: '0.7rem', border: '1px solid var(--color-border, rgba(128,128,128,0.3))', background: 'var(--color-surface, rgba(128,128,128,0.07))', color: 'inherit', cursor: 'pointer' },
     }
 
-    const TABS = ['overview', 'sync', 'backup', 'skills', 'plugins', 'tools', 'settings']
+    const TABS = ['overview', 'sync', 'files', 'backup', 'skills', 'plugins', 'tools', 'settings']
+
+    // ── 同步预设（自定义的核心）──────────────────────────────────────────
+    // 内置四组默认；可改默认组合并存 localStorage（多机器各自持有，不入 git）。
+    const SYNC_PRESETS = [
+      { id: 'memory', cats: ['memory'] },
+      { id: 'light', cats: ['memory', 'config', 'pluginsrc'] },
+      { id: 'skills', cats: ['skills'] },
+      { id: 'full', cats: ['memory', 'skills', 'config', 'pluginsrc', 'dshconfig', 'sessions'] },
+    ]
+    const PRESET_KEY = 'dsh-sync-hub.presets.v1'
+    const loadPresets = () => {
+      try {
+        const raw = window.localStorage.getItem(PRESET_KEY)
+        if (!raw) return null
+        const j = JSON.parse(raw)
+        if (j && typeof j === 'object' && j.default) return j
+      } catch { /* ignore */ }
+      return null
+    }
 
     function Dot({ level }) {
       const L = LEVEL[level] || LEVEL.info
@@ -548,9 +746,33 @@ window.__ModuleLoader__.load({
       // timed sync schedule status from /schedule
       const [sched, setSched] = useState(undefined)
       // sync options: six categories + skill/session multi-select + dshconfig toggles
-      const ALL_CATS = ['memory', 'skills', 'config', 'plugins', 'sessions', 'dshconfig']
+      // pluginsrc = 插件自身源码（plugins/ 下），与 plugins（仅 config/plugin.txt 清单）不同。
+      // 少了它，"改了插件但上传无效"——这正是老大遇到过的坑。
+      const ALL_CATS = ['memory', 'skills', 'config', 'plugins', 'pluginsrc', 'sessions', 'dshconfig']
+      // 每类实际推什么路径：勾选前说得清，避免误把"插件"当成同步插件源码
+      const CAT_HINT = {
+        memory: 'memory/ 全部记忆（shared.md + 各机器档案）',
+        skills: 'skills/ + skill-categories.json + recommended-skills.md',
+        config: 'config/ 全部配置（含 session-map.json、plugins.md、plugin.txt）',
+        plugins: '仅 config/plugin.txt（插件安装清单，不含源码）',
+        pluginsrc: 'plugins/（同步中枢插件自身的 index.js / client.js）',
+        sessions: 'session-backup/ 两台机器的历史对话备份',
+        dshconfig: 'config/dshconfig/ 本机 DSH 运行配置快照',
+      }
       const [pushCats, setPushCats] = useState([...ALL_CATS])
       const [pullCats, setPullCats] = useState([...ALL_CATS])
+      // 默认同步预设：一键同步用；可改可存（localStorage，各机器独立）
+      const [presetId, setPresetId] = useState(() => {
+        const saved = loadPresets()
+        return (saved && saved.default) || 'light'
+      })
+      // 当前生效的预设类目（供一键同步/预演/拉取共用）
+      const syncPresetCats = () => {
+        const saved = loadPresets()
+        if (saved && Array.isArray(saved.overrides) && saved.overrides[presetId]) return saved.overrides[presetId]
+        const p = SYNC_PRESETS.find((x) => x.id === presetId)
+        return p ? [...p.cats] : [...ALL_CATS]
+      }
       const [pushSkills, setPushSkills] = useState([])       // selected skill names (empty = all)
       const [pullSkills, setPullSkills] = useState([])
       const [pushSessions, setPushSessions] = useState([])   // selected workspace names (empty = all)
@@ -562,6 +784,9 @@ window.__ModuleLoader__.load({
       // multi-select option sources
       const [skillList, setSkillList] = useState(undefined)  // from /skills/list
       const [sessionList, setSessionList] = useState(undefined) // from /sessions/list
+      const [sessBrowse, setSessBrowse] = useState(undefined)   // 会话浏览结果（按机器分组）
+      const [sessOpen, setSessOpen] = useState(undefined)       // 单条会话已展开内容
+      const [sessMachine, setSessMachine] = useState('')        // 当前选中的机器筛选
       const [machineId, setMachineId] = useState('')
       // skills page
       const [skList, setSkList] = useState(undefined)
@@ -571,16 +796,46 @@ window.__ModuleLoader__.load({
       const [skNewName, setSkNewName] = useState('')
       const [skNewDesc, setSkNewDesc] = useState('')
       const [trashList, setTrashList] = useState(undefined)
+      const [hubDeleteName, setHubDeleteName] = useState('')  // 待二次确认的"从云端移除"技能名
+      const [hubUploadName, setHubUploadName] = useState('')  // 待二次确认的"上传到云端"技能名
       // plugins page
       const [plList, setPlList] = useState(undefined)
       const [plMarket, setPlMarket] = useState(undefined)
       const [plQuery, setPlQuery] = useState('')
       const [outdated, setOutdated] = useState(undefined)
+      const [plSpec, setPlSpec] = useState(undefined)
+      // hub files tab (cloud viewer/editor): 多 Tab 编辑 + 搜索 + 分组筛选
+      const [hubFilesList, setHubFilesList] = useState(undefined)
+      // 多 Tab：每个元素 { path, text, baseline }；active = 当前编辑的 path
+      const [hubTabs, setHubTabs] = useState([])
+      const [hubActive, setHubActive] = useState('')
+      const [hubQuery, setHubQuery] = useState('')
+      const [hubOnlyDirty, setHubOnlyDirty] = useState(false)
+      // searchRef 用于聚焦搜索框（可选）
+      const hubSearchRef = useRef(null)
+      const hubTextOf = (p) => { const t = hubTabs.find((x) => x.path === p); return t ? t.text : '' }
+      const hubBaselineOf = (p) => { const t = hubTabs.find((x) => x.path === p); return t ? t.baseline : '' }
+      const hubDirtyTab = (p) => hubTextOf(p) !== hubBaselineOf(p)
+      const openHubFile = (path, text) => {
+        setHubTabs((prev) => {
+          if (prev.some((x) => x.path === path)) return prev
+          return [...prev, { path, text: text || '', baseline: text || '' }]
+        })
+        setHubActive(path)
+      }
+      const setHubTabText = (path, text) => setHubTabs((prev) => prev.map((x) => x.path === path ? { ...x, text } : x))
+      const closeHubTab = (path) => setHubTabs((prev) => {
+        const next = prev.filter((x) => x.path !== path)
+        if (hubActive === path) setHubActive(next.length ? next[next.length - 1].path : '')
+        return next
+      })
+      const [preflight, setPreflight] = useState(undefined)
       const [featured, setFeatured] = useState(undefined)
       // selected target profile for install/update/uninstall (defaults from first listed profile)
       const [plProfile, setPlProfile] = useState('desktop')
       const [plLoaded, setPlLoaded] = useState(false)
       const plAutoRef = useRef(false)
+      const hubAutoRef = useRef(false)
 
       const put = useCallback((k, v) => setOut(p => ({ ...p, [k]: v })), [])
 
@@ -610,6 +865,13 @@ window.__ModuleLoader__.load({
         run('plCheck', 'plCheck')
       }, [tab])
 
+      // auto-load the hub file list on first open of the 云端文件 tab
+      useEffect(() => {
+        if (tab !== 'files' || hubAutoRef.current) return
+        hubAutoRef.current = true
+        run('hubRefresh', 'hubList')
+      }, [tab])
+
       // keep the profile selector valid once the installed list arrives
       useEffect(() => {
         if (plList && plList.profiles && plList.profiles.length) {
@@ -637,6 +899,35 @@ window.__ModuleLoader__.load({
                 dshconfig: pushDshConfig,
                 message: a.message || '',
               }, 300000); await loadOverview(); break
+            // 一键同步（overview 用）：按默认预设预演，确认后真推。
+            case 'syncPreview': {
+                const cats = syncPresetCats()
+                r = await post('/push', { categories: cats, dryRun: true }, 300000)
+                break
+            }
+            case 'syncNow': {
+                const cats = syncPresetCats()
+                const dry = await post('/push', { categories: cats, dryRun: true }, 300000)
+                if (dry && dry.fileCount === 0) { r = { text: t('sync.nowNothing') }; break }
+                const msg = dry && dry.ok
+                    ? t('sync.nowConfirm', { n: dry.fileCount, size: dry.bytes > 1024 ? (dry.bytes / 1024).toFixed(1) + ' KB' : dry.bytes + ' B', cats: cats.join(' / ') })
+                    : t('sync.nowRetry')
+                const go = typeof window === 'undefined' ? true : window.confirm(msg)
+                if (!go) { r = { text: t('sync.nowCancelled') }; break }
+                r = await post('/push', { categories: cats }, 600000)
+                await loadOverview()
+                break
+            }
+            case 'preflight': {
+                const cats = syncPresetCats()
+                r = await api('/preflight?categories=' + encodeURIComponent(cats.join(',')), { timeout: 300000 })
+                setPreflight(r)
+                r = { text: (r && r.ok) ? t('pf.done') : 'self-check failed' }
+                break
+            }
+            case 'pullNow':
+                r = await post('/pull', { categories: syncPresetCats() }, 600000)
+                setSyncConflict(r && Array.isArray(r.conflictFiles) ? r.conflictFiles : []); await loadOverview(); break
             case 'pull': r = await post('/pull', {
                 categories: pullCats,
                 skills: pullSkills,
@@ -662,10 +953,22 @@ window.__ModuleLoader__.load({
             }
             case 'restore': r = await post('/restore', { name: a.name || (key === 'restoreLatest' ? 'latest-agents' : (window.__shRestore || '')) }, 90000); break
             case 'sessionsBackup': r = await post('/sessions', { action: 'backup' }, 600000); break
+            case 'sessBrowse': {
+                const q = sessMachine ? '?machine=' + encodeURIComponent(sessMachine) : ''
+                r = await api('/sessions/browse' + q, { timeout: 300000 }); setSessBrowse(r); break
+            }
+            case 'sessOpen': {
+                if (!a.id) { r = { text: 'pick a session first' }; break }
+                const m2 = (sessBrowse && sessBrowse.machine) || ''
+                const q2 = '?machine=' + encodeURIComponent(m2) + '&id=' + encodeURIComponent(a.id)
+                r = await api('/sessions/browse' + q2, { timeout: 300000 }); setSessOpen(r); break
+            }
             case 'sessionsList': r = await post('/sessions', { action: 'list' }, 90000); break
             case 'skillsInfo': r = await api('/skills', { timeout: 60000 }); setSkills(r); break
             case 'skillsToHub': r = await post('/skills', { dir: 'tohub' }, 240000); break
             case 'skillsFromHub': r = await post('/skills', { dir: 'fromhub' }, 240000); break
+            case 'skHubDelete': r = await post('/skills', { action: 'hubdelete', name: a.name }, 240000); await run('skillsInfo', 'skInfo'); break
+            case 'skHubUpload': r = await post('/skills', { action: 'pushsingle', name: a.name }, 240000); await run('skillsInfo', 'skInfo'); break
             // ── skills page ──────────────────────────────────────────────────
             case 'skRefresh': {
               const list = await api('/skills/list', { timeout: 60000 })
@@ -714,6 +1017,56 @@ window.__ModuleLoader__.load({
               setOutdated(o)
               const n = o.outdated || 0
               r = { text: n ? t('pl.hasUpdate', { n }) : t('pl.allLatest') }
+              break
+            }
+            case 'plSpec': {
+              const s = await api('/plugins/spec', { timeout: 30000 })
+              setPlSpec(s)
+              r = { text: s.ok ? t('done.refresh') : 'spec read failed' }
+              break
+            }
+            case 'plPortable': {
+              // 换机补齐：拉源码 + 写 link + 重装依赖（不重启），然后刷两份状态
+              r = await post('/plugins', { action: 'install' }, 900000)
+              if (r.ok) { await run('plSpec', key); await run('plRefresh', 'plRefresh') }
+              break
+            }
+            // ── 云端文件（查看/编辑）────────────────────────────────────
+            case 'hubRefresh': {
+              const l = await api('/hub/files', { timeout: 60000 })
+              // 后端返回 { ok, files:[...], total }；state 直接存 files 数组，
+              // 否则 L1720 的 Array.isArray(hubFilesList) 对对象恒为 false，左侧列表永远空白
+              setHubFilesList(l && Array.isArray(l.files) ? l.files : (Array.isArray(l) ? l : []))
+              r = { text: l && l.ok ? t('hub.loaded', { n: l.total || 0 }) : String(l.error || 'failed') }
+              break
+            }
+            case 'hubRead': {
+              if (!a.path) { r = { text: t('hub.needPick') }; break }
+              const f = await api('/hub/file' + (a.path ? '?path=' + encodeURIComponent(a.path) : ''), { timeout: 60000 })
+              if (!f.ok) { r = { text: f.text || 'open failed' }; break }
+              openHubFile(f.path || a.path, f.text || '')
+              setHubActive(f.path || a.path)
+              r = { text: t('hub.opened', { path: f.path }) }
+              break
+            }
+            case 'hubReload': {
+              if (!hubActive) { r = { text: t('hub.needPick') }; break }
+              const f = await api('/hub/file?path=' + encodeURIComponent(hubActive), { timeout: 60000 })
+              if (f.ok) { setHubTabText(hubActive, f.text || ''); setHubTabs((prev) => prev.map((x) => x.path === hubActive ? { ...x, baseline: f.text || '' } : x)) }
+              r = { text: f.ok ? t('hub.reloaded') : (f.text || 'reload failed') }
+              break
+            }
+            case 'hubSave': {
+              if (!hubActive) { r = { text: t('hub.needPick') }; break }
+              const txt = hubTextOf(hubActive)
+              const base = hubBaselineOf(hubActive)
+              if (txt === base) { r = { text: t('hub.noChange') }; break }
+              // 覆盖类操作：先本地确认（铁律：改动文件前先确认，覆盖前先归档由后端做）
+              const okSave = typeof window === 'undefined' ? true
+                : window.confirm(t('hub.saveConfirm', { path: hubActive }))
+              if (!okSave) { r = { text: t('hub.saveCancelled') }; break }
+              r = await post('/hub/file', { path: hubActive, text: txt }, 120000)
+              if (r && r.ok && r.changed) { setHubTabs((prev) => prev.map((x) => x.path === hubActive ? { ...x, baseline: txt } : x)) }
               break
             }
             case 'plUpdate': {
@@ -826,6 +1179,35 @@ window.__ModuleLoader__.load({
       const st = (ov && ov.status) || { sections: [], worst: 'pass' }
 
       const overviewTab = [
+        // 真实状态条：老代码只比 HEAD vs origin，没看工作区，
+        // 曾出现"完全同步"绿条却带着 5 个未提交文件。这里把三态分开说清。
+        ((info.dirty && info.dirty > 0) || (info.ahead && info.ahead > 0) || (info.behind && info.behind > 0))
+          ? h(Card, { key: 'syncstate', level: 'warn' },
+            h('p', { style: { ...S.hint, margin: 0, fontWeight: 600 } },
+              [
+                info.dirty > 0 ? t('ov.stateDirty', { n: info.dirty }) : null,
+                info.ahead > 0 ? t('ov.stateAhead', { n: info.ahead }) : null,
+                info.behind > 0 ? t('ov.stateBehind', { n: info.behind }) : null,
+              ].filter(Boolean).join('   ·   ')),
+            info.dirty > 0 ? h('p', { style: { ...S.hint, opacity: 0.75, margin: 0 } },
+              t('ov.stateDirtyWhy') + '  ' + (info.dirtyFiles || []).join('  ·  ')) : null,
+            h('p', { style: { ...S.hint, opacity: 0.75, margin: 0 } }, t('ov.stateHint')),
+            h('div', { style: S.row },
+              h(Btn, { label: t('act.syncNow'), kind: 'syncNow', out: 'syncNow', primary: true }),
+              h(Btn, { label: t('act.syncPreview'), kind: 'syncPreview', out: 'syncPreview' }),
+              h(Btn, { label: t('act.pullNow'), kind: 'pullNow', out: 'pullNow' }),
+              h(Btn, { label: t('act.preflight'), kind: 'preflight', out: 'preflight' })),
+            h(Result, { k: 'syncNow', restart: true }), h(Result, { k: 'syncPreview' }), h(Result, { k: 'pullNow', restart: true }))
+          : h(Card, { key: 'syncstate', level: 'pass' },
+            h('p', { style: { ...S.hint, ...S.ok, margin: 0 } }, t('ov.stateIdle')),
+            h('div', { style: S.row },
+              h(Btn, { label: t('act.syncPreview'), kind: 'syncPreview', out: 'syncPreview' }))),
+        preflight && preflight.checks ? h(Card, { key: 'pf', title: t('pf.title'), level: preflight.worst === 'fail' ? 'fail' : (preflight.worst === 'warn' ? 'warn' : 'pass') },
+          h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.2rem' } },
+            ...preflight.checks.map((c, ci) => h('div', { key: ci, style: { ...S.listRow, alignItems: 'flex-start' } },
+              h(Dot, { level: c.level === 'fail' ? 'fail' : (c.level === 'warn' ? 'warn' : (c.level === 'info' ? 'info' : 'pass')) }),
+              h('span', { style: { flex: 1, whiteSpace: 'pre-wrap' } }, t('pf.' + c.key) + '：' + c.detail)))),
+          preflight.fileCount ? h('p', { style: { ...S.hint, opacity: 0.7 } }, t('pf.summary', { n: preflight.fileCount, size: preflight.bytes > 1048576 ? (preflight.bytes / 1048576).toFixed(1) + ' MB' : (preflight.bytes / 1024).toFixed(1) + ' KB' })) : null) : null,
         h(Card, { key: 'kv' },
           h('p', { style: S.hint }, t('ov.guide')),
           h('div', { style: S.kv },
@@ -858,15 +1240,22 @@ window.__ModuleLoader__.load({
           h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '0.6rem 0.9rem' } },
             ALL_CATS.map((c) => h('label', {
               key: c,
+              title: CAT_HINT[c] || '',
               style: { ...S.hint, display: 'flex', gap: '0.3rem', alignItems: 'center', opacity: cats.includes(c) ? 1 : 0.45, cursor: 'pointer' },
             },
               h('input', { type: 'checkbox', checked: cats.includes(c), disabled: !!busy, onChange: () => toggle(c) }),
-              t('cat.' + c)))))
+              t('cat.' + c))))),
+          h('p', { style: { ...S.hint, fontSize: '0.68rem', opacity: 0.55 } },
+            ALL_CATS.filter((c) => cats.includes(c)).map((c) => CAT_HINT[c]).filter(Boolean).join('  |  ') || t('sync.noneScope'))
       }
       // 辅助：技能/会话多选（默认全选=空数组；勾选个别=命名列表）
-      const renderMulti = (label, items, selected, setSelected) => {
+      // 用原生 <details> 实现可收起/展开的列表：点标题收起/展开，每行显示名称 + 说明。
+      // opts.descOf：可选，返回每项的说明文字；缺省取 it.description（会话无说明则留空）。
+      const renderMulti = (label, items, selected, setSelected, opts) => {
         if (!items || !items.length) return null
         const names = items.map((it) => it.name)
+        const descOf = (opts && typeof opts.descOf === 'function') ? opts.descOf
+          : ((it) => (it && it.description ? it.description : ''))
         const allOn = selected.length === 0
         const toggle = (n) => {
           if (selected.length === 0) { setSelected(names.filter((x) => x !== n)); return }
@@ -874,24 +1263,62 @@ window.__ModuleLoader__.load({
         }
         const setAll = () => setSelected([])
         const clearAll = () => setSelected([...names])
-        return h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.3rem' } },
-          h('div', { style: S.row },
-            h('span', { style: { ...S.hint, fontWeight: 600 } }, label),
-            h('button', { type: 'button', style: { ...S.miniBtn }, disabled: !!busy, onClick: setAll }, t('sync.selAll')),
-            h('button', { type: 'button', style: { ...S.miniBtn }, disabled: !!busy, onClick: clearAll }, t('sync.selClear'))),
-          h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '0.4rem 0.8rem', maxHeight: '7.5rem', overflowY: 'auto' } },
+        const onCount = allOn ? names.length : selected.filter((n) => names.includes(n)).length
+        return h('details', {
+          key: 'multi-' + label, open: false,
+          style: {
+            marginTop: '0.3rem',
+            // 主题自适应：跟 S.btn / S.listRow 用同一组变量，浅色主题不会变成黑块
+            border: '1px solid var(--color-border, rgba(128,128,128,0.22))',
+            borderRadius: '6px',
+            padding: '0.15rem 0.5rem',
+            background: 'var(--color-surface, rgba(128,128,128,0.05))',
+            color: 'inherit',
+          },
+        },
+          h('summary', { style: { ...S.hint, color: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' } },
+            h('span', { style: { fontWeight: 600, color: 'inherit' } }, label),
+            h('span', { style: { opacity: 0.6, fontSize: '0.7rem' } }, t('sync.pickCount', { n: onCount, total: names.length })),
+            h('span', { style: { flex: 1 } }),
+            h('button', { type: 'button', style: { ...S.miniBtn, fontSize: '0.64rem', padding: '0.08rem 0.4rem' }, disabled: !!busy, onClick: (e) => { e.stopPropagation(); setAll() } }, t('sync.selAll')),
+            h('button', { type: 'button', style: { ...S.miniBtn, fontSize: '0.64rem', padding: '0.08rem 0.4rem' }, disabled: !!busy, onClick: (e) => { e.stopPropagation(); clearAll() } }, t('sync.selClear'))),
+          h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.05rem', maxHeight: '11rem', overflowY: 'auto', marginTop: '0.2rem', color: 'inherit' } },
             items.map((it) => {
               const on = allOn || selected.includes(it.name)
+              const desc = descOf(it)
               return h('label', {
                 key: it.name,
-                style: { ...S.hint, display: 'flex', gap: '0.25rem', alignItems: 'center', opacity: on ? 1 : 0.45, cursor: 'pointer' },
+                style: { ...S.hint, color: 'inherit', display: 'flex', gap: '0.45rem', alignItems: 'flex-start', opacity: on ? 1 : 0.5, cursor: 'pointer', padding: '0.18rem 0', borderBottom: '1px solid rgba(127,127,127,0.15)' },
               },
-                h('input', { type: 'checkbox', checked: on, disabled: !!busy, onChange: () => toggle(it.name) }),
-                it.name)
+                h('input', { type: 'checkbox', checked: on, disabled: !!busy, onChange: () => toggle(it.name), style: { marginTop: '0.12rem' } }),
+                h('span', { style: { display: 'flex', flexDirection: 'column', gap: '0.1rem', minWidth: 0, color: 'inherit' } },
+                  h('span', { style: { wordBreak: 'break-all', color: 'inherit' } }, it.name),
+                  desc ? h('span', { style: { fontSize: '0.68rem', opacity: 0.6, fontWeight: 400, lineHeight: 1.35, color: 'inherit' } }, desc) : null))
             })))
       }
 
       const syncTab = [
+        h(Card, { key: 'preset', title: t('sync.presetTitle') },
+          h('p', { style: S.hint }, t('sync.presetHint')),
+          h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '0.3rem' } },
+            ...SYNC_PRESETS.map((p) => h('button', {
+              key: p.id, type: 'button', disabled: !!busy,
+              style: {
+                ...S.btn, fontSize: '0.72rem',
+                background: presetId === p.id ? 'var(--color-accent, #2a6)' : 'var(--color-surface, rgba(128,128,128,0.07))',
+                color: presetId === p.id ? '#fff' : 'inherit',
+              },
+              onClick: () => {
+                setPresetId(p.id)
+                const saved = loadPresets() || { overrides: {} }
+                saved.default = p.id
+                try { window.localStorage.setItem(PRESET_KEY, JSON.stringify(saved)) } catch { /* noop */ }
+                setPushCats([...p.cats])
+                setPullCats([...p.cats])
+                put('presetSave', t('sync.presetSaved'))
+              },
+            }, t('sync.preset' + p.id[0].toUpperCase() + p.id.slice(1)) + '  ·  ' + p.cats.join('+')))),
+          h(Result, { k: 'presetSave' })),
         h(Card, { key: 'what', title: t('sync.whatTitle') },
           h('p', { style: { ...S.hint, fontSize: '0.74rem' } }, t('sync.what')),
           h('p', { style: S.hint }, t('hint.console'))),
@@ -899,7 +1326,7 @@ window.__ModuleLoader__.load({
           h('p', { style: S.hint }, t('sync.upHint')),
           renderCatGrid(pushCats, setPushCats),
           pushCats.includes('skills') ? renderMulti(t('sync.pickSkills'), skillList && skillList.items ? skillList.items : [], pushSkills, setPushSkills) : null,
-          pushCats.includes('sessions') ? renderMulti(t('sync.pickSessions'), sessionList && sessionList.length ? sessionList : [], pushSessions, setPushSessions) : null,
+          pushCats.includes('sessions') ? renderMulti(t('sync.pickSessions'), sessionList && sessionList.length ? sessionList : [], pushSessions, setPushSessions, { descOf: () => '' }) : null,
           h('label', { key: 'dsh', style: { ...S.hint, display: 'flex', gap: '0.3rem', alignItems: 'center', marginTop: '0.5rem' } },
             h('input', { type: 'checkbox', checked: pushDshConfig, disabled: !!busy, onChange: (e) => setPushDshConfig(e.target.checked) }),
             t('cat.dshconfig')),
@@ -912,7 +1339,7 @@ window.__ModuleLoader__.load({
           h('p', { style: S.hint }, t('sync.downHint')),
           renderCatGrid(pullCats, setPullCats),
           pullCats.includes('skills') ? renderMulti(t('sync.pickSkills'), skillList && skillList.items ? skillList.items : [], pullSkills, setPullSkills) : null,
-          pullCats.includes('sessions') ? renderMulti(t('sync.pickSessions'), sessionList && sessionList.length ? sessionList : [], pullSessions, setPullSessions) : null,
+          pullCats.includes('sessions') ? renderMulti(t('sync.pickSessions'), sessionList && sessionList.length ? sessionList : [], pullSessions, setPullSessions, { descOf: () => '' }) : null,
           h('label', { key: 'dshb', style: { ...S.hint, display: 'flex', gap: '0.3rem', alignItems: 'center', marginTop: '0.5rem' } },
             h('input', { type: 'checkbox', checked: pullDshConfigWB, disabled: !!busy, onChange: (e) => setPullDshConfigWB(e.target.checked) }),
             t('cat.dshconfig')),
@@ -1002,6 +1429,44 @@ window.__ModuleLoader__.load({
             h(Btn, { label: t('act.sessionsList'), kind: 'sessionsList', out: 'sessL' })),
           h('p', { style: S.hint }, t('hint.sessions')),
           h(Result, { k: 'sessB' }), h(Result, { k: 'sessL' })),
+        h(Card, { key: 'sessbrowse', title: t('sess.title') },
+          h('p', { style: S.hint }, t('sess.hint')),
+          h('div', { style: S.row },
+            sessBrowse && sessBrowse.machines ? h('select', {
+              value: sessMachine || sessBrowse.machine || '', style: S.select, disabled: !!busy,
+              onChange: (e) => setSessMachine(e.target.value),
+            }, ...sessBrowse.machines.map(mm => h('option', { key: mm, value: mm }, mm))) : null,
+            h(Btn, { label: t('act.sessBrowse'), kind: 'sessBrowse', out: 'sessBrowse', primary: true })),
+          sessBrowse && sessBrowse.groups ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.3rem' } },
+            ...sessBrowse.groups.map((g, gi) => h('details', {
+              key: gi, open: false,
+              style: { border: '1px solid var(--color-border, rgba(128,128,128,0.22))', borderRadius: '6px', padding: '0.15rem 0.5rem', background: 'var(--color-surface, rgba(128,128,128,0.05))', color: 'inherit' },
+            },
+              h('summary', { style: { ...S.hint, color: 'inherit', cursor: 'pointer' } },
+                h('span', { style: { fontWeight: 600, color: 'inherit' } }, g.workspace + '  (' + g.sessions.length + ')')),
+              h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.15rem', margin: '0.2rem 0', color: 'inherit' } },
+                ...g.sessions.map(s => h('div', { key: s.id, style: { ...S.listRow, alignItems: 'flex-start' } },
+                  h('span', { style: { flex: 1, minWidth: 0, wordBreak: 'break-all', color: 'inherit' } },
+                    h('span', { style: { fontWeight: 500 } }, s.title),
+                    h('span', { style: { fontSize: '0.66rem', opacity: 0.55, marginLeft: '0.4rem' } }, Math.round(s.bytes / 1024) + ' KB')),
+                  h('button', {
+                    type: 'button', style: { ...S.btn, fontSize: '0.66rem', padding: '0.12rem 0.45rem' }, disabled: !!busy,
+                    onClick: () => run('sessOpen', 'sessOpen', { id: s.id }),
+                  }, t('sess.open')))))))
+          ) : (sessBrowse ? h('p', { style: S.hint }, t('sess.empty')) : null),
+          sessOpen && sessOpen.msgs ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.3rem', marginTop: '0.5rem' } },
+            h('p', { style: { ...S.hint, fontWeight: 600 } }, t('sess.viewing', { title: sessOpen.title || sessOpen.id })),
+            h('div', { style: { maxHeight: '24rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.25rem', color: 'inherit' } },
+              ...sessOpen.msgs.map((mm, mi) => h('div', {
+                key: mi,
+                style: {
+                  ...S.listRow, alignItems: 'flex-start',
+                  background: mm.role === 'user' ? 'rgba(46,160,67,0.10)' : 'var(--color-surface, rgba(128,128,128,0.05))',
+                },
+              },
+                h('span', { style: { minWidth: '3.4rem', fontSize: '0.66rem', opacity: 0.6 } }, mm.role === 'user' ? '老大' : 'AI'),
+                h('span', { style: { flex: 1, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'inherit' } }, mm.text))))) : null,
+          h(Result, { k: 'sessBrowse' }), h(Result, { k: 'sessOpen' })),
       ]
 
       // (environment checks were merged into the toolchain tab: both are
@@ -1070,19 +1535,50 @@ window.__ModuleLoader__.load({
             h(Btn, { label: t('act.skDiff'), kind: 'skillsInfo', out: 'skInfo' })),
           skills ? h(Fragment, {},
             h('p', { style: { ...S.hint, opacity: 0.75 } }, t('skills.summary', { hub: skills.hub ?? '?', local: skills.local ?? '?' })),
-            (skills.onlyLocalReal || []).length ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.2rem' } },
+            (skills.onlyLocal || []).length ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.2rem' } },
               h('div', { style: { fontSize: '0.72rem', opacity: 0.6 } }, t('skills.onlyLocal')),
-              h('div', { style: { ...S.row, gap: '0.3rem' } }, ...skills.onlyLocalReal.map(n => h('span', { key: n, style: S.chip }, n)))) : null,
-            (skills.onlyLocalJunk || []).length ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.2rem' } },
-              h('div', { style: { fontSize: '0.72rem', opacity: 0.45 } }, t('skills.junk')),
-              h('div', { style: { ...S.row, gap: '0.3rem' } }, ...skills.onlyLocalJunk.map(n => h('span', { key: n, style: { ...S.chip, opacity: 0.5 } }, n)))) : null,
+              h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.2rem' } }, ...skills.onlyLocal.map(n => h('div', { key: n.name, style: { ...S.listRow, border: '1px solid rgba(127,127,127,0.25)', borderRadius: '5px', opacity: (n.junk || n.disabled) ? 0.45 : 1 } },
+                h('span', { style: { display: 'flex', flexDirection: 'column', gap: '0.1rem', flex: 1, minWidth: 0 } },
+                  h('span', { style: { wordBreak: 'break-all' } }, n.name),
+                  n.description ? h('span', { style: { fontSize: '0.68rem', opacity: 0.6, fontWeight: 400, lineHeight: 1.35 } }, n.description) : null),
+                (n.junk || n.disabled) ? h('span', { style: { ...S.hint, fontSize: '0.66rem' } }, t('sk.hubSkip')) : h('button', {
+                  type: 'button', style: { ...S.btn, fontSize: '0.66rem', padding: '0.12rem 0.45rem' }, disabled: !!busy,
+                  onClick: () => setHubUploadName(n.name),
+                }, t('sk.hubUpload')))))) : null,
             (skills.onlyHub || []).length ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.2rem' } },
               h('div', { style: { fontSize: '0.72rem', opacity: 0.6 } }, t('skills.onlyHub')),
-              h('div', { style: { ...S.row, gap: '0.3rem' } }, ...skills.onlyHub.map(n => h('span', { key: n, style: S.chip }, n)))) : null,
+              h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.2rem' } }, ...skills.onlyHub.map(n => h('div', { key: n.name, style: { ...S.listRow, border: '1px solid rgba(127,127,127,0.25)', borderRadius: '5px' } },
+                h('span', { style: { flex: 1, wordBreak: 'break-all' } }, n.name),
+                h('button', {
+                  type: 'button', style: { ...S.btn, fontSize: '0.66rem', padding: '0.12rem 0.45rem' },
+                  disabled: !!busy,
+                  onClick: () => { setTab('files'); run('hubRead', 'hubFile', { path: 'skills/' + n.name + '/SKILL.md' }) },
+                }, t('sk.hubEdit')),
+                h('button', {
+                  type: 'button', style: { ...S.btn, fontSize: '0.66rem', padding: '0.12rem 0.45rem' }, disabled: !!busy,
+                  onClick: () => setHubDeleteName(n.name),
+                }, t('sk.hubDelete')))))) : null,
+            hubUploadName ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.3rem', marginTop: '0.4rem', padding: '0.5rem', border: '1px solid #3fb950', borderRadius: '6px', background: 'rgba(63,185,80,0.08)' } },
+              h('p', { style: { ...S.hint, margin: 0 } }, t('sk.hubUploadConfirm', { name: hubUploadName })),
+              h('p', { style: { ...S.hint, margin: 0, fontSize: '0.7rem', opacity: 0.7 } }, t('sk.hubUploadWarn')),
+              h('div', { style: S.row },
+                h('button', { type: 'button', style: { ...S.btn, fontSize: '0.7rem' }, disabled: !!busy, onClick: () => setHubUploadName('') }, t('cancel')),
+                h('button', { type: 'button', style: { ...S.primary, fontSize: '0.7rem' }, disabled: !!busy, onClick: () => { setHubUploadName(''); run('skHubUpload', 'skOp', { name: hubUploadName }) } }, t('sk.hubUploadConfirmBtn')))) : null,
+            hubDeleteName ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.3rem', marginTop: '0.4rem', padding: '0.5rem', border: '1px solid #d29922', borderRadius: '6px', background: 'rgba(210,153,34,0.08)' } },
+              h('p', { style: { ...S.hint, margin: 0 } }, t('sk.hubDeleteConfirm', { name: hubDeleteName })),
+              h('p', { style: { ...S.hint, margin: 0, fontSize: '0.7rem', opacity: 0.7 } }, t('sk.hubDeleteWarn')),
+              h('div', { style: S.row },
+                h('button', { type: 'button', style: { ...S.btn, fontSize: '0.7rem' }, disabled: !!busy, onClick: () => setHubDeleteName('') }, t('cancel')),
+                h('button', { type: 'button', style: { ...S.primary, fontSize: '0.7rem' }, disabled: !!busy, onClick: () => { setHubDeleteName(''); run('skHubDelete', 'skOp', { name: hubDeleteName }) } }, t('sk.hubDeleteConfirmBtn')))) : null,
             (skills.diff || []).length ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.2rem' } },
               h('div', { style: { fontSize: '0.72rem', color: '#d29922' } }, t('skills.diff')),
-              h('div', { style: { ...S.row, gap: '0.3rem' } }, ...skills.diff.map(n => h('span', { key: n, style: S.chip }, n)))) : null,
-            (!(skills.onlyLocalReal || []).length && !(skills.onlyHub || []).length && !(skills.diff || []).length)
+              h('div', { style: { ...S.row, gap: '0.3rem' } }, ...skills.diff.map(n => h(Fragment, { key: n },
+                h('span', { style: S.chip }, n),
+                h('button', {
+                  type: 'button', style: { ...S.miniBtn, fontSize: '0.62rem', padding: '0.05rem 0.35rem' }, disabled: !!busy,
+                  onClick: () => { setTab('files'); run('hubRead', 'hubFile', { path: 'skills/' + n + '/SKILL.md' }) },
+                }, t('sk.hubEdit')))))) : null,
+            (!(skills.onlyLocal || []).length && !(skills.onlyHub || []).length && !(skills.diff || []).length)
               ? h('p', { style: S.hint }, t('skills.none')) : null) : null,
           h(Result, { k: 'skTo', restart: true }), h(Result, { k: 'skFrom', restart: true }), h(Result, { k: 'skInfo' })),
 
@@ -1108,6 +1604,26 @@ window.__ModuleLoader__.load({
       for (const it of (outdated && outdated.items) || []) outdatedMap[it.profile + '/' + it.name] = it
 
       const pluginsTab = [
+        h(Card, { key: 'port', title: t('pl.portTitle') },
+          h('p', { style: S.hint }, t('pl.portHint')),
+          h('div', { style: S.row },
+            h(Btn, { label: t('act.plSpec'), kind: 'plSpec', out: 'plSpecOut' }),
+            h(Btn, { label: t('act.plPortable'), kind: 'plPortable', out: 'plPort', primary: true })),
+          plSpec && plSpec.ok ? h(Fragment, {},
+            h('p', { style: { ...S.hint, opacity: 0.85 } }, t('pl.portSpec', {
+              name: plSpec.spec.name || '-', tag: plSpec.spec.tag || '-',
+            })),
+            h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '0.3rem' } },
+              h('span', { style: { ...S.chip, borderColor: plSpec.cloned ? 'rgba(46,160,67,0.5)' : 'rgba(209,36,47,0.4)' } },
+                t('pl.portCloned') + (plSpec.cloned ? ' ✓' + (plSpec.localVersion ? ' v' + plSpec.localVersion : '') : ' ✗')),
+              h('span', { style: { ...S.chip, borderColor: plSpec.linked ? 'rgba(46,160,67,0.5)' : 'rgba(209,36,47,0.4)' } },
+                t('pl.portLinked') + (plSpec.linked ? ' ✓' : ' ✗'))),
+            (!plSpec.cloned || !plSpec.linked)
+              ? h('p', { style: { ...S.hint, color: '#d29922', margin: 0 } }, t('pl.portNeedFix'))
+              : h('p', { style: { ...S.hint, ...S.ok, margin: 0 } }, t('pl.portOk')))
+          : h('p', { style: { ...S.hint, opacity: 0.55 } }, t('pl.portUnchecked')),
+          h(Result, { k: 'plPort', restart: true }), h(Result, { k: 'plSpecOut' })),
+
         h(Card, { key: 'inst', title: t('pl.title') },
           h('p', { style: S.hint }, t('pl.what')),
           h('p', { style: S.hint }, t('pl.guide')),
@@ -1228,8 +1744,140 @@ window.__ModuleLoader__.load({
           h(Result, { k: 'logs' })),
       ]
 
-      const settingsTab = [
-        h(Card, { key: 'c', title: t('sec.cred'), level: cred.hasCredential ? 'pass' : 'warn' },
+      // ── 云端文件：查看 / 编辑中枢里的记忆·配置·技能正文 ────────────────
+      // 方案 C：左文件树（搜索/筛选/分组折叠 + 元数据）+ 右多 Tab 编辑器 + 顶部摘要条
+      const hubGroups = [
+        { id: 'memory', label: t('hub.grpMemory') },
+        { id: 'machine', label: t('hub.grpMachine') },
+        { id: 'config', label: t('hub.grpConfig') },
+        { id: 'skill', label: t('hub.grpSkill') },
+      ]
+      const hubFiles = Array.isArray(hubFilesList) ? hubFilesList : []
+      const hubGroupOf = (f) => f.group || 'config'
+      const hubBasename = (p) => String(p || '').split('/').pop() || p
+      // 搜索 + 只显示脏 过滤
+      const hubFiltered = hubFiles.filter((f) => {
+        if (hubOnlyDirty && !f.dirty) return false
+        if (!hubQuery.trim()) return true
+        const q = hubQuery.trim().toLowerCase()
+        return String(f.path).toLowerCase().includes(q) || (f.skill && f.skill.toLowerCase().includes(q))
+      })
+      const hubDirtyCount = hubFiles.filter((f) => f.dirty).length
+      // 左侧文件树（按分组）
+      const hubTree = h('div', { style: { flex: '0 1 16rem', minWidth: '11rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' } },
+        h('div', { style: S.row },
+          h(Btn, { label: t('act.hubRefresh'), kind: 'hubRefresh', out: 'hubList', primary: true })),
+        h('input', {
+          ref: hubSearchRef, type: 'text', placeholder: t('hub.searchPh'),
+          value: hubQuery, onChange: (e) => setHubQuery(e.target.value),
+          style: { ...S.input, width: '100%' },
+        }),
+        h('label', { style: { ...S.hint, display: 'flex', gap: '0.35rem', alignItems: 'center', cursor: 'pointer', userSelect: 'none' } },
+          h('input', { type: 'checkbox', checked: !!hubOnlyDirty, onChange: (e) => setHubOnlyDirty(e.target.checked) }),
+          t('hub.onlyDirty', { n: hubDirtyCount })),
+        hubFiltered.length ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.35rem', overflow: 'auto', maxHeight: '34rem' } },
+          ...hubGroups.map((g) => {
+            const items = hubFiltered.filter((f) => hubGroupOf(f) === g.id)
+            if (!items.length) return null
+            return h('details', {
+              key: 'g-' + g.id, open: true,
+              style: { border: '1px solid var(--color-border, rgba(128,128,128,0.22))', borderRadius: '6px', padding: '0.15rem 0.5rem', background: 'var(--color-surface, rgba(128,128,128,0.05))', color: 'inherit' },
+            },
+              h('summary', { style: { ...S.hint, color: 'inherit', cursor: 'pointer', padding: '0.2rem 0' } },
+                h('span', { style: { fontWeight: 600, color: 'inherit' } }, g.label + ' (' + items.length + ')')),
+              h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.06rem', margin: '0.12rem 0 0.3rem', color: 'inherit' } },
+                ...items.map((f) => {
+                  const name = hubBasename(f.path)
+                  const size = f.size != null && f.size > 0 ? (f.size > 1024 ? (f.size / 1024).toFixed(1) + ' KB' : f.size + ' B') : ''
+                  const skillTag = f.group === 'skill' && f.skill ? h('span', { style: { ...S.chip, opacity: 0.8 } }, f.skill) : null
+                  const dirtyTag = f.dirty ? h('span', { style: { ...S.chip, color: '#d29922', borderColor: 'rgba(210,153,34,0.5)' } }, t('hub.dirtyTag')) : null
+                  const active = hubActive === f.path
+                  return h('button', {
+                    key: f.path, type: 'button',
+                    disabled: !f.exists || !!busy,
+                    title: f.path,
+                    style: {
+                      ...S.miniBtn, fontSize: '0.68rem', textAlign: 'left',
+                      display: 'flex', flexDirection: 'column', gap: '0.05rem', alignItems: 'stretch',
+                      opacity: f.exists ? 1 : 0.4,
+                      background: active ? 'var(--color-accent, #2a6)' : 'var(--color-surface, rgba(128,128,128,0.07))',
+                      color: active ? '#fff' : 'inherit',
+                    },
+                    onClick: () => run('hubRead', 'hubFile', { path: f.path }),
+                  },
+                    h('div', { style: { display: 'flex', gap: '0.3rem', alignItems: 'center', justifyContent: 'space-between' } },
+                      h('span', { style: { fontWeight: active ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, name),
+                      h('span', { style: { ...S.hint, opacity: active ? 0.85 : 0.55, fontSize: '0.62rem', whiteSpace: 'nowrap' } }, size)),
+                    h('div', { style: { display: 'flex', gap: '0.25rem', flexWrap: 'wrap', opacity: active ? 0.9 : 0.6 } }, skillTag, dirtyTag))
+                })
+              )
+            )
+          })) : h('p', { style: S.hint }, t('hub.noFiles')),
+      )
+      // 右侧：多 Tab 编辑器
+      const hubEditor = hubTabs.length ? h('div', { style: { flex: '1 1 24rem', minWidth: '15rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' } },
+        // Tab 条
+        h('div', { style: { display: 'flex', gap: '0.2rem', flexWrap: 'wrap', borderBottom: '1px solid var(--color-border, rgba(128,128,128,0.22))', paddingBottom: '0.3rem' } },
+          ...hubTabs.map((x) => h('div', {
+            key: x.path, type: 'button',
+            style: {
+              display: 'flex', gap: '0.3rem', alignItems: 'center',
+              padding: '0.22rem 0.5rem', borderRadius: '0.4rem 0.4rem 0 0', cursor: 'pointer',
+              fontSize: '0.72rem',
+              background: hubActive === x.path ? 'var(--color-surface, rgba(128,128,128,0.12))' : 'transparent',
+              color: 'inherit', border: '1px solid ' + (hubActive === x.path ? 'var(--color-border, rgba(128,128,128,0.3))' : 'transparent'),
+              borderBottom: hubActive === x.path ? '1px solid var(--color-surface, rgba(128,128,128,0.12))' : 'none',
+            },
+            onClick: () => setHubActive(x.path),
+          },
+            h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '12rem' } }, hubBasename(x.path)),
+            hubDirtyTab(x.path) ? h('span', { style: { color: '#d29922', fontWeight: 700 }, title: t('hub.unsaved') }, '•') : null,
+            h('button', {
+              type: 'button', title: t('hub.closeTab'),
+              style: { ...S.btn, padding: '0 0.3rem', fontSize: '0.7rem', lineHeight: 1, border: 'none', background: 'transparent', color: 'inherit', opacity: 0.6 },
+              onClick: (e) => { e.stopPropagation(); closeHubTab(x.path) },
+            }, '×'))),
+        ),
+        // 当前 Tab 内容
+        (() => {
+          const cur = hubTabs.find((x) => x.path === hubActive)
+          if (!cur) return null
+          return h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.4rem' } },
+            h('div', { style: { ...S.hint, wordBreak: 'break-all', fontFamily: 'ui-monospace, Consolas, monospace' } }, cur.path),
+            h('textarea', {
+              value: cur.text, disabled: !!busy,
+              spellCheck: false,
+              onChange: (e) => setHubTabText(cur.path, e.target.value),
+              placeholder: t('hub.ph'),
+              style: {
+                ...S.input, width: '100%', minHeight: '22rem', resize: 'vertical',
+                fontFamily: 'ui-monospace, Consolas, monospace', fontSize: '0.72rem', lineHeight: 1.55,
+                color: 'inherit',
+              },
+            }),
+            h('div', { style: S.row },
+              h(Btn, { label: t('act.hubSave'), kind: 'hubSave', out: 'hubSave', primary: true }),
+              h(Btn, { label: t('act.hubReload'), kind: 'hubReload', out: 'hubFile' }),
+              h('span', { style: { ...S.hint, opacity: 0.7 } }, t('hub.changed', {
+                n: String(cur.text || '').split('\n').length,
+                dirty: hubDirtyTab(cur.path) ? t('hub.dirtyYes') : t('hub.dirtyNo'),
+              }))),
+            hubDirtyTab(cur.path) ? h('p', { style: { ...S.hint, color: '#d29922', margin: 0 } }, t('hub.unsaved')) : null)
+        })(),
+      ) : h('div', { style: { flex: '1 1 24rem', minWidth: '15rem', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, h('p', { style: S.hint }, t('hub.pick')))
+      const filesTab = [
+        h(Card, { key: 'tree', title: t('hub.title') },
+          // 顶部摘要条
+          h('div', { style: { ...S.row, justifyContent: 'space-between', ...S.hint } },
+            h('span', {}, t('hub.summary', { total: hubFiles.length, dirty: hubDirtyCount })),
+            h('span', { style: { opacity: 0.7 } }, t('hub.hintShort'))),
+          h('div', { style: { display: 'flex', gap: '0.9rem', alignItems: 'flex-start', flexWrap: 'wrap' } },
+            hubTree, hubEditor),
+          h('p', { style: { ...S.hint, opacity: 0.6 } }, t('hub.safety'))),
+        h(Result, { k: 'hubList' }), h(Result, { k: 'hubFile' }), h(Result, { k: 'hubSave' }),
+      ]
+
+      const settingsTab = [        h(Card, { key: 'c', title: t('sec.cred'), level: cred.hasCredential ? 'pass' : 'warn' },
           h('p', { style: { fontSize: '0.78rem', margin: 0 } },
             cred.hasCredential ? (t('cred.ok') + '  ·  ' + (cred.username || '') + '  ·  ' + (cred.repoHost || '')) : (t('cred.none') + '  ·  ' + t('cred.noneHint'))),
           h('div', { style: S.row },
@@ -1262,6 +1910,7 @@ window.__ModuleLoader__.load({
 
       const body = tab === 'overview' ? overviewTab
         : tab === 'sync' ? syncTab
+        : tab === 'files' ? filesTab
         : tab === 'backup' ? backupTab
         : tab === 'skills' ? skillsTab
         : tab === 'plugins' ? pluginsTab

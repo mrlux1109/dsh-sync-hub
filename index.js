@@ -28,6 +28,7 @@
  */
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
+import zlib from 'node:zlib'
 import os from 'node:os'
 import path from 'node:path'
 import * as skills from './lib/skills.js'
@@ -476,6 +477,12 @@ async function apiHandler(req, res, config) {
           const ver = fs.readFileSync(path.join(hub, 'VERSION'), 'utf8').trim()
           const log = await runGit(hub, ['log', '-1', '--format=%h|%ci|%s'], 20000)
           const st = await runGit(hub, ['status', '--porcelain'], 20000)
+          // 上游落后多少、本地领先多少：前者=该 pull，后者=该 push（截图曾出现
+          // "完全同步"绿条却带着 5 个未提交文件，因为老代码只看 HEAD vs origin）
+          const ahead = await runGit(hub, ['rev-list', '--count', '@{u}..HEAD'], 20000)
+          const behind = await runGit(hub, ['rev-list', '--count', 'HEAD..@{u}'], 20000)
+          const aheadN = ahead.code === 0 ? parseInt(ahead.out.trim(), 10) || 0 : -1
+          const behindN = behind.code === 0 ? parseInt(behind.out.trim(), 10) || 0 : -1
           let skills = 0
           try { skills = fs.readdirSync(path.join(hub, 'skills'), { withFileTypes: true }).filter((d) => d.isDirectory()).length } catch { /* noop */ }
           const [commit, date, subject] = log.code === 0 ? String(log.out).trim().split('|') : ['', '', '']
@@ -484,6 +491,7 @@ async function apiHandler(req, res, config) {
             ok: true, version: ver, commit, commitDate: date, commitSubject: subject,
             dirty: st.code === 0 ? dirtyLines.length : -1,
             dirtyFiles: dirtyLines.slice(0, 12).map((l) => l.trim()),
+            ahead: aheadN, behind: behindN,
             skills, hubPath: hub, machine: os.hostname(),
           }
         })(),
@@ -565,8 +573,41 @@ async function apiHandler(req, res, config) {
         await runPs(hub, 'backup-sessions.ps1', ['-Backup', '-IncludeInGit']
           .concat(sessionsSel ? ['-Sessions', sessionsSel] : []), null, { timeoutMs: 600000 })
       }
-      const r = await runPs(hub, 'push.ps1', pass, null, { timeoutMs: 300000 })
-      return send(200, result(r.code === 0, r.code, tail(r.out, 20000)))
+      // 预演（不提交不推送，只报告会推什么）+ 真实推送（带结构化回执）。
+      // DryRun 走 push.ps1 -DryRun；真实推送解析 PUSHRCPT_* 行转成结构化结果。
+      if (body.dryRun) {
+        const pass2 = ['-DryRun'].concat(body.categories ? ['-What', normalizeCategories(body.categories).join(',')] : [])
+        const d = await runPs(hub, 'push.ps1', pass2, null, { timeoutMs: 300000 })
+        const files = []
+        let scope = '', bytes = 0
+        for (const line of String(d.out).split(/\r?\n/)) {
+          const m = line.match(/^DRYRUN_FILE=(.+)$/)
+          if (m) files.push(m[1].trim())
+          else if (/^DRYRUN_SCOPE=/.test(line)) scope = line.split('=')[1] || ''
+          else if (/^DRYRUN_BYTES=/.test(line)) bytes = Number(line.split('=')[1] || 0)
+        }
+        return send(200, {
+          ok: d.code === 0, code: d.code, dryRun: true,
+          files, fileCount: files.length, bytes, scope,
+          text: files.length
+            ? ('将推送 ' + files.length + ' 个文件（' + (bytes > 1024 ? (bytes / 1024).toFixed(1) + ' KB' : bytes + ' B') + '）：\n' + files.join('\n'))
+            : '所选范围内没有可推送的改动。',
+        })
+      }
+      const pr = await runPs(hub, 'push.ps1', pass, null, { timeoutMs: 300000 })
+      // 解析 push.ps1 的结构化回执，让卡片能显示"推了几个文件/哪个 commit"
+      let receipt = null
+      {
+        const files = []
+        let commit = '', subject = ''
+        for (const line of String(pr.out).split(/\r?\n/)) {
+          if (/^PUSHRCPT_FILE=/.test(line)) files.push(line.slice('PUSHRCPT_FILE='.length).trim())
+          else if (/^PUSHRCPT_COMMIT=/.test(line)) commit = line.split('=').slice(1).join('=').trim()
+          else if (/^PUSHRCPT_SUBJECT=/.test(line)) subject = line.split('=').slice(1).join('=').trim()
+        }
+        if (commit || files.length) receipt = { commit, subject, files, fileCount: files.length }
+      }
+      return send(200, { ...result(pr.code === 0, pr.code, tail(pr.out, 20000)), receipt })
     }
     if (method === 'POST' && routePath === '/pull') {
       const body = await readJsonBody(req)
@@ -703,6 +744,25 @@ async function apiHandler(req, res, config) {
       const onlyHub = h1.filter((n) => !l1.includes(n))
       const onlyLocal = l1.filter((n) => !h1.includes(n))
       const diff = []
+      // Load each skill's frontmatter `description` so the sync card can render a
+      // collapsible list with per-skill notes (see client renderMulti descOf).
+      const describe = (dir, n) => {
+        try {
+          const raw = fs.readFileSync(path.join(dir, n, 'SKILL.md'), 'utf8')
+          const m = raw.match(/description:\s*(.+?)\s*$/im)
+          let s = m ? m[1].replace(/^['"]|['"]$/g, '').trim() : ''
+          if (s.length > 120) s = s.slice(0, 120) + '…'
+          return s
+        } catch { return '' }
+      }
+      // Names like "@org-xxxx" / "@user_xxxx" are auto-generated placeholders,
+      // not real skills: flag them so the user can tell noise from real work.
+      const junk = (n) => /^@(org|user)[-_]/i.test(n)
+      const onlyHubInfo = onlyHub.map((n) => ({ name: n, description: describe(hubSkills, n) }))
+      const onlyLocalInfo = onlyLocal.map((n) => ({
+        name: n, description: describe(localSkills, n),
+        junk: junk(n), disabled: /\.disabled$/.test(n),
+      }))
       for (const n of h1) {
         if (!l1.includes(n)) continue
         try {
@@ -713,9 +773,8 @@ async function apiHandler(req, res, config) {
       }
       // Names like "@org-xxxx" / "@user_xxxx" are auto-generated placeholders,
       // not real skills: flag them so the user can tell noise from real work.
-      const junk = (n) => /^@(org|user)[-_]/i.test(n)
       return send(200, {
-        ok: true, hub: h1.length, local: l1.length, onlyHub, onlyLocal, diff,
+        ok: true, hub: h1.length, local: l1.length, onlyHub: onlyHubInfo, onlyLocal: onlyLocalInfo, diff,
         onlyLocalReal: onlyLocal.filter((n) => !junk(n)),
         onlyLocalJunk: onlyLocal.filter(junk),
       })
@@ -776,6 +835,81 @@ async function apiHandler(req, res, config) {
       const dir = String(body.dir ?? '').trim()
       if (dir === 'tohub') return run('skills-market.ps1', ['-ToHub'], 120000)
       if (dir === 'fromhub') return run('skills-market.ps1', ['-FromHub'], 120000)
+      // 从云端仓库删除一个技能（保留 git 历史，非硬清物理文件于其他机）。
+      // 必须显式带 action:'hubdelete' + name，且做路径穿越校验。绝不静默删。
+      if (String(body.action ?? '').trim() === 'hubdelete') {
+        const name = String(body.name ?? '').trim()
+        if (!name) return send(200, result(false, -1, 'name required'))
+        // 拒绝任何路径穿越 / 上级引用 / 分隔符
+        if (/[\\/]|\.\./.test(name) || !/^[^\\/]+$/.test(name)) {
+          return send(200, result(false, -1, 'invalid skill name'))
+        }
+        const skillDir = path.join(hub, 'skills', name)
+        if (!fs.existsSync(skillDir)) {
+          return send(200, result(false, -1, 'skill not found in hub: ' + name))
+        }
+        // 1) 从 git 跟踪中移除（停止追踪 + 删除工作树，仅限本仓库内）
+        const rm = await runGit(hub, ['rm', '-r', '--force', path.join('skills', name)], 60000)
+        if (rm.code !== 0) return send(200, result(false, -1, 'git rm failed: ' + rm.out))
+        // 2) 提交（不自动 push —— 与「云端文件」编辑保存同一心智：上传由用户显式点推送）
+        const commit = await runGit(hub, ['commit', '-m', 'remove skill ' + name + ' from hub (delete)'], 60000)
+        if (commit.code !== 0) {
+          // 没有可提交内容时也算成功（理论上不会，因 rm 必有改动）
+          const undo = await runGit(hub, ['reset', '--', path.join('skills', name)], 30000)
+          return send(200, result(false, -1, 'git commit failed: ' + commit.out + (undo.code === 0 ? ' (rolled back)' : '')))
+        }
+        // 只提交不推送：结果里明确告知，避免"以为删了其实没删"
+        return send(200, result(true, 0, '云端技能已删除并本地提交（未推送）。请点「上传备份/推送」，另一台机器下次拉取后才会同样删除。'))
+      }
+      // 把【单个】本地技能上传到云端仓库（hubdelete 的正向对照：一个删、一个补）。
+      // 只复制该技能目录进 hub/skills/<name> 并 commit（不自动 push），绝不覆盖同名内容。
+      if (String(body.action ?? '').trim() === 'pushsingle') {
+        const name = String(body.name ?? '').trim()
+        if (!name) return send(200, result(false, -1, 'name required'))
+        if (/[\\/]|\.\./.test(name) || !/^[^\\/]+$/.test(name)) {
+          return send(200, result(false, -1, 'invalid skill name'))
+        }
+        // 本地根取 DSH 的实际技能目录（含 .disabled 形式：名字带 .disabled 也算合法目录名）
+        const localSkills = path.join(os.homedir(), '.dsh', 'skills', name)
+        if (!fs.existsSync(localSkills) || !fs.statSync(localSkills).isDirectory()) {
+          return send(200, result(false, -1, 'local skill not found: ' + name))
+        }
+        const hubDir = path.join(hub, 'skills', name)
+        if (fs.existsSync(hubDir)) {
+          return send(200, result(false, -1, '云端已存在同名技能 ' + name + '（不会覆盖）。若内容不同请先用「差异」比对，再决定改哪一边。'))
+        }
+        // 1) 复制到工作树。不用 fs.cpSync（Windows 上可能有原生层静默崩溃），手写逐文件递归。
+        const copyDirSafe = (src, dst) => {
+          fs.mkdirSync(dst, { recursive: true })
+          for (const ent of fs.readdirSync(src, { withFileTypes: true })) {
+            const s = path.join(src, ent.name)
+            const d = path.join(dst, ent.name)
+            if (ent.isDirectory()) copyDirSafe(s, d)
+            else if (ent.isFile()) fs.copyFileSync(s, d)
+          }
+        }
+        try {
+          if (fs.existsSync(hubDir)) throw new Error('target already exists')
+          copyDirSafe(localSkills, hubDir)
+        } catch (e) {
+          try { fs.rmSync(hubDir, { recursive: true, force: true }) } catch { /* noop */ }
+          return send(200, result(false, -1, '复制到中枢失败: ' + String(e && e.message || e)))
+        }
+        // 2) add + commit
+        const add = await runGit(hub, ['add', '--', path.join('skills', name)], 60000)
+        if (add.code !== 0) {
+          try { fs.rmSync(hubDir, { recursive: true, force: true }) } catch { /* noop */ }
+          return send(200, result(false, -1, 'git add failed: ' + add.out))
+        }
+        const commit = await runGit(hub, ['commit', '-m', 'add skill ' + name + ' from this machine'], 60000)
+        if (commit.code !== 0) {
+          const undo = await runGit(hub, ['reset', '--', path.join('skills', name)], 30000)
+          try { fs.rmSync(hubDir, { recursive: true, force: true }) } catch { /* noop */ }
+          return send(200, result(false, -1, 'git commit failed: ' + commit.out + (undo.code === 0 ? ' (rolled back)' : '')))
+        }
+        // 3) 只提交不推送（与 hubdelete / 云端文件编辑同一心智：推送由用户显式点）
+        return send(200, result(true, 0, '已上传到云端仓库并本地提交（未推送）。请点「上传备份/推送」，另一台机器拉取后才会获得该技能。'))
+      }
       return send(200, result(false, -1, 'dir must be tohub | fromhub'))
     }
     if (method === 'POST' && routePath === '/plugins') {
@@ -786,6 +920,338 @@ async function apiHandler(req, res, config) {
       if (!a) return send(200, result(false, -1, 'action must be list | install | update | setlink | restart'))
       const extra = a === 'Install' ? ['-NoRestart'] : []
       return run('plugins.ps1', ['-Action', a].concat(extra), 300000)
+    }
+    // Read the hub's portable-plugin spec (config/plugin.txt) plus THIS machine's
+    // clone/link state, so the card can tell "pull got the new tag, but this
+    // machine still runs the old clone" apart from "already in sync".
+    if (method === 'GET' && routePath === '/plugins/spec') {
+      const cfg = {}
+      const f = path.join(hub, 'config', 'plugin.txt')
+      try {
+        const raw = fs.readFileSync(f, 'utf8')
+        for (const line of raw.split(/\r?\n/)) {
+          const t = line.trim()
+          if (!t || t.startsWith('#')) continue
+          const i = t.indexOf('=')
+          if (i < 1) continue
+          cfg[t.slice(0, i).trim()] = t.slice(i + 1).trim()
+        }
+      } catch { /* no plugin.txt */ }
+      const name = cfg.name || ''
+      const srcDir = name ? path.join(hub, 'plugins', name) : ''
+      let cloned = false, localVersion = ''
+      if (srcDir && fs.existsSync(path.join(srcDir, 'package.json'))) {
+        cloned = true
+        try { localVersion = JSON.parse(fs.readFileSync(path.join(srcDir, 'package.json'), 'utf8')).version || '' } catch { /* unknown */ }
+      }
+      // Is the current profile actually referencing it (link:...) ?
+      let linked = false
+      let linkedSpec = ''
+      try {
+        const pj = path.join(os.homedir(), '.dsh', 'profiles', 'desktop', 'package.json')
+        const j = JSON.parse(fs.readFileSync(pj, 'utf8'))
+        const spec = j.dependencies && name ? String(j.dependencies[name] ?? '') : ''
+        if (spec) { linkedSpec = spec; linked = spec.startsWith('link:') || spec.startsWith('file:') ? fs.existsSync(spec.replace(/^(link|file):/, '')) : true }
+      } catch { /* profile unreadable */ }
+      return send(200, {
+        ok: true,
+        spec: { name, repo: cfg.repo || '', tag: cfg.tag || 'main' },
+        cloned, localVersion, linked, linkedSpec, hubPath: srcDir,
+      })
+    }
+    // ── 云端文件（hub viewer/editor）────────────────────────────────────
+    // 白名单制：只暴露中枢里"值得人看、值得人改"的文本，别的（二进制会话备份、
+    // 插件自身源码、技能素材/脚本）一律不可达，从根上杜绝误改与路径穿越。
+    const HUB_FILE_GROUPS = [
+      { group: 'memory', label: '记忆（双机唯一真相源）', paths: ['memory/shared.md'] },
+      { group: 'machine', label: '机器档案', paths: [] }, // machines/*.md 由目录扫描补
+      { group: 'config', label: '配置', paths: ['config/session-map.json', 'config/plugins.md', 'config/plugin.txt', 'config/tools.txt', 'config/sync-manifest.json'] },
+    ]
+    const normHubPath = (p) => String(p ?? '').replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+/g, '/')
+    const isSafeHubPath = (p) => {
+      if (!p || typeof p !== 'string') return false
+      if (p.includes('..') || p.startsWith('/') || /^[a-zA-Z]:/.test(p)) return false
+      return normHubPath(p) === p
+    }
+    // 技能：只允许 <name>/SKILL.md（frontmatter+正文），脚本/素材一律不暴露
+    const hubSkillNames = () => {
+      try {
+        return fs.readdirSync(path.join(hub, 'skills'), { withFileTypes: true })
+          .filter((d) => d.isDirectory()).map((d) => d.name).sort()
+      } catch { return [] }
+    }
+    if (method === 'GET' && routePath === '/hub/files') {
+      const files = []
+      for (const g of HUB_FILE_GROUPS) {
+        for (const rel of g.paths) {
+          const abs = path.join(hub, rel)
+          let size = 0, exists = false
+          try { const st = fs.statSync(abs); exists = st.isFile(); size = st.size } catch { /* noop */ }
+          files.push({ path: rel, group: g.group, size, exists })
+        }
+      }
+      // machines/*.md：一机一文件，按名列出
+      const mdir = path.join(hub, 'memory', 'machines')
+      try {
+        for (const e of fs.readdirSync(mdir, { withFileTypes: true })) {
+          if (!e.isFile() || !/\.md$/i.test(e.name)) continue
+          const rel = 'memory/machines/' + e.name
+          files.push({ path: rel, group: 'machine', size: fs.statSync(path.join(mdir, e.name)).size, exists: true })
+        }
+      } catch { /* no machines dir */ }
+      // skills/<name>/SKILL.md
+      for (const n of hubSkillNames()) {
+        const rel = 'skills/' + n + '/SKILL.md'
+        let size = 0, exists = false
+        try { const st = fs.statSync(path.join(hub, rel)); exists = st.isFile(); size = st.size } catch { /* noop */ }
+        files.push({ path: rel, group: 'skill', skill: n, size, exists })
+      }
+      // 本地 git 已改动（未提交）路径集合 → 给每个文件打 dirty（前端"只显示有改动"用）
+      const dirtySet = new Set()
+      try {
+        const st = await runGit(hub, ['status', '--porcelain'], 20000)
+        if (st.code === 0) {
+          for (const line of String(st.out).split('\n')) {
+            const p = line.trim().slice(2).trim() // " M path" → path
+            if (p) dirtySet.add(p.replace(/\\/g, '/'))
+          }
+        }
+      } catch { /* 非 git 仓库时忽略 */ }
+      for (const f of files) { f.dirty = dirtySet.has(f.path) ? 1 : 0 }
+      return send(200, { ok: true, files, total: files.length, writable: files.filter((f) => f.exists).length, dirty: [...dirtySet] })
+    }
+    if (method === 'GET' && routePath === '/hub/file') {
+      const rel = normHubPath(url.searchParams.get('path') || '')
+      if (!isSafeHubPath(rel)) return send(200, { ok: false, code: -1, text: '非法路径' })
+      // 白名单命中判断：配置组按全等；机器档案按前缀；技能按 <name>/SKILL.md
+      const inWhitelist = HUB_FILE_GROUPS.some((g) => g.paths.includes(rel))
+        || /^memory\/machines\/[^/]+\.md$/.test(rel)
+        || (rel.startsWith('skills/') && rel.endsWith('/SKILL.md'))
+      if (!inWhitelist) return send(200, { ok: false, code: -1, text: '该文件不在可查看/编辑范围' })
+      const abs = path.join(hub, rel)
+      if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) return send(200, { ok: false, code: -1, text: '文件不存在：' + rel })
+      let text = ''
+      try { text = fs.readFileSync(abs, 'utf8') } catch (e) { return send(200, { ok: false, code: -1, text: '读取失败: ' + String(e && e.message || e) }) }
+      const isJson = /\.json$/i.test(rel)
+      return send(200, { ok: true, path: rel, text, size: text.length, isJson })
+    }
+    if (method === 'POST' && routePath === '/hub/file') {
+      const body = await readJsonBody(req)
+      const rel = normHubPath(body.path)
+      const text = typeof body.text === 'string' ? body.text : null
+      if (!isSafeHubPath(rel)) return send(200, result(false, -1, '非法路径'))
+      if (text === null) return send(200, result(false, -1, 'text required'))
+      const inWhitelist = HUB_FILE_GROUPS.some((g) => g.paths.includes(rel))
+        || /^memory\/machines\/[^/]+\.md$/.test(rel)
+        || (rel.startsWith('skills/') && rel.endsWith('/SKILL.md'))
+      if (!inWhitelist) return send(200, result(false, -1, '该文件不可编辑'))
+      const abs = path.join(hub, rel)
+      if (fs.existsSync(abs) && !fs.statSync(abs).isFile()) return send(200, result(false, -1, '目标不是文件'))
+      // JSON 先校验：改坏了不让存（session-map.json 是典型）
+      if (/\.json$/i.test(rel)) {
+        try { JSON.parse(text) } catch (e) {
+          return send(200, result(false, -1, 'JSON 语法错误，已拒绝保存：' + String(e && e.message || e)))
+        }
+      }
+      // 内容没变就别提交空 commit
+      let old = ''
+      try { old = fs.readFileSync(abs, 'utf8') } catch { /* new file */ }
+      if (old === text) return send(200, { ok: true, code: 0, changed: false, text: '内容无变化，未提交。', path: rel })
+      // 归档旧版本（铁律：覆盖前先归档，绝不静默删）
+      let archived = ''
+      if (old) {
+        try {
+          const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)
+          const safeName = rel.replace(/\//g, '--')
+          const dst = path.join(hub, 'backups-archive', safeName + '--' + stamp + '.bak')
+          if (!fs.existsSync(path.join(hub, 'backups-archive'))) fs.mkdirSync(path.join(hub, 'backups-archive'), { recursive: true })
+          fs.writeFileSync(dst, old, 'utf8')
+          archived = dst
+        } catch { /* 归档失败不阻断编辑，但会在结果里说明 */ }
+      }
+      // 冲突保护：远端该文件若有别人的新提交，先拒绝，避免直接覆盖另一台的劳动成果
+      try {
+        const fetch = await runGit(hub, ['fetch', '--quiet'], 120000)
+        if (fetch.code === 0) {
+          const mine = await runGit(hub, ['log', '-1', '--format=%H', '--', rel], 30000)
+          const theirs = await runGit(hub, ['log', '-1', '--format=%H', 'origin/main', '--', rel], 30000)
+          const isNew = await runGit(hub, ['log', '-1', '--format=%H', 'HEAD', '--', rel], 30000)
+          if (mine.code === 0 && theirs.code === 0 && mine.out.trim() && theirs.out.trim()
+            && mine.out.trim() !== theirs.out.trim() && String(isNew.out).trim()) {
+            return send(200, result(false, -1, '另一台机器已修改过该文件。请先在「从云端拉取」里 git pull 合并，再保存，避免覆盖对方的改动。'))
+          }
+        }
+      } catch { /* fetch 失败不阻断（离线场景），保存照常 */ }
+      fs.writeFileSync(abs, text, 'utf8')
+      const add = await runGit(hub, ['add', '--', rel], 60000)
+      if (add.code !== 0) return send(200, result(false, -1, 'git add failed: ' + add.out))
+      const commit = await runGit(hub, ['commit', '-m', 'edit ' + rel], 60000)
+      if (commit.code !== 0) return send(200, result(false, -1, 'git commit failed: ' + commit.out))
+      return send(200, {
+        ok: true, code: 0, changed: true, path: rel,
+        text: '已保存到工作区并本地提交（未推送：请点「上传备份/推送」让另一台机器收到）。'
+          + (archived ? ' 旧版本已归档：' + path.basename(archived) : ''),
+      })
+    }
+    // ── 推送前智能自检（pre-flight）────────────────────────────────────
+    // 把「会推什么 + 远端是否该先拉 + 凭据是否在位 + 会话体积是否失控」合成一张
+    // 红黄绿灯清单，用户点一下就知道「这次同步该不该推、推什么」。
+    if (method === 'GET' && routePath === '/preflight') {
+      const cats = normalizeCategories(url.searchParams.get('categories') || '')
+      const checks = []
+      const add = (level, key, detail) => checks.push({ level, key, detail })
+      // 1) 预演：这次到底推什么
+      const pass2 = ['-DryRun'].concat(cats.length ? ['-What', cats.join(',')] : [])
+      const d = await runPs(hub, 'push.ps1', pass2, null, { timeoutMs: 300000 })
+      const files = []
+      let bytes = 0
+      for (const line of String(d.out).split(/\r?\n/)) {
+        const m = line.match(/^DRYRUN_FILE=(.+)$/)
+        if (m) { files.push(m[1].trim()); continue }
+        if (/^DRYRUN_BYTES=/.test(line)) bytes = Number(line.split('=')[1] || 0)
+      }
+      if (!files.length) {
+        add('pass', 'scope', '所选范围内没有可推送的改动')
+      } else {
+        const kb = bytes > 1024 ? (bytes / 1024).toFixed(1) + ' KB' : bytes + ' B'
+        add('pass', 'scope', '将推送 ' + files.length + ' 个文件（' + kb + '）')
+        if (bytes > 20 * 1024 * 1024) add('fail', 'size', '单次推送超过 20MB（' + kb + '）：Gitee 单文件上限 100MB，大块建议分批或缩小范围')
+        else if (bytes > 5 * 1024 * 1024) add('warn', 'size', '本次推送 ' + kb + '，偏大，确认网络稳定')
+        const sess = files.filter((f) => f.startsWith('session-backup/'))
+        if (sess.length) add('info', 'sessions', '含 ' + sess.length + ' 个会话备份文件（历史对话，体积大但只读）')
+      }
+      // 2) 远端是否领先（必须先 pull 再推，否则 rebase 冲突）
+      const behind = await runGit(hub, ['rev-list', '--count', 'HEAD..@{u}'], 20000)
+      const behindN = behind.code === 0 ? parseInt(behind.out.trim(), 10) || 0 : -1
+      if (behindN > 0) add('warn', 'behind', '远端领先 ' + behindN + ' 个提交：建议先「从云端拉取」，否则推送时要 rebase，可能撞冲突')
+      // 3) 凭据
+      const remoteRes = await runGit(hub, ['remote', 'get-url', 'origin'])
+      let host = 'gitee.com'
+      try { if (remoteRes.code === 0 && remoteRes.out.trim()) host = new URL(remoteRes.out.trim()).host } catch { /* default */ }
+      const probe = await probeGiteeCredential(host)
+      add(probe.ok ? 'pass' : 'fail', 'cred', probe.ok ? ('凭据在位（' + (probe.user || host) + '）') : '没有 Gitee 凭据：推送会失败，请先在概览里保存')
+      // 4) 本地未提交的越界改动（parking 会被 stash，推完再 pop）
+      const dirty = await runGit(hub, ['status', '--porcelain'])
+      const dirtyLines = dirty.code === 0 ? dirty.out.trim().split('\n').filter(Boolean) : []
+      const outside = dirtyLines.length
+      if (outside > 0) add('info', 'dirty', '另有 ' + outside + ' 个改动不在本次范围内（推送时自动暂存保护，推完还原）')
+      const worst = checks.some((c) => c.level === 'fail') ? 'fail' : (checks.some((c) => c.level === 'warn') ? 'warn' : 'pass')
+      return send(200, { ok: true, worst, checks, files, fileCount: files.length, bytes, categories: cats })
+    }
+    // ── 会话历史浏览（只读）──────────────────────────────────────────
+    // DSH 会话是「增量追写的多帧 zstd」：每帧独立，zstdDecompressSync 一次只能
+    // 解一帧，必须逐帧解压才能拿到全部消息。全程只读，绝不写回。
+    const decodeSessionFile = (abs) => {
+      let raw
+      try { raw = fs.readFileSync(abs) } catch { return '' }
+      const MAGIC = Buffer.from([0x28, 0xb5, 0x2f, 0xfd])
+      const chunks = []
+      let pos = 0
+      while (pos < raw.length) {
+        const idx = raw.indexOf(MAGIC, pos)
+        if (idx < 0) break
+        try {
+          chunks.push(zlib.zstdDecompressSync(raw.subarray(idx)))
+          pos = idx + 4
+          let next = raw.indexOf(MAGIC, pos)
+          while (next > 0) {
+            try { zlib.zstdDecompressSync(raw.subarray(next)); break } catch { next = raw.indexOf(MAGIC, next + 4) }
+          }
+          pos = next > 0 ? next : raw.length
+        } catch { pos = idx + 4 }
+      }
+      return Buffer.concat(chunks).toString('utf8')
+    }
+    // 把一段 JSONL 事件流收敛成「可读的消息列表」（用户/助手/工具/标题）
+    const summarizeSession = (text, limit) => {
+      const msgs = []
+      let title = ''
+      // 噪音过滤：system-reminder / 运行时上下文 / 技能目录等不是真人说的话
+      const isNoise = (s) => /^\s*<?\s*(system-reminder|Current runtime context|Time sampled|A skill is)/i.test(s)
+      const push = (role, body, time) => {
+        if (msgs.length >= limit) return
+        const clean = String(body || '').replace(/\s+/g, ' ').trim()
+        if (clean && !isNoise(clean)) msgs.push({ role, text: clean.slice(0, 300), time: time || 0 })
+      }
+      for (const line of text.split('\n')) {
+        if (!line) continue
+        let j = null
+        try { j = JSON.parse(line) } catch { continue }
+        const d = j.data || {}
+        if (j.type === 'session/title' && !title && d.title) title = String(d.title).trim()
+        else if (j.type === 'user/message' && Array.isArray(d.content)) {
+          push('user', d.content.map((c) => c.text || '').join(' '), j.time)
+        } else if (j.type === 'assistant/message' && d.message && Array.isArray(d.message.content)) {
+          const t2 = d.message.content.filter((c) => c.type === 'text').map((c) => c.text || '').join(' ')
+          const tools = d.message.content.filter((c) => c.type === 'tool-call').map((c) => c.name).join(',')
+          push('assistant', t2 || (tools ? '（调用工具：' + tools + '）' : ''), j.time)
+        }
+      }
+      return { title, msgs }
+    }
+    if (method === 'GET' && routePath === '/sessions/browse') {
+      const machine = (url.searchParams.get('machine') || '').trim()
+      const sid = (url.searchParams.get('id') || '').trim()
+      const limit = Math.min(Math.max(Number(url.searchParams.get('limit')) || 40, 1), 200)
+      const base = path.join(hub, 'session-backup')
+      // 机器列表
+      const machines = []
+      try {
+        for (const e of fs.readdirSync(base, { withFileTypes: true })) {
+          if (!e.isDirectory()) continue
+          machines.push(e.name)
+        }
+      } catch { /* no session backups yet */ }
+      // 指定会话 -> 解压并摘要（只读）
+      if (sid) {
+        if (/[\\/]|\.\./.test(sid) || !/^[\w.-]+$/.test(sid)) return send(200, { ok: false, code: -1, text: 'invalid session id' })
+        const m = machine && machines.includes(machine) ? machine : machines[0]
+        if (!m) return send(200, { ok: false, code: -1, text: 'no session backups found' })
+        let found = ''
+        try {
+          for (const w of fs.readdirSync(path.join(base, m), { withFileTypes: true })) {
+            if (!w.isDirectory()) continue
+            const f = path.join(base, m, w.name, sid, 'session.v4.jsonl.zstd')
+            if (fs.existsSync(f)) { found = f; break }
+          }
+        } catch { /* noop */ }
+        if (!found) return send(200, { ok: false, code: -1, text: 'session not found: ' + sid })
+        const text = decodeSessionFile(found)
+        if (!text) return send(200, { ok: false, code: -1, text: 'cannot decode session file' })
+        const { title, msgs } = summarizeSession(text, limit)
+        return send(200, { ok: true, machine: m, id: sid, title, msgs, bytes: text.length })
+      }
+      // 否则列出某个机器的会话（按工作区分组）
+      const m = machine && machines.includes(machine) ? machine : machines[0]
+      const groups = []
+      if (m) {
+        try {
+          for (const w of fs.readdirSync(path.join(base, m), { withFileTypes: true })) {
+            if (!w.isDirectory()) continue
+            const sessions = []
+            for (const s of fs.readdirSync(path.join(base, m, w.name), { withFileTypes: true })) {
+              if (!s.isDirectory()) continue
+              const f = path.join(base, m, w.name, s.name, 'session.v4.jsonl.zstd')
+              if (!fs.existsSync(f)) continue
+              const st = fs.statSync(f)
+              // 只解压元数据行拿标题：解压后取第一行 session + 首个 title，成本可控
+              let title = ''
+              try {
+                const text = decodeSessionFile(f).slice(0, 200000)
+                const hit = summarizeSession(text, 1)
+                title = hit.title
+                if (!title) {
+                  const firstUser = hit.msgs.find((x) => x.role === 'user')
+                  if (firstUser) title = firstUser.text.slice(0, 40)
+                }
+              } catch { /* skip */ }
+              sessions.push({ id: s.name, title: title || s.name, bytes: st.size, mtime: st.mtimeMs })
+            }
+            groups.push({ workspace: w.name, sessions })
+          }
+        } catch { /* noop */ }
+      }
+      return send(200, { ok: true, machines, machine: m, groups })
     }
     // list local session workspaces (for the session multi-select dropdowns)
     if (method === 'GET' && routePath === '/sessions/list') {
