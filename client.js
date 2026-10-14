@@ -60,6 +60,9 @@ window.__ModuleLoader__.load({
         'ov.holderNote': '占位 {n}',
         'ov.skillsEqual': '两边一致',
         'ov.skillsDiff': '两边差 {n} 个',
+        'ov.none': '无',
+        'ov.localNA': '本机侧暂不可用',
+        'ov.stale': '⚠ 后端字段缺失（{fields}）—— 插件刚更新过、DSH 还没重启。请完全退出并重开 DSH 后再看。',
         'ov.clean': '干净',
         'ov.dirty': '{n} 个改动待提交',
         'ov.health': '健康检查',
@@ -371,6 +374,9 @@ window.__ModuleLoader__.load({
         'ov.holderNote': '{n} placeholder',
         'ov.skillsEqual': 'in agreement',
         'ov.skillsDiff': 'differ by {n}',
+        'ov.none': 'none',
+        'ov.localNA': 'local side unavailable',
+        'ov.stale': '⚠ Backend fields missing ({fields}) — the plugin was updated but DSH has not been restarted. Quit DSH fully and reopen it.',
         'ov.clean': 'clean',
         'ov.dirty': '{n} pending change(s)',
         'ov.health': 'Health',
@@ -1234,30 +1240,43 @@ window.__ModuleLoader__.load({
           preflight.fileCount ? h('p', { style: { ...S.hint, opacity: 0.7 } }, t('pf.summary', { n: preflight.fileCount, size: preflight.bytes > 1048576 ? (preflight.bytes / 1048576).toFixed(1) + ' MB' : (preflight.bytes / 1024).toFixed(1) + ' KB' })) : null) : null,
         h(Card, { key: 'kv' },
           h('p', { style: S.hint }, t('ov.guide')),
+          // 后端字段缺失检测：新前端 + 旧后端（DSH 未重启）时会缺字段。
+          // 不检测就会显示 "?" 和"差 49 个"这类假数据，看着像出故障。
+          (() => {
+            const need = ['machineId', 'profile', 'node', 'localSkills', 'skillsShell']
+            const miss = need.filter((k) => info[k] === undefined || info[k] === null)
+            if (!miss.length) return null
+            return h('p', { style: { ...S.hint, color: '#d29922', margin: 0 } },
+              t('ov.stale', { fields: miss.join(', ') }))
+          })(),
           h('div', { style: S.kv },
             h(KV, { k: t('ov.version'), v: 'v' + (info.version || '?') }),
             h(KV, { k: t('ov.machine'), v: (info.machine || '?') + (info.platform ? '   ·   ' + info.platform : '') }),
-            h(KV, { k: t('ov.machineId'), v: info.machineId || t('ov.skillsNone') }),
-            h(KV, { k: t('ov.profile'), v: info.profile || '?' }),
+            h(KV, { k: t('ov.machineId'), v: info.machineId || t('ov.none') }),
+            h(KV, { k: t('ov.profile'), v: info.profile || t('ov.none') }),
             h(KV, { k: t('ov.hubPath'), v: info.hubPath || '?' }),
-            h(KV, { k: t('ov.runtime'), v: 'Node ' + (info.node || '?') }),
+            h(KV, { k: t('ov.runtime'), v: info.node ? 'Node ' + info.node : t('ov.none') }),
             h(KV, { k: t('ov.commit'), v: [info.commit, info.commitDate, info.commitSubject].filter(Boolean).join('  ') }),
             h(KV, {
               k: t('ov.skills'),
               v: (() => {
                 // 说清三个数各是什么，避免"51 / 52 / 47 对不上"的困惑：
                 // 真技能=有 SKILL.md；空壳=删剩的目录；占位=skillhub 的 @xxx 命名空间
-                const hubN = info.skills ?? '?'
-                const locN = info.localSkills ?? '?'
+                const hubN = info.skills
+                const locN = info.localSkills
+                // 本机侧数据缺失（旧后端）时，只报中枢数并说明，绝不拿 undefined 算差值
+                if (locN === undefined || locN === null) {
+                  return t('ov.skillsHub') + ' ' + (hubN ?? '?') + '   ·   ' + t('ov.localNA')
+                }
                 const hubExtra = []
                 if (info.skillsShell) hubExtra.push(t('ov.shellNote', { n: info.skillsShell }))
                 const locExtra = []
                 if (info.localPlaceholder) locExtra.push(t('ov.holderNote', { n: info.localPlaceholder }))
                 if (info.localShell) locExtra.push(t('ov.shellNote', { n: info.localShell }))
-                const same = (info.skills != null && info.localSkills != null && info.skills === info.localSkills)
+                const same = (hubN != null && hubN === locN)
                 return t('ov.skillsHub') + ' ' + hubN + (hubExtra.length ? '（' + hubExtra.join(' · ') + '）' : '')
                   + '   ·   ' + t('ov.skillsLocal') + ' ' + locN + (locExtra.length ? '（' + locExtra.join(' · ') + '）' : '')
-                  + '   ·   ' + (same ? t('ov.skillsEqual') : t('ov.skillsDiff', { n: Math.abs((info.skills || 0) - (info.localSkills || 0)) }))
+                  + '   ·   ' + (same ? t('ov.skillsEqual') : t('ov.skillsDiff', { n: Math.abs((hubN || 0) - (locN || 0)) }))
               })(),
             }),
             h(KV, { k: t('ov.tree'), v: (info.dirty === 0 ? t('ov.clean') : t('ov.dirty', { n: info.dirty })) + (info.ahead > 0 ? '   ·   ' + t('ov.ahead', { n: info.ahead }) : '') + (info.behind > 0 ? '   ·   ' + t('ov.behind', { n: info.behind }) : '') }),
