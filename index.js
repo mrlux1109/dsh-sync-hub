@@ -1137,6 +1137,53 @@ async function apiHandler(req, res, config) {
           + (archived ? ' 旧版本已归档：' + path.basename(archived) : ''),
       })
     }
+    // ── 检查 / 应用中枢更新（卡片上的「检查更新」「立即更新」）────────────
+    // 单一真相源 = tools/update.ps1，菜单 [24] 走同一个脚本，行为不会漂移。
+    if (method === 'GET' && routePath === '/update/check') {
+      const r = await runPs(hub, 'update.ps1', ['-Check', '-Json'], null, { timeoutMs: 120000 })
+      let info = null
+      try {
+        const txt = String(r.out)
+        const s = txt.indexOf('{')
+        const e = txt.lastIndexOf('}')
+        if (s >= 0 && e > s) info = JSON.parse(txt.slice(s, e + 1))
+      } catch { /* fall through to the raw text below */ }
+      if (!info) {
+        return send(200, result(false, r.code === 0 ? 0 : r.code, tail(r.out, 4000) || '检查更新失败'))
+      }
+      return send(200, {
+        ok: true, code: 0,
+        localVersion: info.localVersion, remoteVersion: info.remoteVersion,
+        behind: info.behind, ahead: info.ahead, dirty: info.dirty,
+        remoteSubject: info.remoteSubject, remoteCommit: info.remoteCommit,
+        text: info.text,
+      })
+    }
+    if (method === 'POST' && routePath === '/update/apply') {
+      const body = await readJsonBody(req).catch(() => ({}))
+      const args = ['-Force', '-Json']
+      if (body && body.force === false) args.splice(0, 1)
+      const r = await runPs(hub, 'update.ps1', args, null, { timeoutMs: 600000 })
+      let info = null
+      try {
+        const txt = String(r.out)
+        const s = txt.indexOf('{')
+        const e = txt.lastIndexOf('}')
+        if (s >= 0 && e > s) info = JSON.parse(txt.slice(s, e + 1))
+      } catch { /* fall through */ }
+      if (!info) {
+        return send(200, result(false, r.code === 0 ? 0 : r.code, tail(r.out, 4000) || '更新失败'))
+      }
+      const needRestart = !!info.restartNeeded
+      return send(200, {
+        ok: info.ok !== false, code: 0,
+        action: info.action, text: info.text,
+        localVersion: info.localVersion, remoteVersion: info.remoteVersion,
+        behind: info.behind, pluginUpdated: info.pluginUpdated,
+        restartNeeded: needRestart, notes: info.notes || [],
+        raw: tail(r.out, 2000),
+      })
+    }
     // ── 推送前智能自检（pre-flight）────────────────────────────────────
     // 把「会推什么 + 远端是否该先拉 + 凭据是否在位 + 会话体积是否失控」合成一张
     // 红黄绿灯清单，用户点一下就知道「这次同步该不该推、推什么」。

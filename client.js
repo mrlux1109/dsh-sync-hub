@@ -42,7 +42,10 @@ window.__ModuleLoader__.load({
         retry: '重试',
         error: '连接失败：{e}',
         state: { pass: '正常', warn: '注意', fail: '异常', info: '信息' },
-        tab: { overview: '概览', sync: '同步', files: '云端文件', backup: '备份', skills: '技能', plugins: '插件', tools: '工具链', settings: '设置' },
+        tab: { overview: '概览', sync: '同步', backup: '备份', skills: '技能', plugins: '插件', system: '系统' },
+        'sys.grpTools': '▸ 工具链与体检',
+        'sys.grpFiles': '▸ 云端文件（记忆 · 配置 · 技能正文）',
+        'sys.grpSettings': '▸ 设置与接入',
 
         'ov.version': '版本',
         'ov.commit': '最新提交',
@@ -63,6 +66,18 @@ window.__ModuleLoader__.load({
         'ov.none': '无',
         'ov.localNA': '本机侧暂不可用',
         'ov.stale': '⚠ 后端字段缺失（{fields}）—— 插件刚更新过、DSH 还没重启。请完全退出并重开 DSH 后再看。',
+        'upd.title': '中枢更新',
+        'upd.check': '检查更新',
+        'upd.apply': '立即更新',
+        'upd.upToDate': '已是最新（v{ver}）',
+        'upd.available': '发现新版本：v{from} → v{to}（落后 {n} 个提交）',
+        'upd.newest': '最新提交：{subject}',
+        'upd.dirtyWarn': '本机有 {n} 个未提交改动，更新时会自动暂存并在拉取后恢复。',
+        'upd.updated': '已更新到 v{ver}（{n} 个提交）',
+        'upd.pluginRedeployed': '插件副本已重新部署',
+        'upd.needRestart': '请完全退出并重开 DSH，新版本才会生效。',
+        'upd.checking': '正在检查…',
+        'upd.applying': '正在更新（拉取 + 重新部署插件）…',
         'ov.clean': '干净',
         'ov.dirty': '{n} 个改动待提交',
         'ov.health': '健康检查',
@@ -262,6 +277,7 @@ window.__ModuleLoader__.load({
         'ov.stateDirtyWhy': '未提交的文件：',
         'ov.stateHint': '这些改动还没进 git，所以另一台机器收不到。点「一键同步」即可提交并推送。',
         'ov.stateIdle': '工作区干净，与远端一致。',
+        'ov.goSync': '去「同步」页操作 →',
         'act.syncNow': '一键同步',
         'act.syncPreview': '预演将推送什么',
         'act.pullNow': '从云端拉取',
@@ -356,7 +372,10 @@ window.__ModuleLoader__.load({
         retry: 'Retry',
         error: 'Connection failed: {e}',
         state: { pass: 'OK', warn: 'Warning', fail: 'Failed', info: 'Info' },
-        tab: { overview: 'Overview', sync: 'Sync', files: 'Cloud files', backup: 'Backup', skills: 'Skills', plugins: 'Plugins', tools: 'Toolchain', settings: 'Settings' },
+        tab: { overview: 'Overview', sync: 'Sync', backup: 'Backup', skills: 'Skills', plugins: 'Plugins', system: 'System' },
+        'sys.grpTools': '▸ Toolchain & health',
+        'sys.grpFiles': '▸ Cloud files (memory · config · skill text)',
+        'sys.grpSettings': '▸ Settings & onboarding',
 
         'ov.version': 'Version',
         'ov.commit': 'Last commit',
@@ -377,6 +396,18 @@ window.__ModuleLoader__.load({
         'ov.none': 'none',
         'ov.localNA': 'local side unavailable',
         'ov.stale': '⚠ Backend fields missing ({fields}) — the plugin was updated but DSH has not been restarted. Quit DSH fully and reopen it.',
+        'upd.title': 'Hub update',
+        'upd.check': 'Check for updates',
+        'upd.apply': 'Update now',
+        'upd.upToDate': 'Up to date (v{ver})',
+        'upd.available': 'Update available: v{from} → v{to} ({n} commits behind)',
+        'upd.newest': 'Newest commit: {subject}',
+        'upd.dirtyWarn': '{n} uncommitted change(s) here — they will be stashed during the update and restored afterwards.',
+        'upd.updated': 'Updated to v{ver} ({n} commits)',
+        'upd.pluginRedeployed': 'Plugin copy redeployed',
+        'upd.needRestart': 'Quit DSH fully and reopen it for the new version to take effect.',
+        'upd.checking': 'Checking…',
+        'upd.applying': 'Updating (pull + redeploy plugin)…',
         'ov.clean': 'clean',
         'ov.dirty': '{n} pending change(s)',
         'ov.health': 'Health',
@@ -576,6 +607,7 @@ window.__ModuleLoader__.load({
         'ov.stateDirtyWhy': 'Uncommitted files: ',
         'ov.stateHint': 'These edits are not in git yet, so the other machine cannot see them. Click One-tap sync to commit and push.',
         'ov.stateIdle': 'Working tree clean and in sync with the remote.',
+        'ov.goSync': 'Go to the Sync tab →',
         'act.syncNow': 'One-tap sync',
         'act.syncPreview': 'Preview push',
         'act.pullNow': 'Pull from cloud',
@@ -713,9 +745,14 @@ window.__ModuleLoader__.load({
       listRow: { display: 'flex', gap: '0.5rem', alignItems: 'center', fontSize: '0.76rem', padding: '0.3rem 0.45rem', borderRadius: '0.4rem', background: 'var(--color-surface, rgba(128,128,128,0.05))' },
       pre: { margin: 0, padding: '0.55rem', borderRadius: '0.45rem', fontSize: '0.7rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: '16rem', overflow: 'auto', background: 'var(--color-surface, rgba(128,128,128,0.07))', border: '1px solid var(--color-border, rgba(128,128,128,0.2))', fontFamily: 'ui-monospace, Consolas, monospace' },
       miniBtn: { padding: '0.18rem 0.55rem', borderRadius: '0.4rem', fontSize: '0.7rem', border: '1px solid var(--color-border, rgba(128,128,128,0.3))', background: 'var(--color-surface, rgba(128,128,128,0.07))', color: 'inherit', cursor: 'pointer' },
+      // 合并页的分组标题（系统页把工具链/云端文件/设置三组隔开）
+      groupHead: { fontSize: '0.8rem', fontWeight: 600, opacity: 0.8, margin: '0.2rem 0 0', paddingTop: '0.5rem', borderTop: '1px solid var(--color-border, rgba(128,128,128,0.22))' },
     }
 
-    const TABS = ['overview', 'sync', 'files', 'backup', 'skills', 'plugins', 'tools', 'settings']
+    // 方案 A（2026-10-14 老大定）：8 tab -> 6 tab，去重 + 合并低频页
+    //   概览 只展示状态（同步动作按钮挪去「同步」）
+    //   系统 = 工具链 + 云端文件 + 设置（三者都是"偶尔用一次"）
+    const TABS = ['overview', 'sync', 'backup', 'skills', 'plugins', 'system']
 
     // ── 同步预设（自定义的核心）──────────────────────────────────────────
     // 内置四组默认；可改默认组合并存 localStorage（多机器各自持有，不入 git）。
@@ -834,6 +871,9 @@ window.__ModuleLoader__.load({
       const [plQuery, setPlQuery] = useState('')
       const [outdated, setOutdated] = useState(undefined)
       const [plSpec, setPlSpec] = useState(undefined)
+      // 中枢自身更新（检查 / 应用）
+      const [updInfo, setUpdInfo] = useState(undefined)
+      const [updMsg, setUpdMsg] = useState('')
       // hub files tab (cloud viewer/editor): 多 Tab 编辑 + 搜索 + 分组筛选
       const [hubFilesList, setHubFilesList] = useState(undefined)
       // 多 Tab：每个元素 { path, text, baseline }；active = 当前编辑的 path
@@ -1061,6 +1101,42 @@ window.__ModuleLoader__.load({
               if (r.ok) { await run('plSpec', key); await run('plRefresh', 'plRefresh') }
               break
             }
+            // ── 中枢自身更新 ────────────────────────────────────────────
+            case 'goSync': {
+              // 概览页只展示状态；动作统一在「同步」页（方案 A 去重）
+              setTab('sync')
+              r = { text: '' }
+              break
+            }
+            case 'updCheck': {
+              setUpdMsg(t('upd.checking'))
+              const u = await api('/update/check', { timeout: 180000 })
+              setUpdInfo(u)
+              setUpdMsg('')
+              if (!u.ok) { r = { text: u.text || 'check failed' }; break }
+              const behind = Number(u.behind || 0)
+              r = {
+                text: behind > 0
+                  ? t('upd.available', { from: u.localVersion, to: u.remoteVersion, n: behind })
+                  : t('upd.upToDate', { ver: u.localVersion }),
+              }
+              break
+            }
+            case 'updApply': {
+              setUpdMsg(t('upd.applying'))
+              const u = await post('/update/apply', { force: true }, 900000)
+              setUpdInfo(u)
+              setUpdMsg('')
+              if (!u.ok) { r = { text: u.text || 'update failed' }; break }
+              const n = Number(u.behind || 0)
+              r = {
+                text: u.action === 'updated'
+                  ? t('upd.updated', { ver: u.localVersion, n })
+                  : t('upd.upToDate', { ver: u.localVersion }),
+                restart: !!u.restartNeeded,
+              }
+              break
+            }
             // ── 云端文件（查看/编辑）────────────────────────────────────
             case 'hubRefresh': {
               const l = await api('/hub/files', { timeout: 60000 })
@@ -1211,6 +1287,8 @@ window.__ModuleLoader__.load({
       const overviewTab = [
         // 真实状态条：老代码只比 HEAD vs origin，没看工作区，
         // 曾出现"完全同步"绿条却带着 5 个未提交文件。这里把三态分开说清。
+        // 方案 A：概览只负责「看清状态」，同步动作按钮统一在「同步」页，
+        // 这里只留一个跳转提示，消除与同步页的重复。
         ((info.dirty && info.dirty > 0) || (info.ahead && info.ahead > 0) || (info.behind && info.behind > 0))
           ? h(Card, { key: 'syncstate', level: 'warn' },
             h('p', { style: { ...S.hint, margin: 0, fontWeight: 600 } },
@@ -1223,21 +1301,33 @@ window.__ModuleLoader__.load({
               t('ov.stateDirtyWhy') + '  ' + (info.dirtyFiles || []).join('  ·  ')) : null,
             h('p', { style: { ...S.hint, opacity: 0.75, margin: 0 } }, t('ov.stateHint')),
             h('div', { style: S.row },
-              h(Btn, { label: t('act.syncNow'), kind: 'syncNow', out: 'syncNow', primary: true }),
-              h(Btn, { label: t('act.syncPreview'), kind: 'syncPreview', out: 'syncPreview' }),
-              h(Btn, { label: t('act.pullNow'), kind: 'pullNow', out: 'pullNow' }),
-              h(Btn, { label: t('act.preflight'), kind: 'preflight', out: 'preflight' })),
-            h(Result, { k: 'syncNow', restart: true }), h(Result, { k: 'syncPreview' }), h(Result, { k: 'pullNow', restart: true }))
+              h(Btn, { label: t('ov.goSync'), kind: 'goSync' })))
           : h(Card, { key: 'syncstate', level: 'pass' },
             h('p', { style: { ...S.hint, ...S.ok, margin: 0 } }, t('ov.stateIdle')),
             h('div', { style: S.row },
-              h(Btn, { label: t('act.syncPreview'), kind: 'syncPreview', out: 'syncPreview' }))),
+              h(Btn, { label: t('ov.goSync'), kind: 'goSync' }))),
         preflight && preflight.checks ? h(Card, { key: 'pf', title: t('pf.title'), level: preflight.worst === 'fail' ? 'fail' : (preflight.worst === 'warn' ? 'warn' : 'pass') },
           h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.2rem' } },
             ...preflight.checks.map((c, ci) => h('div', { key: ci, style: { ...S.listRow, alignItems: 'flex-start' } },
               h(Dot, { level: c.level === 'fail' ? 'fail' : (c.level === 'warn' ? 'warn' : (c.level === 'info' ? 'info' : 'pass')) }),
               h('span', { style: { flex: 1, whiteSpace: 'pre-wrap' } }, t('pf.' + c.key) + '：' + c.detail)))),
           preflight.fileCount ? h('p', { style: { ...S.hint, opacity: 0.7 } }, t('pf.summary', { n: preflight.fileCount, size: preflight.bytes > 1048576 ? (preflight.bytes / 1048576).toFixed(1) + ' MB' : (preflight.bytes / 1024).toFixed(1) + ' KB' })) : null) : null,
+        // ── 中枢自身更新（检查 + 一键更新）────────────────────────────
+        h(Card, { key: 'upd', title: t('upd.title'),
+          level: updInfo && Number(updInfo.behind) > 0 ? 'warn' : (updInfo ? 'pass' : undefined) },
+          h('p', { style: S.hint },
+            updInfo && Number(updInfo.behind) > 0
+              ? t('upd.available', { from: updInfo.localVersion, to: updInfo.remoteVersion, n: updInfo.behind })
+              : (updInfo ? t('upd.upToDate', { ver: updInfo.localVersion }) : t('upd.title') + '：' + t('upd.check'))),
+          updInfo && updInfo.remoteSubject ? h('p', { style: { ...S.hint, opacity: 0.7, margin: 0 } }, t('upd.newest', { subject: updInfo.remoteSubject })) : null,
+          updInfo && Number(updInfo.dirty) > 0 ? h('p', { style: { ...S.hint, color: '#d29922', margin: 0 } }, t('upd.dirtyWarn', { n: updInfo.dirty })) : null,
+          updMsg ? h('p', { style: { ...S.hint, color: '#d29922', margin: 0 } }, updMsg) : null,
+          h('div', { style: S.row },
+            h(Btn, { label: t('upd.check'), kind: 'updCheck', out: 'upd', primary: !(updInfo && Number(updInfo.behind) > 0) }),
+            (updInfo && Number(updInfo.behind) > 0)
+              ? h(Btn, { label: t('upd.apply'), kind: 'updApply', out: 'upd', primary: true })
+              : null),
+          h(Result, { k: 'upd', restart: true })),
         h(Card, { key: 'kv' },
           h('p', { style: S.hint }, t('ov.guide')),
           // 后端字段缺失检测：新前端 + 旧后端（DSH 未重启）时会缺字段。
@@ -1973,14 +2063,22 @@ window.__ModuleLoader__.load({
           h(Result, { k: 'sch' })),
       ]
 
+      // 系统页 = 工具链 + 云端文件 + 设置（三组，用分隔标题区分，避免 8 个顶级 tab）
+      const systemTab = [
+        h('div', { key: 'sys-h1', style: S.groupHead }, t('sys.grpTools')),
+        ...toolsTab,
+        h('div', { key: 'sys-h2', style: S.groupHead }, t('sys.grpFiles')),
+        ...filesTab,
+        h('div', { key: 'sys-h3', style: S.groupHead }, t('sys.grpSettings')),
+        ...settingsTab,
+      ]
+
       const body = tab === 'overview' ? overviewTab
         : tab === 'sync' ? syncTab
-        : tab === 'files' ? filesTab
         : tab === 'backup' ? backupTab
         : tab === 'skills' ? skillsTab
         : tab === 'plugins' ? pluginsTab
-        : tab === 'tools' ? toolsTab
-        : settingsTab
+        : systemTab
 
       if (err) {
         return shell(h(Card, { title: t('error', { e: err }), level: 'fail' },
