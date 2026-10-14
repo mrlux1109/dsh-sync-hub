@@ -120,6 +120,18 @@ window.__ModuleLoader__.load({
       'ob.cloned': '克隆完成：{p}。面板已就绪。',
       'ob.explain': '判定标准：目录里有 VERSION 和 tools/ 两个条目即视为中枢。默认仓库地址是作者的 Gitee 模板，可在克隆时换成你自己的私有仓库地址（在输入框填目标目录，克隆动作会用默认地址；私有仓库请先用终端 git clone 一次建立凭据，再点「使用这个目录」）。',
 
+      // 记忆·配置页（白名单编辑器）
+      'mm.title': '记忆·配置（云端白名单编辑）',
+      'mm.hint': '左侧是中枢里可编辑的白名单文件。保存 = 写中枢 + 本地提交（不自动推送）；JSON 先校验语法；旧版本自动归档；另一台改过同一文件会拒绝保存并提示先拉取。',
+      'mm.search': '搜索文件名…',
+      'mm.pick': '从左侧选一个文件开始编辑。',
+      'mm.close': '关闭此标签',
+      'mm.save': '保存',
+      'mm.saved': '已保存 {p}',
+      'mm.archived': '旧版本已归档：{n}',
+      'mm.staleHint': '处理方法：到「同步」页拉取最新内容，再回到本页重新打开该文件编辑。',
+      'mm.saveNote': '保存只提交到本地中枢仓库；要让另一台收到，请到「同步」页推送。',
+
       // 同步
       'sync.scope': '推送范围',
       'sync.scopeHint': '日常用「全部」即可；只改了一类就只选那一类，推得更快。',
@@ -304,6 +316,18 @@ window.__ModuleLoader__.load({
       'ob.savedButIncomplete': 'Path remembered: {p}. That directory is not a complete hub yet (missing VERSION or tools/) — features degrade until you fill it in.',
       'ob.cloned': 'Cloned: {p}. Panel is ready.',
       'ob.explain': 'A directory counts as a hub when it contains VERSION and tools/. The default clone address is the author\'s Gitee template; for your own private repo, git clone once in a terminal to establish credentials, then click "Use this directory".',
+
+      // Memory · Config page (whitelist editor)
+      'mm.title': 'Memory · Config (whitelist editing)',
+      'mm.hint': 'Left: whitelist files editable in the hub. Save = write hub + local commit (no auto push); JSON is syntax-checked first; the previous version is archived; saving is refused when the other machine changed the file (pull first).',
+      'mm.search': 'Search files…',
+      'mm.pick': 'Pick a file on the left to start editing.',
+      'mm.close': 'Close tab',
+      'mm.save': 'Save',
+      'mm.saved': 'Saved {p}',
+      'mm.archived': 'Previous version archived: {n}',
+      'mm.staleHint': 'Fix: pull the latest on the Sync page, then reopen the file here.',
+      'mm.saveNote': 'Saving commits to your local hub only; push from the Sync page for the other machine to receive it.',
       'sync.scope': 'Push scope',
       'sync.scopeHint': 'Use "All" for daily sync; pick one category when that is all you changed.',
       'sync.all': 'All',
@@ -1542,7 +1566,202 @@ window.__ModuleLoader__.load({
       )
     }
 
-    // ─────────────────── 施工页（记忆·配置，M6b） ───────────────────
+    // ─────────────────── 记忆·配置页（白名单编辑器） ───────────────────
+
+    /**
+     * 记忆·配置页：左侧白名单文件列表（按组），右侧多标签编辑。
+     *
+     * 宿主守卫（lib/hub/memory.js）：白名单硬闸 / JSON 先校验 / 保存前归档 /
+     * 基线不一致拒保存（另一台改过）/ 本地 commit 不推送。
+     *
+     * @param {object} p { t, data, onRefresh }
+     */
+    function MemoryPage({ t, data, onRefresh }) {
+      const [files, setFiles] = useState(null)
+      const [error, setError] = useState(null)
+      const [tabs, setTabs] = useState([]) // [{path, content, baseSha, dirty, loading}]
+      const [activeTab, setActiveTab] = useState(null)
+      const [busy, setBusy] = useState(null)
+      const [note, setNote] = useState(null)
+      const [filter, setFilter] = useState('')
+
+      const load = useCallback(async () => {
+        setError(null)
+        const r = await apiGet('/memory')
+        if (!r.ok) { setError(r.error); return }
+        setFiles(r.files)
+      }, [])
+      useEffect(() => { load() }, [load])
+
+      const openFile = async (path) => {
+        const existing = tabs.find((x) => x.path === path)
+        if (existing) { setActiveTab(path); return }
+        setBusy('read')
+        const r = await apiPost('/memory', { action: 'read', path })
+        setBusy(null)
+        if (!r.ok) { setNote({ tone: 'error', text: r.error }); return }
+        setTabs((prev) => [...prev, { path, content: r.content, baseSha: r.sha, dirty: false, group: r.group }])
+        setActiveTab(path)
+      }
+
+      const closeTab = (path) => {
+        setTabs((prev) => prev.filter((x) => x.path !== path))
+        if (activeTab === path) {
+          const rest = tabs.filter((x) => x.path !== path)
+          setActiveTab(rest.length ? rest[rest.length - 1].path : null)
+        }
+      }
+
+      const edit = (value) => {
+        setTabs((prev) => prev.map((x) => (x.path === activeTab ? { ...x, content: value, dirty: true } : x)))
+      }
+
+      const save = async () => {
+        const tab = tabs.find((x) => x.path === activeTab)
+        if (!tab) return
+        setBusy('save')
+        setNote(null)
+        const r = await apiPost('/memory', {
+          action: 'save', path: tab.path, content: tab.content, baseSha: tab.baseSha,
+        })
+        setBusy(null)
+        if (!r.ok) {
+          setNote({ tone: 'error', text: r.error + (r.hint === 'stale-baseline' ? `\n${t('mm.staleHint')}` : '') })
+          return
+        }
+        setTabs((prev) => prev.map((x) => (x.path === tab.path ? { ...x, dirty: false, baseSha: undefined } : x)))
+        setNote({
+          tone: 'success',
+          text: t('mm.saved', { p: r.path }) + (r.commit ? `（${r.commit}）` : '') + (r.warning ? `\n${r.warning}` : '') + (r.archived ? `\n${t('mm.archived', { n: r.archived })}` : ''),
+        })
+        load()
+        onRefresh()
+      }
+
+      const groups = useMemo(() => {
+        const q = filter.trim().toLowerCase()
+        const map = new Map()
+        for (const f of files ?? []) {
+          if (q && !f.path.toLowerCase().includes(q)) continue
+          if (!map.has(f.group)) map.set(f.group, [])
+          map.get(f.group).push(f)
+        }
+        return map
+      }, [files, filter])
+
+      const tab = tabs.find((x) => x.path === activeTab) ?? null
+
+      return h('div', null,
+        h(Card, {
+          title: t('mm.title'), hint: t('mm.hint'),
+          right: h(ActionButton, { label: t('refresh'), small: true, onClick: load }),
+        },
+          error ? h(InlineNote, { tone: 'error' }, t('error', { e: error })) : null,
+          h(InlineNote, { tone: note?.tone }, note?.text),
+        ),
+
+        h('div', { style: { display: 'flex', gap: 12, alignItems: 'flex-start' } },
+          // 左：文件列表
+          h('div', {
+            style: {
+              flex: '0 0 260px', border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.08))',
+              borderRadius: 10, padding: 8, maxHeight: 480, overflow: 'auto',
+            },
+          },
+            h('input', {
+              value: filter,
+              onChange: (e) => setFilter(e.target.value),
+              placeholder: t('mm.search'),
+              style: {
+                width: '100%', boxSizing: 'border-box', padding: '6px 8px', marginBottom: 8,
+                fontSize: 12, borderRadius: 6,
+                border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.12))',
+                background: 'var(--dsw-alias-bg-base, transparent)', color: 'inherit',
+              },
+            }),
+            !files
+              ? h(Empty, null, t('loading'))
+              : [...groups.entries()].map(([group, list]) => h('div', { key: group, style: { marginBottom: 8 } },
+                h('div', { style: { fontSize: 11, opacity: 0.5, marginBottom: 3 } }, `${group} · ${list.length}`),
+                list.map((f) => h('div', {
+                  key: f.path,
+                  onClick: () => openFile(f.path),
+                  style: {
+                    fontSize: 12, padding: '4px 6px', borderRadius: 6, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    background: activeTab === f.path ? 'var(--dsw-alias-bg-fill-subtle, rgba(0,0,0,0.05))' : 'transparent',
+                  },
+                },
+                  f.dirty ? h(Dot, { level: 'warn' }) : null,
+                  h('span', {
+                    style: {
+                      flex: '1 1 auto', fontFamily: 'ui-monospace, monospace',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    },
+                    title: f.path,
+                  }, f.path.split('/').slice(-1)[0] + (f.dirty ? ' *' : '')),
+                )),
+              ))),
+          ),
+
+          // 右：编辑器
+          h('div', { style: { flex: '1 1 auto', minWidth: 0 } },
+            !tab
+              ? h(Empty, null, t('mm.pick'))
+              : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
+                // 标签页条
+                h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 4 } },
+                  tabs.map((x) => h('span', {
+                    key: x.path,
+                    onClick: () => setActiveTab(x.path),
+                    style: {
+                      fontSize: 12, padding: '3px 8px', borderRadius: 999, cursor: 'pointer',
+                      display: 'inline-flex', alignItems: 'center', gap: 5,
+                      border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.12))',
+                      background: activeTab === x.path ? 'var(--dsw-alias-bg-fill-subtle, rgba(0,0,0,0.05))' : 'transparent',
+                    },
+                  },
+                    x.path.split('/').slice(-1)[0],
+                    x.dirty ? h('span', { style: { opacity: 0.6 } }, '*' ) : null,
+                    h('button', {
+                      type: 'button',
+                      onClick: (e) => { e.stopPropagation(); closeTab(x.path) },
+                      'aria-label': t('mm.close'),
+                      style: {
+                        appearance: 'none', border: 'none', background: 'transparent',
+                        cursor: 'pointer', padding: 0, fontSize: 12, opacity: 0.5, lineHeight: 1,
+                      },
+                    }, '×'),
+                  )),
+                ),
+                // 文件头 + 保存
+                h('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+                  h('span', {
+                    style: { fontSize: 12, opacity: 0.6, fontFamily: 'ui-monospace, monospace', flex: '1 1 auto' },
+                  }, tab.path),
+                  h(ActionButton, {
+                    label: t('mm.save'), tone: 'primary', small: true,
+                    onClick: save, busy: busy === 'save', disabled: !tab.dirty,
+                  }),
+                ),
+                h('textarea', {
+                  value: tab.content,
+                  onChange: (e) => edit(e.target.value),
+                  rows: 20,
+                  spellCheck: false,
+                  style: {
+                    width: '100%', boxSizing: 'border-box', padding: 10, borderRadius: 8,
+                    fontSize: 12, lineHeight: '19px', resize: 'vertical',
+                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                    border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.12))',
+                    background: 'var(--dsw-alias-bg-base, transparent)', color: 'inherit',
+                  },
+                }),
+                h('p', { style: { margin: 0, fontSize: 11, opacity: 0.5 } }, t('mm.saveNote')),
+          ),
+        ),
+      )
+    }
 
     /** 一页占位：施工期给结构反馈，不假装功能已好。 */
     function PageStub({ t, label }) {
@@ -1721,6 +1940,7 @@ window.__ModuleLoader__.load({
       } else if (pageId === 'overview') body = h(OverviewPage, { t, data, onGoSync: goSync })
       else if (pageId === 'sync') body = h(SyncPage, { t, data, onRefresh: refresh })
       else if (pageId === 'skills') body = h(SkillsPage, { t, data, onRefresh: refresh })
+      else if (pageId === 'memory') body = h(MemoryPage, { t, data, onRefresh: refresh })
       else if (pageId === 'sessions') body = h(SessionsPage, { t, data, onRefresh: refresh })
       else if (pageId === 'maintain') body = h(MaintainPage, { t, data, onRefresh: refresh })
       else body = h(PageStub, { t, label: t(page.labelKey) })
