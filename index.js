@@ -20,6 +20,7 @@
 import { resolveHubPath, readHubVersion } from './lib/hub-paths.js'
 import { createApiHandler } from './lib/api.js'
 import { rejectionFor, connectionAdmissionView } from './lib/trust.js'
+import { registerTools } from './lib/tools.js'
 
 /** 宿主半身依赖。 */
 export const inject = ['tools']
@@ -110,6 +111,10 @@ export function apply(ctx, config = {}) {
   // connection 由浏览器半身晚于插件发布，一次性读取会永久冻死在"不存在"。
   const optionalRead = (name) => (typeof ctx.get === 'function' ? ctx.get(name) : undefined)
   const fenceConnection = connectionAdmissionView(() => optionalRead('connection'))
+
+  // ⓪ 模型工具（P0 功能审计回补）：12 个 sync_hub_*，直接调 lib/hub/* 模块。
+  const toolCount = registerTools(ctx, { config, getHub: () => state.hub })
+  if (toolCount > 0) log.info(`已注册 ${toolCount} 个 sync_hub_* 模型工具`)
 
   // ② HTTP 挂载：必须用 ctx.inject 拿 webServer（插件加载早于它出现）。
   if (typeof ctx.inject === 'function') {

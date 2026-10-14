@@ -137,6 +137,24 @@ window.__ModuleLoader__.load({
       'job.took': '用时 {t}',
       'job.dismiss': '收起',
 
+      // N2 时间线 / N7 自动推送
+      'tl.expand': '完整时间线',
+      'tl.collapse': '收起时间线',
+      'tl.allMachines': '全部机器',
+      'tl.noRows': '（没有匹配的提交）',
+      'tl.files': '文件',
+      'ap.title': '自动推送',
+      'ap.hint': '开启后：记忆·配置页保存成功会立即 push 到云端（同步页的推送不受影响，那里本来就会推送）。默认关，防止把半成品推给另一台。',
+      'ap.on': '已开启：记忆页保存后自动推送',
+      'ap.off': '已关闭：保存只提交本地，推送去「同步」页',
+      'ap.turnOn': '开启',
+      'ap.turnOff': '关闭',
+
+      // v2.0.6 一键流先拉后推 + 审计回补
+      'flow.roundtrip': '完整同步一轮（先拉后推）',
+      'flow.roundtripTip': '先拉取另一台的改动并应用，再把本机改动推上去。换机后或久未同步时用。',
+      'flow.confirmRoundtrip': '确认执行「完整同步一轮」？将先拉取并应用（撞车会停下来进入冲突解决器），成功后自动推送你选的 {n} 类范围。',
+
       // 同步
       'sync.scope': '推送范围',
       'sync.scopeHint': '日常用「全部」即可；只改了一类就只选那一类，推得更快。',
@@ -208,6 +226,7 @@ window.__ModuleLoader__.load({
       'mt.portableRun': '执行补齐（预演）',
       'mt.portableSpec': '清单：{name} · tag {tag}',
       'mt.console': '打开控制台',
+      'mt.manual': '打开使用手册',
       'mt.consoleHint': '换机器身份（要手输 YES）、全自动一条龙、冲突人工处理——这些必须人工确认的流程走 .bat 窗口。',
       'mt.log': '运行日志',
       'mt.logPath': '路径：{p}',
@@ -338,6 +357,24 @@ window.__ModuleLoader__.load({
       'job.running': 'working…',
       'job.took': 'took {t}',
       'job.dismiss': 'dismiss',
+
+      // N2 timeline / N7 auto-push
+      'tl.expand': 'Full timeline',
+      'tl.collapse': 'Collapse',
+      'tl.allMachines': 'All machines',
+      'tl.noRows': '(no matching commits)',
+      'tl.files': 'files',
+      'ap.title': 'Auto-push',
+      'ap.hint': 'When on, a successful save on the Memory · Config page pushes to the cloud immediately (the Sync page push is unaffected). Off by default so half-finished work stays local.',
+      'ap.on': 'On: saving on Memory · Config auto-pushes',
+      'ap.off': 'Off: saves stay local; push from the Sync page',
+      'ap.turnOn': 'Enable',
+      'ap.turnOff': 'Disable',
+
+      // v2.0.6 roundtrip flow
+      'flow.roundtrip': 'Full round trip (pull then push)',
+      'flow.roundtripTip': 'Pull and apply the other machine\'s changes first, then push yours. Use after switching machines or a long gap.',
+      'flow.confirmRoundtrip': 'Run a full round trip? Pulls and applies first (stops at conflicts into the resolver), then pushes your {n} selected categories.',
       'sync.scope': 'Push scope',
       'sync.scopeHint': 'Use "All" for daily sync; pick one category when that is all you changed.',
       'sync.all': 'All',
@@ -406,6 +443,7 @@ window.__ModuleLoader__.load({
       'mt.portableRun': 'Run setup (dry run)',
       'mt.portableSpec': 'Spec: {name} · tag {tag}',
       'mt.console': 'Open console',
+      'mt.manual': 'Open manual',
       'mt.consoleHint': 'Identity switch (typed YES), one-shot bootstrap, manual conflict handling.',
       'mt.log': 'Logs',
       'mt.logPath': 'Path: {p}',
@@ -693,6 +731,7 @@ window.__ModuleLoader__.load({
       const st = data?.status ?? {}
       const todos = buildTodos(t, data)
       const recent = data?.recent ?? []
+      const [timelineOpen, setTimelineOpen] = useState(false)
 
       return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 0 } },
         // 待办卡
@@ -785,23 +824,100 @@ window.__ModuleLoader__.load({
             ),
         ),
 
-        // 最近动态
-        h(Card, { title: t('ov.recent') },
-          recent.length === 0
-            ? h(Empty, null, t('ov.noRecent'))
-            : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
-              recent.slice(0, 6).map((c) => h('div', {
-                key: c.hash,
-                style: { display: 'flex', gap: 8, fontSize: 12, alignItems: 'baseline' },
+        // 最近动态（N2：展开后是带机器筛选的完整时间线）
+        h(Card, {
+          title: t('ov.recent'),
+          right: h(ActionButton, {
+            label: timelineOpen ? t('tl.collapse') : t('tl.expand'),
+            small: true,
+            onClick: () => setTimelineOpen(!timelineOpen),
+          }),
+        },
+          timelineOpen
+            ? h(TimelineView, { t })
+            : (recent.length === 0
+              ? h(Empty, null, t('ov.noRecent'))
+              : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
+                recent.slice(0, 6).map((c) => h('div', {
+                  key: c.hash,
+                  style: { display: 'flex', gap: 8, fontSize: 12, alignItems: 'baseline' },
+                },
+                  h('span', { style: { opacity: 0.5, fontFamily: 'ui-monospace, monospace', flex: '0 0 auto' } }, c.hash.slice(0, 7)),
+                  h('span', {
+                    style: { flex: '1 1 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+                  }, c.subject),
+                  h('span', { style: { opacity: 0.5, flex: '0 0 auto' } }, c.date),
+                )),
+              )),
+        ),
+      )
+    }
+
+    /**
+     * N2 同步时间线视图：按机器筛选 + 文件数 + 完整历史（宿主 /timeline 取 120 条）。
+     * @param {object} p { t }
+     */
+    function TimelineView({ t }) {
+      const [commits, setCommits] = useState(null)
+      const [error, setError] = useState(null)
+      const [machine, setMachine] = useState('all')
+
+      useEffect(() => {
+        apiGet('/timeline').then((r) => {
+          if (r.ok) setCommits(r.commits)
+          else setError(r.error)
+        }).catch((e) => setError(String(e?.message ?? e)))
+      }, [])
+
+      const machines = useMemo(() => {
+        const set = new Set((commits ?? []).map((c) => c.machine).filter(Boolean))
+        return [...set]
+      }, [commits])
+
+      const rows = (commits ?? []).filter((c) => (machine === 'all' ? true : c.machine === machine))
+
+      return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
+        error ? h(InlineNote, { tone: 'error' }, t('error', { e: error })) : null,
+        // 机器筛选
+        h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6 } },
+          h(ActionButton, {
+            label: t('tl.allMachines'), small: true,
+            onClick: () => setMachine('all'),
+            tone: machine === 'all' ? 'primary' : undefined,
+          }),
+          machines.map((m) => h(ActionButton, {
+            key: m, label: m, small: true,
+            onClick: () => setMachine(m),
+            tone: machine === m ? 'primary' : undefined,
+          })),
+        ),
+        !commits
+          ? h(Empty, null, t('loading'))
+          : rows.length === 0
+            ? h(Empty, null, t('tl.noRows'))
+            : h('div', {
+              style: {
+                maxHeight: 420, overflow: 'auto',
+                border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.08))', borderRadius: 8,
               },
-                h('span', { style: { opacity: 0.5, fontFamily: 'ui-monospace, monospace', flex: '0 0 auto' } }, c.hash.slice(0, 7)),
+            },
+              rows.map((c) => h('div', {
+                key: c.hash,
+                style: {
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', fontSize: 12,
+                  borderBottom: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.05))',
+                },
+              },
+                h('span', { style: { opacity: 0.5, fontFamily: 'ui-monospace, monospace', flex: '0 0 auto' } }, c.short),
+                c.machine ? h(Tag, { text: c.machine, level: 'info' }) : null,
                 h('span', {
                   style: { flex: '1 1 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+                  title: c.subject,
                 }, c.subject),
-                h('span', { style: { opacity: 0.5, flex: '0 0 auto' } }, c.date),
+                h('span', { style: { opacity: 0.5, flex: '0 0 auto' } }, `${c.files} ${t('tl.files')}`),
+                h('span', { style: { opacity: 0.5, flex: '0 0 auto' } }, `${c.date} ${c.time}`),
               )),
             ),
-        ),
       )
     }
 
@@ -973,13 +1089,22 @@ window.__ModuleLoader__.load({
       }
 
       // N6 一键同步流：预演 → 确认 → 执行 → 结果 → 提示重启，一条流内完成不跳页。
-      const [flow, setFlow] = useState(null) // {stage:'preview'|'confirm'|'done', ...}
+      // v2.0.6：mode = 'push'（只推）| 'roundtrip'（先拉后推，对齐 bat [5] 完整同步一轮）
+      const [flow, setFlow] = useState(null)
+      const [flowMode, setFlowMode] = useState('push')
       const [flowBusy, setFlowBusy] = useState(false)
       const flowJob = useJob()
 
       const flowPreview = async () => {
         setFlowBusy(true)
-        const r = await apiPost('/sync', { action: 'preview', scopes, except })
+        let r
+        if (flowMode === 'roundtrip') {
+          // 先拉后推：预演的是"拉取后的推送"，这里先只报拉取意图，确认后执行
+          setFlowBusy(false)
+          setFlow({ stage: 'confirm', files: null, totalBytes: 0, roundtrip: true })
+          return
+        }
+        r = await apiPost('/sync', { action: 'preview', scopes, except })
         setFlowBusy(false)
         if (!r.ok) { setNote({ tone: 'error', text: r.error }); return }
         if (!r.files?.length) {
@@ -992,6 +1117,14 @@ window.__ModuleLoader__.load({
       const flowRun = async () => {
         setFlow({ ...flow, stage: 'running' })
         const r = await flowJob.run(async () => {
+          // 先拉后推模式：第一步拉取（撞车即停，进冲突解决器）
+          if (flow.roundtrip) {
+            const pulled = await apiPost('/sync', { action: 'pull' })
+            if (!pulled.ok) {
+              if (pulled.conflict) { setConflicts(pulled.conflicts ?? []); setResolverOpen(true) }
+              return pulled
+            }
+          }
           const out = await apiPost('/sync', { action: 'push', scopes, except })
           if (out.ok) {
             onRefresh()
@@ -1001,7 +1134,7 @@ window.__ModuleLoader__.load({
           }
           return out
         })
-        if (r?.ok) setFlow({ stage: 'done', fileCount: r.fileCount ?? 0, commit: r.commit ?? '' })
+        if (r?.ok) setFlow({ stage: 'done', fileCount: r.fileCount ?? 0, commit: r.commit ?? '', roundtrip: flow.roundtrip })
         else setFlow(null)
       }
 
@@ -1015,7 +1148,7 @@ window.__ModuleLoader__.load({
           })
           : null,
 
-        // N6 一键同步（主路径：一条流内完成）
+        // N6 一键同步（主路径：一条流内完成；v2.0.6 两种模式）
         h(Card, { title: t('flow.title'), hint: t('flow.hint') },
           !flow
             ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' } },
@@ -1023,25 +1156,34 @@ window.__ModuleLoader__.load({
                 label: t('flow.start'), tone: 'primary',
                 onClick: flowPreview, busy: flowBusy, disabled: scopes.length === 0,
               }),
+              h(ActionButton, {
+                label: t('flow.roundtrip'), onClick: flowPreview, busy: flowBusy,
+                disabled: scopes.length === 0,
+                title: t('flow.roundtripTip'),
+              }),
               h('span', { style: { fontSize: 12, opacity: 0.6 } },
                 scopes.length === 0 ? t('sync.pickCat') : t('flow.picked', { n: scopes.length })),
               h(InlineNote, { tone: note?.tone }, note?.text),
             )
             : flow.stage === 'confirm'
               ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
-                h('p', { style: { margin: 0, fontSize: 13 } },
-                  t('sync.confirmPush', { n: flow.files.length }) + ' · ' + t('sync.files', {
-                    n: flow.files.length, size: humanBytes(flow.totalBytes),
-                  })),
-                h('div', {
-                  style: {
-                    maxHeight: 160, overflow: 'auto', padding: 8, borderRadius: 8, fontSize: 11,
-                    background: 'var(--dsw-alias-bg-fill-subtle, rgba(0,0,0,0.04))',
-                    fontFamily: 'ui-monospace, monospace', lineHeight: '17px',
+                flow.roundtrip
+                  ? h('p', { style: { margin: 0, fontSize: 13 } }, t('flow.confirmRoundtrip', { n: scopes.length }))
+                  : h('p', { style: { margin: 0, fontSize: 13 } },
+                    t('sync.confirmPush', { n: flow.files.length }) + ' · ' + t('sync.files', {
+                      n: flow.files.length, size: humanBytes(flow.totalBytes),
+                    })),
+                !flow.roundtrip
+                  ? h('div', {
+                    style: {
+                      maxHeight: 160, overflow: 'auto', padding: 8, borderRadius: 8, fontSize: 11,
+                      background: 'var(--dsw-alias-bg-fill-subtle, rgba(0,0,0,0.04))',
+                      fontFamily: 'ui-monospace, monospace', lineHeight: '17px',
+                    },
                   },
-                },
-                  flow.files.slice(0, 60).map((f) => h('div', { key: f.path }, f.path)),
-                ),
+                    flow.files.slice(0, 60).map((f) => h('div', { key: f.path }, f.path)),
+                  )
+                  : null,
                 h('div', { style: { display: 'flex', gap: 8 } },
                   h(ActionButton, { label: t('flow.confirm'), tone: 'primary', onClick: flowRun }),
                   h(ActionButton, { label: t('act.cancel'), onClick: () => setFlow(null) }),
@@ -1173,6 +1315,11 @@ window.__ModuleLoader__.load({
       const [busy, setBusy] = useState(null)
       const [note, setNote] = useState(null)
       const [portable, setPortable] = useState(null)
+      const [autoPush, setAutoPush] = useState(false)
+
+      useEffect(() => {
+        apiGet('/autopush').then((r) => { if (r.ok) setAutoPush(r.enabled === true) }).catch(() => {})
+      }, [])
 
       const loadBackups = useCallback(async () => {
         const r = await apiGet('/content')
@@ -1313,6 +1460,23 @@ window.__ModuleLoader__.load({
           ),
         ),
 
+        // N7 自动推送开关（记忆页保存后是否立即 push；默认关）
+        h(Card, { title: t('ap.title'), hint: t('ap.hint') },
+          h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 } },
+            h(Dot, { level: autoPush ? 'pass' : 'info' }),
+            h('span', { style: { flex: '1 1 auto' } }, autoPush ? t('ap.on') : t('ap.off')),
+            h(ActionButton, {
+              label: autoPush ? t('ap.turnOff') : t('ap.turnOn'),
+              small: true,
+              tone: autoPush ? undefined : 'primary',
+              onClick: async () => {
+                const r = await apiPost('/autopush', { enabled: !autoPush })
+                if (r.ok) setAutoPush(!autoPush)
+              },
+            }),
+          ),
+        ),
+
         // 换机补齐
         h(Card, { title: t('mt.portable'), hint: t('mt.portableHint') },
           h('div', { style: { display: 'flex', gap: 8, alignItems: 'center' } },
@@ -1342,9 +1506,19 @@ window.__ModuleLoader__.load({
             : null,
         ),
 
-        // 控制台 + 日志
+        // 控制台 + 使用手册 + 日志
         h(Card, { title: t('mt.console'), hint: t('mt.consoleHint') },
           h(ActionButton, { label: t('mt.console'), small: true, onClick: openConsole }),
+          h(ActionButton, {
+            label: t('mt.manual'), small: true,
+            onClick: () => {
+              const hub = data?.hub
+              if (hub) {
+                // 用宿主同源 API 打开手册（复用受控入口），失败则复制路径
+                apiPost('/env', { action: 'open-manual', hub }).catch(() => {})
+              }
+            },
+          }),
         ),
         h(Card, { title: t('mt.log') },
           h('div', { style: { fontSize: 12, opacity: 0.7, fontFamily: 'ui-monospace, monospace' } },
