@@ -132,6 +132,11 @@ window.__ModuleLoader__.load({
       'mm.staleHint': '处理方法：到「同步」页拉取最新内容，再回到本页重新打开该文件编辑。',
       'mm.saveNote': '保存只提交到本地中枢仓库；要让另一台收到，请到「同步」页推送。',
 
+      // 长动作运行器（v2.0.5）
+      'job.running': '执行中…',
+      'job.took': '用时 {t}',
+      'job.dismiss': '收起',
+
       // 同步
       'sync.scope': '推送范围',
       'sync.scopeHint': '日常用「全部」即可；只改了一类就只选那一类，推得更快。',
@@ -328,6 +333,11 @@ window.__ModuleLoader__.load({
       'mm.archived': 'Previous version archived: {n}',
       'mm.staleHint': 'Fix: pull the latest on the Sync page, then reopen the file here.',
       'mm.saveNote': 'Saving commits to your local hub only; push from the Sync page for the other machine to receive it.',
+
+      // Job runner (v2.0.5)
+      'job.running': 'working…',
+      'job.took': 'took {t}',
+      'job.dismiss': 'dismiss',
       'sync.scope': 'Push scope',
       'sync.scopeHint': 'Use "All" for daily sync; pick one category when that is all you changed.',
       'sync.all': 'All',
@@ -795,6 +805,103 @@ window.__ModuleLoader__.load({
       )
     }
 
+    // ─────────────────── 长动作统一运行器（v2.0.5 反馈打磨） ───────────────────
+
+    /**
+     * useJob —— 长动作统一状态机。
+     *
+     * 解决的问题（老大 2026-10-14 反馈）：
+     *   "点击同步就一直显示正在同步，也看不到进度，不知道到底同步了没有" ——
+     *   旧实现只有 busy 布尔 + 一条会消失的 note。新运行器给每个动作：
+     *     · 步骤态：idle / running / success / error（**常驻，不自动消失**）
+     *     · 已用时计时器（running 时每秒走字，长操作看得到在动）
+     *     · 结构化回执（commit / 文件数 / 错误 + 修复提示），成败都留痕
+     *     · running 期间调用方禁其它动作（防并发推送搅乱 git）
+     */
+    function useJob() {
+      const [state, setState] = useState('idle')
+      const [elapsed, setElapsed] = useState(0)
+      const [result, setResult] = useState(null)
+      const [error, setError] = useState(null)
+
+      useEffect(() => {
+        if (state !== 'running') return undefined
+        const started = Date.now()
+        setElapsed(0)
+        const timer = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000)
+        return () => clearInterval(timer)
+      }, [state])
+
+      const run = useCallback(async (fn) => {
+        setState('running')
+        setResult(null)
+        setError(null)
+        try {
+          const r = await fn()
+          if (r?.ok) { setResult(r); setState('success') } else {
+            setError({ text: r?.error ?? '未知错误', hint: r?.hint })
+            setState('error')
+          }
+          return r
+        } catch (e) {
+          setError({ text: String(e?.message ?? e) })
+          setState('error')
+          return null
+        }
+      }, [])
+
+      const reset = useCallback(() => {
+        setState('idle'); setResult(null); setError(null); setElapsed(0)
+      }, [])
+
+      return { state, elapsed, result, error, run, reset, running: state === 'running' }
+    }
+
+    /** 秒数 → mm:ss。 */
+    function fmtSecs(n) {
+      const m = Math.floor(n / 60)
+      const s = n % 60
+      return m > 0 ? `${m}分${String(s).padStart(2, '0')}秒` : `${s}秒`
+    }
+
+    /**
+     * JobView —— 一个 useJob 的常驻状态视图（就地，不消失）。
+     * idle 时不渲染；running 转圈 + 已用时；success/error 结构化回执。
+     *
+     * @param {object} p { t, job, title, detail?, onReset? }
+     */
+    function JobView({ t, job, title, detail, onReset }) {
+      if (job.state === 'idle') return null
+      const level = job.state === 'running' ? 'info' : job.state === 'success' ? 'pass' : 'fail'
+      return h('div', {
+        style: {
+          marginTop: 8, padding: '8px 10px', borderRadius: 8, fontSize: 12,
+          border: `1px solid ${job.state === 'error' ? 'var(--dsw-alias-status-danger, #ef4444)' : 'var(--dsw-alias-border-l3, rgba(0,0,0,0.08))'}`,
+          background: job.state === 'success' ? 'transparent' : 'var(--dsw-alias-bg-fill-subtle, rgba(0,0,0,0.03))',
+        },
+        'data-sync-hub-job': job.state,
+      },
+        h('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+          h(Dot, { level }),
+          h('span', { style: { fontWeight: 500 } }, title),
+          job.state === 'running'
+            ? h('span', { style: { opacity: 0.7 } }, t('job.running') + (job.elapsed > 0 ? ` · ${fmtSecs(job.elapsed)}` : ''))
+            : h('span', { style: { opacity: 0.5 } }, t('job.took', { t: fmtSecs(job.elapsed) })),
+          job.state !== 'running' && onReset
+            ? h(ActionButton, { label: t('job.dismiss'), small: true, onClick: onReset })
+            : null,
+        ),
+        // 结构化回执
+        job.state === 'success' && detail
+          ? h('div', { style: { marginTop: 4, opacity: 0.8, lineHeight: '18px' } }, detail)
+          : null,
+        job.state === 'error'
+          ? h('div', { style: { marginTop: 4, color: 'var(--dsw-alias-status-danger, #ef4444)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: '18px' } },
+            job.error.text + (job.error.hint ? `\n${job.error.hint}` : ''))
+          : null,
+      )
+    }
+
     // ─────────────────── 同步页 ───────────────────
 
     /** 推送范围（与宿主 SCOPE_PATHS 的键一致）。 */
@@ -813,6 +920,10 @@ window.__ModuleLoader__.load({
       // 冲突文件列表：非空即渲染冲突解决器（拉取撞车或手动查询命中）
       const [conflicts, setConflicts] = useState([])
       const [resolverOpen, setResolverOpen] = useState(false)
+      // 长动作运行器（v2.0.5）：推送/拉取各有独立常驻状态
+      const pushJob = useJob()
+      const pullJob = useJob()
+      const anyRunning = pushJob.running || pullJob.running
 
       const toggle = (key) => {
         setScopes((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]))
@@ -828,37 +939,27 @@ window.__ModuleLoader__.load({
       }
 
       const runPush = async () => {
-        setBusy('push')
         setNote(null)
-        const r = await apiPost('/sync', { action: 'push', scopes, except })
-        setBusy(null)
-        if (!r.ok) {
-          setNote({ tone: 'error', text: r.conflict ? r.error : t('sync.err.secret', { e: r.error }) })
-          return
-        }
-        setPreview(null)
-        setNote({ tone: 'success', text: t('sync.msg.pushed', { n: r.fileCount ?? 0, commit: r.commit ?? '' }) })
-        onRefresh()
-      }
-
-      const runPull = async () => {
-        setBusy('pull')
-        setNote(null)
-        const r = await apiPost('/sync', { action: 'pull' })
-        setBusy(null)
-        if (!r.ok) {
-          setNote({ tone: 'error', text: r.error })
-          // 撞车：自动展开冲突解决器（D7 的核心体验）
-          if (r.conflict) {
+        await pushJob.run(async () => {
+          const r = await apiPost('/sync', { action: 'push', scopes, except })
+          if (r.ok) {
+            setPreview(null)
+            onRefresh()
+          } else if (r.conflict) {
             setConflicts(r.conflicts ?? [])
             setResolverOpen(true)
           }
-          return
-        }
-        setConflicts([])
-        setResolverOpen(false)
-        setNote({ tone: 'success', text: t('sync.msg.pulled', { commit: r.commit ?? '' }) })
-        onRefresh()
+          return r
+        })
+      }
+
+      const runPull = async () => {
+        setNote(null)
+        await pullJob.run(async () => {
+          const r = await apiPost('/sync', { action: 'pull' })
+          if (r.ok) onRefresh()
+          return r
+        })
       }
 
       const runConflicts = async () => {
@@ -872,8 +973,9 @@ window.__ModuleLoader__.load({
       }
 
       // N6 一键同步流：预演 → 确认 → 执行 → 结果 → 提示重启，一条流内完成不跳页。
-      const [flow, setFlow] = useState(null) // {stage:'preview'|'confirm'|'running'|'done', ...}
+      const [flow, setFlow] = useState(null) // {stage:'preview'|'confirm'|'done', ...}
       const [flowBusy, setFlowBusy] = useState(false)
+      const flowJob = useJob()
 
       const flowPreview = async () => {
         setFlowBusy(true)
@@ -889,16 +991,18 @@ window.__ModuleLoader__.load({
 
       const flowRun = async () => {
         setFlow({ ...flow, stage: 'running' })
-        const r = await apiPost('/sync', { action: 'push', scopes, except })
-        if (!r.ok) {
-          setNote({ tone: 'error', text: r.conflict ? r.error : t('sync.err.secret', { e: r.error }) })
-          if (r.conflict) { setConflicts(r.conflicts ?? []); setResolverOpen(true) }
-          setFlow(null)
-          return
-        }
-        setFlow({ stage: 'done', fileCount: r.fileCount ?? 0, commit: r.commit ?? '' })
-        setNote({ tone: 'success', text: t('sync.msg.pushed', { n: r.fileCount ?? 0, commit: r.commit ?? '' }) })
-        onRefresh()
+        const r = await flowJob.run(async () => {
+          const out = await apiPost('/sync', { action: 'push', scopes, except })
+          if (out.ok) {
+            onRefresh()
+          } else if (out.conflict) {
+            setConflicts(out.conflicts ?? [])
+            setResolverOpen(true)
+          }
+          return out
+        })
+        if (r?.ok) setFlow({ stage: 'done', fileCount: r.fileCount ?? 0, commit: r.commit ?? '' })
+        else setFlow(null)
       }
 
       return h('div', null,
@@ -943,15 +1047,20 @@ window.__ModuleLoader__.load({
                   h(ActionButton, { label: t('act.cancel'), onClick: () => setFlow(null) }),
                 ),
               )
-              : flow.stage === 'running'
-                ? h('p', { style: { margin: 0, fontSize: 13 } }, t('sync.working'))
-                : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
-                  h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 } },
-                    h(Dot, { level: 'pass' }),
-                    h('span', null, t('flow.done', { n: flow.fileCount, commit: flow.commit })),
-                  ),
-                  h('p', { style: { margin: 0, fontSize: 12, opacity: 0.6 } }, t('flow.restartHint')),
-                  h('div', null, h(ActionButton, { label: t('flow.again'), small: true, onClick: () => setFlow(null) })),
+              : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
+                  // v2.0.5：running 态由 flowJob 渲染（带已用时），done 态常驻
+                  flow.stage === 'running'
+                    ? h(JobView, { t, job: flowJob, title: t('sync.push') })
+                    : h(JobView, {
+                      t,
+                      job: { state: 'success', elapsed: flowJob.elapsed, result: flow, error: null },
+                      title: t('sync.push'),
+                      detail: t('flow.done', { n: flow.fileCount, commit: flow.commit }) + '\n' + t('flow.restartHint'),
+                      onReset: () => { flowJob.reset(); setFlow(null) },
+                    }),
+                  flow.stage !== 'running'
+                    ? h('div', null, h(ActionButton, { label: t('flow.again'), small: true, onClick: () => setFlow(null) }))
+                    : null,
                 ),
         ),
 
@@ -988,14 +1097,46 @@ window.__ModuleLoader__.load({
           }, note?.text),
         ),
 
-        // 动作卡
+        // 动作卡（v2.0.5：常驻回执 + 已用时 + 执行中禁全部按钮）
         h(Card, { title: t('sync.resultTitle') },
           h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 8 } },
-            h(ActionButton, { label: t('sync.preview'), onClick: runPreview, busy: busy === 'preview' }),
-            h(ActionButton, { label: t('sync.push'), tone: 'primary', onClick: runPush, busy: busy === 'push', disabled: scopes.length === 0 }),
-            h(ActionButton, { label: t('sync.pull'), onClick: runPull, busy: busy === 'pull' }),
-            h(ActionButton, { label: t('sync.conflicts'), onClick: runConflicts, busy: busy === 'conflicts', small: true }),
+            h(ActionButton, {
+              label: t('sync.preview'), onClick: runPreview,
+              busy: busy === 'preview', disabled: anyRunning,
+            }),
+            h(ActionButton, {
+              label: t('sync.push'), tone: 'primary', onClick: runPush,
+              busy: pushJob.running, disabled: anyRunning || scopes.length === 0,
+            }),
+            h(ActionButton, {
+              label: t('sync.pull'), onClick: runPull,
+              busy: pullJob.running, disabled: anyRunning,
+            }),
+            h(ActionButton, {
+              label: t('sync.conflicts'), onClick: runConflicts,
+              busy: busy === 'conflicts', disabled: anyRunning, small: true,
+            }),
           ),
+          // 常驻回执（不消失；running 显示已用时走字）
+          h(JobView, {
+            t,
+            job: pushJob,
+            title: t('sync.push'),
+            detail: pushJob.result
+              ? t('sync.msg.pushed', { n: pushJob.result.fileCount ?? 0, commit: pushJob.result.commit ?? '' })
+                + (pushJob.result.files?.length ? `\n${pushJob.result.files.slice(0, 8).join('\n')}${pushJob.result.files.length > 8 ? `\n…共 ${pushJob.result.files.length} 个文件` : ''}` : '')
+              : null,
+            onReset: pushJob.reset,
+          }),
+          h(JobView, {
+            t,
+            job: pullJob,
+            title: t('sync.pull'),
+            detail: pullJob.result
+              ? t('sync.msg.pulled', { commit: pullJob.result.commit ?? '' })
+              : null,
+            onReset: pullJob.reset,
+          }),
           h('p', { style: { margin: '6px 0 0', fontSize: 12, opacity: 0.6 } }, t('sync.hint.pull')),
           preview && preview.files?.length > 0
             ? h('div', {
@@ -1048,12 +1189,14 @@ window.__ModuleLoader__.load({
         return r
       }
 
+      // v2.0.5：备份/定时/换机补齐用 useJob 常驻回执
+      const backupJob = useJob()
+      const scheduleJob = useJob()
+      const portableJob = useJob()
+
       const doBackup = async () => {
-        const r = await act('backup')
-        if (r?.ok) {
-          setNote({ tone: 'success', text: t('mt.msg.backed', { n: r.created.length }) })
-          loadBackups()
-        }
+        const r = await backupJob.run(() => apiPost('/content', { action: 'backup' }))
+        if (r?.ok) loadBackups()
       }
       const doRestore = async (name) => {
         const r = await act('restore', { name })
@@ -1073,20 +1216,13 @@ window.__ModuleLoader__.load({
       }
 
       const doSchedule = async (action) => {
-        setBusy(action)
-        setNote(null)
-        const r = await apiPost('/env', { action })
-        setBusy(null)
-        if (!r.ok) { setNote({ tone: 'error', text: r.error }); return }
-        setNote({ tone: 'success', text: action === 'schedule-install' ? t('mt.msg.scheduleOn') : t('mt.msg.scheduleOff') })
-        onRefresh()
+        const r = await scheduleJob.run(() => apiPost('/env', { action }))
+        if (r?.ok) onRefresh()
       }
 
       const doPortable = async () => {
-        setBusy('portable')
-        const r = await apiPost('/portable', { action: 'setup', profile: 'desktop', dryRun: true })
-        setBusy(null)
-        setPortable(r)
+        const r = await portableJob.run(() => apiPost('/portable', { action: 'setup', profile: 'desktop', dryRun: true }))
+        if (r) setPortable(r)
       }
 
       const tools = data?.tools ?? {}
@@ -1096,8 +1232,13 @@ window.__ModuleLoader__.load({
         // 备份
         h(Card, {
           title: t('mt.backup'), hint: t('mt.backupHint'),
-          right: h(ActionButton, { label: t('mt.backupNow'), tone: 'primary', small: true, onClick: doBackup, busy: busy === 'backup' }),
+          right: h(ActionButton, { label: t('mt.backupNow'), tone: 'primary', small: true, onClick: doBackup, busy: backupJob.running }),
         },
+          h(JobView, {
+            t, job: backupJob, title: t('mt.backupNow'),
+            detail: backupJob.result ? t('mt.msg.backed', { n: backupJob.result.created?.length ?? 0 }) : null,
+            onReset: backupJob.reset,
+          }),
           h(InlineNote, { tone: note?.tone }, note?.text),
           h('div', { style: { marginTop: 4 } },
             h('div', { style: { fontSize: 12, opacity: 0.6, marginBottom: 4 } }, t('mt.backups')),
@@ -1145,14 +1286,21 @@ window.__ModuleLoader__.load({
         h(Card, {
           title: t('mt.schedule'), hint: t('mt.scheduleHint'),
           right: data?.schedule?.installed
-            ? h(ActionButton, { label: t('mt.scheduleRemove'), small: true, onClick: () => doSchedule('schedule-remove'), busy: busy === 'schedule-remove' })
-            : h(ActionButton, { label: t('mt.scheduleInstall'), small: true, tone: 'primary', onClick: () => doSchedule('schedule-install'), busy: busy === 'schedule-install' }),
+            ? h(ActionButton, { label: t('mt.scheduleRemove'), small: true, onClick: () => doSchedule('schedule-remove'), busy: scheduleJob.running })
+            : h(ActionButton, { label: t('mt.scheduleInstall'), small: true, tone: 'primary', onClick: () => doSchedule('schedule-install'), busy: scheduleJob.running }),
         },
           h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 } },
             h(Dot, { level: data?.schedule?.installed ? 'pass' : 'info' }),
             h('span', null, data?.schedule?.installed ? t('mt.scheduleOn') : t('mt.scheduleOff')),
             data?.schedule?.nextRun ? h('span', { style: { opacity: 0.6, fontSize: 12 } }, t('mt.scheduleNext', { t: data.schedule.nextRun })) : null,
           ),
+          h(JobView, {
+            t, job: scheduleJob, title: t('mt.schedule'),
+            detail: scheduleJob.result
+              ? (scheduleJob.result.partial ? scheduleJob.result.error : t(scheduleJob.result.tasks ? 'mt.msg.scheduleOn' : 'mt.msg.scheduleOff'))
+              : null,
+            onReset: scheduleJob.reset,
+          }),
         ),
 
         // 凭据
@@ -1168,8 +1316,13 @@ window.__ModuleLoader__.load({
         // 换机补齐
         h(Card, { title: t('mt.portable'), hint: t('mt.portableHint') },
           h('div', { style: { display: 'flex', gap: 8, alignItems: 'center' } },
-            h(ActionButton, { label: t('mt.portableRun'), small: true, onClick: doPortable, busy: busy === 'portable' }),
+            h(ActionButton, { label: t('mt.portableRun'), small: true, onClick: doPortable, busy: portableJob.running }),
           ),
+          h(JobView, {
+            t, job: portableJob, title: t('mt.portableRun'),
+            detail: null,
+            onReset: portableJob.reset,
+          }),
           portable
             ? h('div', {
               style: {

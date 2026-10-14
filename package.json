@@ -1,6 +1,6 @@
 {
   "name": "dsh-sync-hub",
-  "version": "2.0.4",
+  "version": "2.0.5",
   "description": "DSH 同步中枢：侧栏入口 + 六页信息面板。两台电脑的 AI 记忆 / 技能 / 配置同步。数据走 Gitee 私有中枢，插件代码走 GitHub 发布。",
   "type": "module",
   "main": "index.js",
