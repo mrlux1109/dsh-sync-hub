@@ -1991,8 +1991,10 @@ window.__ModuleLoader__.load({
           // 左：文件列表
           h('div', {
             style: {
-              flex: '0 0 260px', border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.08))',
-              borderRadius: 10, padding: 8, maxHeight: 480, overflow: 'auto',
+              flex: '0 0 280px', border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.08))',
+              borderRadius: 10, padding: 8,
+              alignSelf: 'stretch', maxHeight: 'calc(100vh - 260px)', overflow: 'auto',
+              minWidth: 0,
             },
           },
             h('input', {
@@ -2026,10 +2028,9 @@ window.__ModuleLoader__.load({
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     },
                     title: f.path,
-                  }, f.path.split('/').slice(-1)[0] + (f.dirty ? ' *' : '')),
+                  }, (f.path.includes('/') ? f.path.split('/').slice(-2).join('/') : f.path) + (f.dirty ? ' *' : '')),
                 )),
               ))),
-          ),
 
           // 右：编辑器
           h('div', { style: { flex: '1 1 auto', minWidth: 0 } },
@@ -2074,17 +2075,18 @@ window.__ModuleLoader__.load({
                 h('textarea', {
                   value: tab.content,
                   onChange: (e) => edit(e.target.value),
-                  rows: 20,
                   spellCheck: false,
                   style: {
                     width: '100%', boxSizing: 'border-box', padding: 10, borderRadius: 8,
                     fontSize: 12, lineHeight: '19px', resize: 'vertical',
+                    minHeight: 320,
                     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
                     border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.12))',
                     background: 'var(--dsw-alias-bg-base, transparent)', color: 'inherit',
                   },
                 }),
                 h('p', { style: { margin: 0, fontSize: 11, opacity: 0.5 } }, t('mm.saveNote')),
+              ),
           ),
         ),
       )
