@@ -179,7 +179,13 @@ window.__ModuleLoader__.load({
       'flow.restartHint': '涉及记忆 / 插件的改动，重启 DSH 后完整生效。',
       'flow.again': '再来一次',
       'sync.msg.pushed': '已上传 {n} 个文件（{commit}）',
-      'sync.msg.pulled': '已恢复（{commit}）',
+      // v2.3.2：拉取回执展示 apply 到本机的真实结果（对齐 BAT 版 pull→apply）
+      'sync.pullCommit': '中枢已拉取（{commit}）',
+      'sync.pullAgents': 'AGENTS.md 已重建（{bytes}）',
+      'sync.pullAgentsFail': 'AGENTS.md 重建失败：{e}',
+      'sync.pullSkills': '技能新增 {n} 个',
+      'sync.pullNoId': '本机还没设机器身份，AGENTS.md 没重建',
+      'sync.pullRestart': '重启 DSH 后完整生效；本机会话不会被覆盖。',
       // 专业备注（D2）：飞牛叫法看不懂时的小字解释
       'sync.term.push': '专业术语：push / 推送 —— 把本机内容提交并上传到云端中枢',
       'sync.term.pull': '专业术语：pull / 拉取 —— 从云端中枢取回内容到本机',
@@ -453,7 +459,12 @@ window.__ModuleLoader__.load({
       'flow.restartHint': 'Memory / plugin changes take full effect after restarting DSH.',
       'flow.again': 'Run again',
       'sync.msg.pushed': 'Uploaded {n} file(s) ({commit})',
-      'sync.msg.pulled': 'Restored ({commit})',
+      'sync.pullCommit': 'Hub pulled ({commit})',
+      'sync.pullAgents': 'AGENTS.md rebuilt ({bytes})',
+      'sync.pullAgentsFail': 'AGENTS.md rebuild failed: {e}',
+      'sync.pullSkills': '{n} skill(s) added',
+      'sync.pullNoId': 'No machine identity set yet — AGENTS.md not rebuilt',
+      'sync.pullRestart': 'Full effect after restarting DSH; existing local sessions are never overwritten.',
       'sync.term.push': 'Terminology: push — commit this machine\'s content and upload it to the cloud hub',
       'sync.term.pull': 'Terminology: pull — fetch content from the cloud hub back to this machine',
       'sync.term.preview': 'Terminology: dry-run — look without uploading, to confirm what will happen',
@@ -1428,7 +1439,18 @@ window.__ModuleLoader__.load({
             job: pullJob,
             title: t('sync.pull'),
             detail: pullJob.result
-              ? t('sync.msg.pulled', { commit: pullJob.result.commit ?? '' })
+              ? (() => {
+                const ap = pullJob.result.applied
+                const lines = [t('sync.pullCommit', { commit: pullJob.result.commit ?? '' })]
+                if (ap) {
+                  lines.push(ap.agentsOk
+                    ? t('sync.pullAgents', { bytes: `${Math.round((ap.agentsBytes ?? 0) / 1024)}KB` })
+                    : t('sync.pullAgentsFail', { e: ap.agentsError ?? t('sync.pullNoId') }))
+                  if (ap.skillsAdded > 0) lines.push(t('sync.pullSkills', { n: ap.skillsAdded }))
+                }
+                lines.push(t('sync.pullRestart'))
+                return lines.join('\n')
+              })()
               : null,
             onReset: pullJob.reset,
           }),
