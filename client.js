@@ -1327,7 +1327,7 @@ window.__ModuleLoader__.load({
                   key: c.hash,
                   style: { display: 'flex', gap: 8, fontSize: 12, alignItems: 'baseline' },
                 },
-                  h('span', { style: { opacity: 0.5, fontFamily: 'ui-monospace, monospace', flex: '0 0 auto' } }, c.hash.slice(0, 7)),
+                  h('span', { style: { opacity: 0.5, fontFamily: 'ui-monospace, monospace', flex: '0 0 auto' } }, (c.hash ?? '').slice(0, 7) || '—'),
                   h('span', {
                     style: { flex: '1 1 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
                   }, c.subject),
