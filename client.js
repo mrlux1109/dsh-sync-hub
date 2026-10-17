@@ -228,6 +228,8 @@ window.__ModuleLoader__.load({
       'mt.pluginUpdate': '插件更新',
       'mt.pluginUpdateHint': '检查 dsh-sync-hub 插件是否有新版本。',
       'mt.pluginCheck': '检查更新',
+      'mt.pluginChecking': '检查中…（正在连 GitHub）',
+      'mt.pluginUpToDate': '已是最新（{v}），无需更新。',
       'mt.pluginVersion': '版本',
       'mt.pluginNotChecked': '未检查',
       'mt.pluginUpdateAvailable': '有新版本可用，建议更新。',
@@ -497,6 +499,8 @@ window.__ModuleLoader__.load({
       'mt.pluginUpdate': 'Plugin update',
       'mt.pluginUpdateHint': 'Check if dsh-sync-hub plugin has a new version.',
       'mt.pluginCheck': 'Check for updates',
+      'mt.pluginChecking': 'Checking… (connecting to GitHub)',
+      'mt.pluginUpToDate': 'Up to date ({v}) — nothing to update.',
       'mt.pluginVersion': 'Version',
       'mt.pluginNotChecked': 'Not checked',
       'mt.pluginUpdateAvailable': 'A new version is available. Consider updating.',
@@ -1491,6 +1495,9 @@ window.__ModuleLoader__.load({
       const backupJob = useJob()
       const scheduleJob = useJob()
       const portableJob = useJob()
+      // v2.3.1：插件更新检查也用 useJob —— 旧版按钮点击无任何反馈（无 busy、失败不显示），
+      // 加上后端 execSync 卡死事件循环，看起来就像"假按钮"。
+      const pluginCheckJob = useJob()
 
       const doBackup = async () => {
         const r = await backupJob.run(() => apiPost('/content', { action: 'backup' }))
@@ -1630,27 +1637,41 @@ window.__ModuleLoader__.load({
             `${t('mt.core')} ${(tools.present ?? 0)}/${tools.total ?? 0}`),
         ),
 
-        // 插件更新
+        // 插件更新（v2.3.1：useJob 常驻回执 + 检查中反馈 + 失败显示原因）
         h(Card, {
           title: t('mt.pluginUpdate'), hint: t('mt.pluginUpdateHint'),
           right: h(ActionButton, {
-            label: t('mt.pluginCheck'), small: true, tone: 'primary',
+            label: pluginCheckJob.running ? t('mt.pluginChecking') : t('mt.pluginCheck'),
+            small: true, tone: 'primary',
+            busy: pluginCheckJob.running,
+            disabled: pluginCheckJob.running,
             onClick: async () => {
-              const r = await apiPost('/content', { action: 'plugin-update-check' })
-              if (r.ok) setPluginUpdate(r.update)
+              const r = await pluginCheckJob.run(() => apiPost('/content', { action: 'plugin-update-check' }))
+              if (r?.ok) setPluginUpdate(r.update)
             },
           }),
         },
           h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 } },
-            h(Dot, { level: pluginUpdate?.hasUpdate ? 'warn' : (pluginUpdate?.checking ? 'info' : 'info') }),
-            h('span', null, pluginUpdate
-              ? `${t('mt.pluginVersion')}: ${pluginUpdate.current} → ${pluginUpdate.latest}`
-              : t('mt.pluginNotChecked')),
+            h(Dot, { level: pluginCheckJob.running ? 'info' : (pluginUpdate?.hasUpdate ? 'warn' : 'info') }),
+            h('span', null, pluginCheckJob.running
+              ? t('mt.pluginChecking')
+              : (pluginUpdate
+                ? `${t('mt.pluginVersion')}: ${pluginUpdate.current} → ${pluginUpdate.latest}`
+                : t('mt.pluginNotChecked'))),
           ),
           pluginUpdate?.hasUpdate
             ? h('div', { style: { marginTop: 6, fontSize: 12, color: 'var(--dsw-alias-status-warn, #f59e0b)' } },
-                t('mt.pluginUpdateAvailable'))
+              t('mt.pluginUpdateAvailable'))
             : null,
+          pluginUpdate && !pluginUpdate.hasUpdate
+            ? h('div', { style: { marginTop: 6, fontSize: 12, opacity: 0.6 } },
+              t('mt.pluginUpToDate', { v: pluginUpdate.current }))
+            : null,
+          h(JobView, {
+            t, job: pluginCheckJob, title: t('mt.pluginCheck'),
+            detail: null,
+            onReset: pluginCheckJob.reset,
+          }),
         ),
 
         // 定时同步
