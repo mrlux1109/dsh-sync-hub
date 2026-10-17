@@ -254,6 +254,12 @@ window.__ModuleLoader__.load({
       'mt.pluginVersion': '版本',
       'mt.pluginNotChecked': '未检查',
       'mt.pluginUpdateAvailable': '有新版本可用，建议更新。',
+      // ── v2.4.1 一键更新落地 ──
+      'mt.pluginApply': '立即更新',
+      'mt.pluginApplyTip': '自动完成：拉取新版 → 备份现有安装 → 整套拷入 → 回读校验；任何一步失败自动回滚，不会留下半套。',
+      'mt.pluginApplied': '已更新到 {v}（回读校验通过）。',
+      'mt.pluginRestart': '重启 DSH 后新版本生效。',
+      'mt.pluginBackup': '旧版已留底：{p}',
 
       // ── S3/S4：缺失工作区（"未分组"的真正解药） ──
       'se.missingTitle': '⚠ {n} 个工作区本机不存在（会话会显示为「未分组」）',
@@ -544,6 +550,11 @@ window.__ModuleLoader__.load({
       'mt.pluginVersion': 'Version',
       'mt.pluginNotChecked': 'Not checked',
       'mt.pluginUpdateAvailable': 'A new version is available. Consider updating.',
+      'mt.pluginApply': 'Update now',
+      'mt.pluginApplyTip': 'Runs it all: fetch new version → back up current install → copy the full set in → verify by re-reading; any failure auto-rolls back, never leaves a half install.',
+      'mt.pluginApplied': 'Updated to {v} (verification passed).',
+      'mt.pluginRestart': 'Restart DSH to run the new version.',
+      'mt.pluginBackup': 'Previous version kept at: {p}',
 
       // ── S3/S4: missing workspaces (the real fix for "ungrouped") ──
       'se.missingTitle': '⚠ {n} workspace(s) do not exist here (sessions show as ungrouped)',
@@ -1553,6 +1564,8 @@ window.__ModuleLoader__.load({
       // v2.3.1：插件更新检查也用 useJob —— 旧版按钮点击无任何反馈（无 busy、失败不显示），
       // 加上后端 execSync 卡死事件循环，看起来就像"假按钮"。
       const pluginCheckJob = useJob()
+      // v2.4.1：一键更新落地（拉 tag → 备份 → 拷入 → 回读校验，失败自动回滚）
+      const pluginApplyJob = useJob()
 
       const doBackup = async () => {
         const r = await backupJob.run(() => apiPost('/content', { action: 'backup' }))
@@ -1715,13 +1728,33 @@ window.__ModuleLoader__.load({
                 : t('mt.pluginNotChecked'))),
           ),
           pluginUpdate?.hasUpdate
-            ? h('div', { style: { marginTop: 6, fontSize: 12, color: 'var(--dsw-alias-status-warn, #f59e0b)' } },
-              t('mt.pluginUpdateAvailable'))
+            ? h('div', { style: { marginTop: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
+              h('span', { style: { fontSize: 12, color: 'var(--dsw-alias-status-warn, #f59e0b)' } },
+                t('mt.pluginUpdateAvailable')),
+              h(ActionButton, {
+                label: t('mt.pluginApply'), small: true, tone: 'primary',
+                busy: pluginApplyJob.running, disabled: pluginApplyJob.running,
+                title: t('mt.pluginApplyTip'),
+                onClick: async () => {
+                  await pluginApplyJob.run(() => apiPost('/content', {
+                    action: 'plugin-update-apply', tag: pluginUpdate.latest,
+                  }))
+                },
+              }),
+            )
             : null,
           pluginUpdate && !pluginUpdate.hasUpdate
             ? h('div', { style: { marginTop: 6, fontSize: 12, opacity: 0.6 } },
               t('mt.pluginUpToDate', { v: pluginUpdate.current }))
             : null,
+          h(JobView, {
+            t, job: pluginApplyJob, title: t('mt.pluginApply'),
+            detail: pluginApplyJob.result
+              ? t('mt.pluginApplied', { v: pluginApplyJob.result.version ?? '' }) + '\n' + t('mt.pluginRestart')
+                + (pluginApplyJob.result.backup ? `\n${t('mt.pluginBackup', { p: pluginApplyJob.result.backup })}` : '')
+              : null,
+            onReset: pluginApplyJob.reset,
+          }),
           h(JobView, {
             t, job: pluginCheckJob, title: t('mt.pluginCheck'),
             detail: null,
