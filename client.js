@@ -37,30 +37,29 @@ window.__ModuleLoader__.load({
     /** 浏览器半身依赖的服务（对应 manifest dsh.client.inject 的四个包）。 */
     const inject = ['slots', 'locale', 'layout']
 
-    /** 六个一级页（开发文档 §4.2，决策 D5）。 */
+    /** 四个一级页（v2.2 D3：6 平铺页 → 状态/内容/知识库/设置）。 */
     const PAGES = [
-      { id: 'overview', labelKey: 'page.overview' },
-      { id: 'sync', labelKey: 'page.sync' },
-      { id: 'skills', labelKey: 'page.skills' },
-      { id: 'memory', labelKey: 'page.memory' },
-      { id: 'sessions', labelKey: 'page.sessions' },
-      { id: 'maintain', labelKey: 'page.maintain' },
+      { id: 'status', labelKey: 'page.status' },
+      { id: 'content', labelKey: 'page.content' },
+      { id: 'knowledge', labelKey: 'page.knowledge' },
+      { id: 'settings', labelKey: 'page.settings' },
     ]
 
     /** 扁平键文案表：zh 为真相源，en 必须同键集。 */
     const ZH = {
       'panel': '同步中枢',
-      'page.overview': '总览',
-      'page.sync': '同步',
-      'page.skills': '技能',
-      'page.memory': '记忆·配置',
-      'page.sessions': '会话',
-      'page.maintain': '维护',
+      'page.status': '📊 状态',
+      'page.content': '📁 内容',
+      'page.knowledge': '📚 知识库',
+      'page.settings': '⚙️ 设置',
+      // 内容页二级 Tab（沿用旧页名，改名会丢已有中文语义）
+      'page.memory': '🧠 记忆·配置',
+      'page.skills': '🛠 技能',
+      'page.sessionsArchive': '💬 会话归档',
       'loading': '读取中…',
       'error': '加载失败：{e}',
       'retry': '重试',
       'refresh': '刷新',
-      'stale': '插件刚更新过，需要重启 DSH 才能加载新面板。',
       'todo.placeholder': '（本页施工中）',
 
       // 全局状态条
@@ -74,7 +73,6 @@ window.__ModuleLoader__.load({
       'bar.off': '关',
       'bar.ok': '正常',
       'bar.missing': '缺失',
-      'bar.none': '无',
 
       // 总览
       'ov.todo': '接下来做什么',
@@ -91,7 +89,6 @@ window.__ModuleLoader__.load({
       'ov.machines': '机器档案',
       'ov.tools': '工具链',
       'ov.machine': '本机',
-      'ov.computer': '计算机名',
       'ov.dshHome': 'DSH 目录',
       'ov.recent': '最近动态',
       'ov.noRecent': '（没有提交记录）',
@@ -160,19 +157,16 @@ window.__ModuleLoader__.load({
       'sync.scopeHint': '日常用「全部」即可；只改了一类就只选那一类，推得更快。',
       'sync.all': '全部',
       'sync.none': '全不选',
-      'sync.advanced': '高级选项',
-      'sync.except': '排除范围',
-      'sync.push': '推送到中枢',
-      'sync.pull': '从中枢拉取',
-      'sync.preview': '预演将推送什么',
+      // ── 飞牛叫法（D2）：主文案用飞牛叫法，专业术语小字备注 ──
+      'sync.push': '📤 上传备份',
+      'sync.pull': '📥 下载恢复',
+      'sync.preview': '👁 预览变化',
       'sync.conflicts': '查看冲突',
-      'sync.previewTitle': '预演结果',
-      'sync.previewEmpty': '所选范围内没有可推送的改动。',
+      'sync.previewTitle': '预览结果',
+      'sync.previewEmpty': '所选范围内没有可上传的改动。',
       'sync.files': '{n} 个文件 · {size}',
       'sync.resultTitle': '执行结果',
       'sync.confirmPush': '确认推送这 {n} 个文件？',
-      'sync.confirmPull': '确认拉取并应用到本机？重启 DSH 后生效。',
-      'sync.working': '执行中…',
       'sync.hint.pull': '拉取会应用到本机；若撞车，冲突解决器会引导你逐文件处理。',
 
       // N6 一键同步流
@@ -184,10 +178,14 @@ window.__ModuleLoader__.load({
       'flow.done': '已推送 {n} 个文件（{commit}）',
       'flow.restartHint': '涉及记忆 / 插件的改动，重启 DSH 后完整生效。',
       'flow.again': '再来一次',
-      'sync.msg.pushed': '已推送 {n} 个文件（{commit}）',
-      'sync.msg.pulled': '已拉取（{commit}）',
+      'sync.msg.pushed': '已上传 {n} 个文件（{commit}）',
+      'sync.msg.pulled': '已恢复（{commit}）',
+      // 专业备注（D2）：飞牛叫法看不懂时的小字解释
+      'sync.term.push': '专业术语：push / 推送 —— 把本机内容提交并上传到云端中枢',
+      'sync.term.pull': '专业术语：pull / 拉取 —— 从云端中枢取回内容到本机',
+      'sync.term.preview': '专业术语：dry-run / 预演 —— 只看不传，确认将发生什么',
+      'sync.term.flow': '一条龙：下载恢复 → 提交 → 上传备份，一步跑完（push · commit · pull）',
       'sync.msg.noConflict': '当前没有冲突。',
-      'sync.err.secret': '推送被守卫拦截：{e}',
 
       // 维护
       'mt.backup': '本机备份快照',
@@ -205,8 +203,6 @@ window.__ModuleLoader__.load({
       'mt.tools': '工具链体检',
       'mt.toolsHint': '必需 / 开发 / 可选三档。缺失只报告，不自动装。',
       'mt.core': '必需',
-      'mt.dev': '开发',
-      'mt.nice': '可选',
       'mt.toolsAll': '全部就位',
       'mt.toolsMissing': '缺 {n} 个：{list}',
       'mt.schedule': '定时同步',
@@ -224,19 +220,48 @@ window.__ModuleLoader__.load({
       'mt.portable': '换机补齐',
       'mt.portableHint': '新机器 pull 之后：按中枢清单现场拉自研插件源码 + 写 link + 挂 bundles。',
       'mt.portableRun': '执行补齐（预演）',
-      'mt.portableSpec': '清单：{name} · tag {tag}',
       'mt.console': '打开控制台',
       'mt.manual': '打开使用手册',
       'mt.consoleHint': '换机器身份（要手输 YES）、全自动一条龙、冲突人工处理——这些必须人工确认的流程走 .bat 窗口。',
       'mt.log': '运行日志',
       'mt.logPath': '路径：{p}',
-      'mt.openDir': '打开目录',
       'mt.pluginUpdate': '插件更新',
       'mt.pluginUpdateHint': '检查 dsh-sync-hub 插件是否有新版本。',
       'mt.pluginCheck': '检查更新',
       'mt.pluginVersion': '版本',
       'mt.pluginNotChecked': '未检查',
       'mt.pluginUpdateAvailable': '有新版本可用，建议更新。',
+
+      // ── 💬 会话归档语义（v2.2 D1：单向归档，不是双向同步） ──
+      'se.archiveTitle': '会话归档说明（单向，不是双向同步）',
+      'se.archiveLine1': '· 每台机器各自备份：上传备份 = 把本机会话存一份到云端归档（不是"同步"，不会来回覆盖）。',
+      'se.archiveLine2': '· 恢复只读：下载恢复 = 把另一台机的会话副本恢复到本机，本机已有的会话永远不会被覆盖（跳过已有）。',
+      'se.archiveLine3': '· 项目文件不走这里：会话只归档对话记录，项目代码请用飞牛同步；且会话按工作区目录归组，目录不存在才会显示未分组。',
+
+      // ── 📚 知识库页（v2.2 D5：IMA 为主） ──
+      'kb.title': '知识库（IMA）',
+      'kb.hint': '手机投喂 → 腾讯云端知识库 → 电脑随时问。dsh-ima-copilot 已在两台机器装好。',
+      'kb.installed': 'IMA Copilot 插件已装（dsh-ima-copilot），我可以直接替你查知识库',
+      'kb.divide': '分工：IMA 管「随手投喂 + 随时问答」；中枢管「结构化长期记忆」（记忆/技能/配置）。项目代码不入中枢，跨机走飞牛同步。',
+      'kb.askPlaceholder': '想问知识库里的什么？例如「上次那份报价单怎么写的」',
+      'kb.ask': '问一下',
+      'kb.askViaModel': '在对话里直接问我即可，我会调用知识库检索后回答。',
+      'kb.setup': '首次配置（一次性，约 5 分钟）',
+      'kb.setupHint': '插件已装但缺 3 个凭据，配一次就能查。位置：DSH 设置 → 插件 → 可配置 → IMA Copilot',
+      'kb.step1': '浏览器登录 ima.qq.com',
+      'kb.step1Body': '打开腾讯 IMA 网页版并登录（和手机 App 同一个账号）。',
+      'kb.step2': 'F12 抓两个值',
+      'kb.step2Body': '开发者工具 → Network → 随便点一个请求 → 复制 IMA_X_IMA_COOKIE 与 IMA_X_IMA_BKN。',
+      'kb.step3': '填知识库 id 并保存',
+      'kb.step3Body': '点进你的知识库，URL 里那串 id 填入 IMA_KNOWLEDGE_BASE_IDS，保存后重启 DSH。',
+      'kb.mobile': '手机投喂',
+      'kb.mobileHint': '装 IMA App，随手就能存',
+      'kb.mobile1': '· 拍照扫描纸质文件 / 合同',
+      'kb.mobile2': '· 微信文章一键转存',
+      'kb.mobile3': '· 上传 PDF、表格、课件',
+      'kb.split': '中枢不重复建设',
+      'kb.splitHint': '为什么不用 TiddlyWiki 当主库',
+      'kb.splitBody': 'IMA 已有手机端与云端同步，体验更好；TiddlyWiki 无手机 App。中枢只保留 git 管的记忆/技能/配置，不再单独建 wiki 轨道，避免两套维护。',
 
       // 技能页
       'sk.summary': '同步概览',
@@ -254,13 +279,13 @@ window.__ModuleLoader__.load({
       'se.local': '本机会话',
       'se.localHint': '对话记录只读拷贝进中枢；凭据类文件永不被包含（硬守卫，负例单测覆盖）。',
       'se.files': '文件',
-      'se.backup': '备份到中枢',
-      'se.hub': '跨机会话备份（只读浏览）',
+      'se.backup': '📤 上传备份（存到中枢）',
+      'se.hub': '跨机会话归档（只读浏览）',
       'se.hubHint': '按机器 → 工作区逐层展开，看另一台电脑聊过什么。全程只读，不会改回本机。',
-      'se.noMachines': '（中枢里还没有任何机器的会话备份）',
-      'se.restoreFrom': '恢复到本机（{machine}）',
-      'se.msg.backed': '已备份 {n} 个文件（跳过 {skipped} 个）',
-      'se.msg.restored': '已恢复 {n} 个（跳过已存在 {same} 个，路径映射 {mapped} 个）',
+      'se.noMachines': '（中枢里还没有任何机器的会话归档）',
+      'se.restoreFrom': '📥 下载恢复到本机（{machine}）',
+      'se.msg.backed': '【结论】已归档 {n} 个会话到中枢。\n【关键】新归档 {n} 个 · 跳过未变更 {skipped} 个\n【细节】另一台机器不会自动拿到，需要它主动"下载恢复"。',
+      'se.msg.restored': '【结论】已恢复 {n} 个会话（跳过本机已有的 {same} 个）。\n【关键】恢复 {n} 个 · 跳过已有 {same} 个 · 路径映射 {mapped} 个\n【细节】若会话显示未分组：确认该项目目录已用飞牛同步到本机（本机会话永远不会被覆盖）。',
 
       // 冲突解决器（N1）
       'cf.title': '拉取撞车 · 冲突解决器',
@@ -277,21 +302,20 @@ window.__ModuleLoader__.load({
       'cf.finish': '收尾（git add + rebase --continue）',
       'cf.finishHint': '只 add 你点名保存过的文件，绝不 add -A；仍有未解决冲突时会拒绝收尾。',
       'cf.finished': '已收尾，rebase 完成。',
-      'cf.open': '打开冲突解决器',
     }
     const EN = {
       'panel': 'Sync Hub',
-      'page.overview': 'Overview',
-      'page.sync': 'Sync',
-      'page.skills': 'Skills',
-      'page.memory': 'Memory · Config',
-      'page.sessions': 'Sessions',
-      'page.maintain': 'Maintain',
+      'page.status': '📊 Status',
+      'page.content': '📁 Content',
+      'page.knowledge': '📚 Knowledge',
+      'page.settings': '⚙️ Settings',
+      'page.memory': '🧠 Memory · Config',
+      'page.skills': '🛠 Skills',
+      'page.sessionsArchive': '💬 Session archive',
       'loading': 'Loading…',
       'error': 'Load failed: {e}',
       'retry': 'Retry',
       'refresh': 'Refresh',
-      'stale': 'The plugin just updated. Restart DSH to load the new panel.',
       'todo.placeholder': '(under construction)',
       'bar.identity': 'Identity',
       'bar.ahead': 'Ahead',
@@ -303,7 +327,6 @@ window.__ModuleLoader__.load({
       'bar.off': 'off',
       'bar.ok': 'ok',
       'bar.missing': 'missing',
-      'bar.none': 'none',
       'ov.todo': 'Next steps',
       'ov.todo.empty': 'All clear, nothing to do.',
       'ov.todo.commit': '{n} uncommitted change(s) — the other machine cannot see them yet',
@@ -318,7 +341,6 @@ window.__ModuleLoader__.load({
       'ov.machines': 'Machines',
       'ov.tools': 'Toolchain',
       'ov.machine': 'Machine',
-      'ov.computer': 'Computer',
       'ov.dshHome': 'DSH home',
       'ov.recent': 'Recent activity',
       'ov.noRecent': '(no commits)',
@@ -385,19 +407,15 @@ window.__ModuleLoader__.load({
       'sync.scopeHint': 'Use "All" for daily sync; pick one category when that is all you changed.',
       'sync.all': 'All',
       'sync.none': 'None',
-      'sync.advanced': 'Advanced',
-      'sync.except': 'Exclude',
-      'sync.push': 'Push',
-      'sync.pull': 'Pull',
-      'sync.preview': 'Preview',
+      'sync.push': '📤 Upload backup',
+      'sync.pull': '📥 Download & restore',
+      'sync.preview': '👁 Preview changes',
       'sync.conflicts': 'Conflicts',
-      'sync.previewTitle': 'Preview',
-      'sync.previewEmpty': 'Nothing to push in the selected scope.',
+      'sync.previewTitle': 'Preview result',
+      'sync.previewEmpty': 'Nothing to upload in the selected scope.',
       'sync.files': '{n} file(s) · {size}',
       'sync.resultTitle': 'Result',
       'sync.confirmPush': 'Push these {n} files?',
-      'sync.confirmPull': 'Pull and apply locally? Restart DSH afterwards.',
-      'sync.working': 'Working…',
       'sync.hint.pull': 'Pull applies locally; on conflict the resolver walks you through it.',
 
       // N6 one-shot sync flow
@@ -409,10 +427,13 @@ window.__ModuleLoader__.load({
       'flow.done': 'Pushed {n} file(s) ({commit})',
       'flow.restartHint': 'Memory / plugin changes take full effect after restarting DSH.',
       'flow.again': 'Run again',
-      'sync.msg.pushed': 'Pushed {n} file(s) ({commit})',
-      'sync.msg.pulled': 'Pulled ({commit})',
+      'sync.msg.pushed': 'Uploaded {n} file(s) ({commit})',
+      'sync.msg.pulled': 'Restored ({commit})',
+      'sync.term.push': 'Terminology: push — commit this machine\'s content and upload it to the cloud hub',
+      'sync.term.pull': 'Terminology: pull — fetch content from the cloud hub back to this machine',
+      'sync.term.preview': 'Terminology: dry-run — look without uploading, to confirm what will happen',
+      'sync.term.flow': 'One-shot: restore → commit → upload in a single run (push · commit · pull)',
       'sync.msg.noConflict': 'No conflicts.',
-      'sync.err.secret': 'Blocked by the secret guard: {e}',
       'mt.backup': 'Local snapshots',
       'mt.backupHint': 'Undo points before touching AGENTS.md / plugin config. Local only.',
       'mt.backupNow': 'Back up now',
@@ -428,8 +449,6 @@ window.__ModuleLoader__.load({
       'mt.tools': 'Toolchain',
       'mt.toolsHint': 'core / dev / nice. Missing tools are reported, never auto-installed.',
       'mt.core': 'core',
-      'mt.dev': 'dev',
-      'mt.nice': 'nice',
       'mt.toolsAll': 'All present',
       'mt.toolsMissing': 'Missing {n}: {list}',
       'mt.schedule': 'Scheduled sync',
@@ -447,19 +466,48 @@ window.__ModuleLoader__.load({
       'mt.portable': 'Portable setup',
       'mt.portableHint': 'After a new machine pulls: clone self-built plugin sources, write links, mount bundles.',
       'mt.portableRun': 'Run setup (dry run)',
-      'mt.portableSpec': 'Spec: {name} · tag {tag}',
       'mt.console': 'Open console',
       'mt.manual': 'Open manual',
       'mt.consoleHint': 'Identity switch (typed YES), one-shot bootstrap, manual conflict handling.',
       'mt.log': 'Logs',
       'mt.logPath': 'Path: {p}',
-      'mt.openDir': 'Open folder',
       'mt.pluginUpdate': 'Plugin update',
       'mt.pluginUpdateHint': 'Check if dsh-sync-hub plugin has a new version.',
       'mt.pluginCheck': 'Check for updates',
       'mt.pluginVersion': 'Version',
       'mt.pluginNotChecked': 'Not checked',
       'mt.pluginUpdateAvailable': 'A new version is available. Consider updating.',
+
+      // ── 💬 Session archive semantics (v2.2 D1: one-way archive) ──
+      'se.archiveTitle': 'About session archiving (one-way, not two-way sync)',
+      'se.archiveLine1': '· Each machine backs up on its own: upload = save a copy of this machine\'s sessions to the cloud archive (it never overwrites back and forth).',
+      'se.archiveLine2': '· Restore is read-only: download = copy another machine\'s sessions here; sessions already on this machine are never overwritten (existing ones are skipped).',
+      'se.archiveLine3': '· Project files do not travel here: only chat records are archived. Sync project code with fnOS; sessions are grouped by workspace folder, so a missing folder shows as ungrouped.',
+
+      // ── 📚 Knowledge page (v2.2 D5: IMA-first) ──
+      'kb.title': 'Knowledge base (IMA)',
+      'kb.hint': 'Phone upload → Tencent cloud KB → ask from PC. dsh-ima-copilot is installed on both machines.',
+      'kb.installed': 'IMA Copilot plugin installed (dsh-ima-copilot) — I can query the knowledge base for you',
+      'kb.divide': 'Split: IMA handles "capture on the go + instant Q&A"; the hub handles structured long-term memory (memory/skills/config). Project code stays out of the hub; use fnOS sync across machines.',
+      'kb.askPlaceholder': 'What do you want to look up? e.g. "how was that quote written"',
+      'kb.ask': 'Ask',
+      'kb.askViaModel': 'Just ask me in chat — I will query the knowledge base and answer.',
+      'kb.setup': 'First-time setup (one-off, ~5 min)',
+      'kb.setupHint': 'The plugin is installed but 3 credentials are missing. Location: DSH Settings → Plugins → Configurable → IMA Copilot',
+      'kb.step1': 'Sign in to ima.qq.com in a browser',
+      'kb.step1Body': 'Open the IMA web app and sign in (same account as the phone app).',
+      'kb.step2': 'Grab two values with F12',
+      'kb.step2Body': 'DevTools → Network → click any request → copy IMA_X_IMA_COOKIE and IMA_X_IMA_BKN.',
+      'kb.step3': 'Fill in the knowledge base id and save',
+      'kb.step3Body': 'Open your knowledge base, copy the id from the URL into IMA_KNOWLEDGE_BASE_IDS, save and restart DSH.',
+      'kb.mobile': 'Phone capture',
+      'kb.mobileHint': 'Install the IMA app and save anything on the go',
+      'kb.mobile1': '· Scan paper documents / contracts',
+      'kb.mobile2': '· Save WeChat articles in one tap',
+      'kb.mobile3': '· Upload PDFs, spreadsheets, slides',
+      'kb.split': 'No duplicate system',
+      'kb.splitHint': 'Why TiddlyWiki is not the primary store',
+      'kb.splitBody': 'IMA already has a phone app and cloud sync — a better experience. TiddlyWiki has no mobile app. The hub keeps only git-managed memory/skills/config and will not build a separate wiki track.',
 
       // Skills page
       'sk.summary': 'Sync overview',
@@ -477,13 +525,13 @@ window.__ModuleLoader__.load({
       'se.local': 'Local sessions',
       'se.localHint': 'Chat history is copied read-only into the hub; credential files are never included (hard guard, covered by negative tests).',
       'se.files': 'files',
-      'se.backup': 'Back up to hub',
-      'se.hub': 'Cross-machine session backups (read-only)',
-      'se.hubHint': 'Expand machine → workspace to see what the other computer talked about. Read-only throughout.',
-      'se.noMachines': '(no session backups in the hub yet)',
-      'se.restoreFrom': 'Restore locally ({machine})',
-      'se.msg.backed': 'Backed up {n} file(s) (skipped {skipped})',
-      'se.msg.restored': 'Restored {n} (skipped {same} existing, path-mapped {mapped})',
+      'se.backup': '📤 Upload backup (to hub)',
+      'se.hub': 'Cross-machine session archive (read-only)',
+      'se.hubHint': 'Expand by machine → workspace to browse what the other PC chatted about. Read-only; nothing is written back.',
+      'se.noMachines': '(no session archives in the hub yet)',
+      'se.restoreFrom': '📥 Download & restore here ({machine})',
+      'se.msg.backed': '[Verdict] Archived {n} session(s) to the hub.\n[Key] Archived {n} · skipped unchanged {skipped}\n[Detail] The other machine will not get them automatically — it must run "download & restore" itself.',
+      'se.msg.restored': '[Verdict] Restored {n} session(s) (skipped {same} already present here).\n[Key] Restored {n} · skipped existing {same} · path-mapped {mapped}\n[Detail] If sessions show as ungrouped: make sure that project folder was synced here via fnOS (existing local sessions are never overwritten).',
 
       // Conflict resolver (N1)
       'cf.title': 'Pull conflict · resolver',
@@ -500,7 +548,6 @@ window.__ModuleLoader__.load({
       'cf.finish': 'Finish (git add + rebase --continue)',
       'cf.finishHint': 'Only adds the files you named; refuses while conflicts remain.',
       'cf.finished': 'Finished — rebase complete.',
-      'cf.open': 'Open conflict resolver',
     }
 
     /** 简易占位符填充：'x {a} y' + {a:1} → 'x 1 y'。 */
@@ -588,33 +635,14 @@ window.__ModuleLoader__.load({
       })
     }
 
-    /** 一行"标签 + 值 + 状态点"。 */
-    function Row({ label, value, level, mono }) {
-      return h('div', {
-        style: {
-          display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0',
-          fontSize: 13, lineHeight: '20px',
-        },
-      },
-        level ? h(Dot, { level }) : null,
-        h('span', { style: { opacity: 0.6, flex: '0 0 auto' } }, label),
-        h('span', {
-          style: {
-            flex: '1 1 auto', textAlign: 'right',
-            fontFamily: mono ? 'ui-monospace, SFMono-Regular, Menlo, monospace' : undefined,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          },
-        }, value),
-      )
-    }
-
-    /** 一张卡片（标题 + 子内容）。 */
-    function Card({ title, hint, children, right }) {
+    /** 一张卡片（标题 + 子内容）。span=2 时在双列网格里占整行。 */
+    function Card({ title, hint, children, right, span }) {
       return h('section', {
         style: {
           border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.08))',
           borderRadius: 10, padding: '12px 14px', marginBottom: 12,
           display: 'flex', flexDirection: 'column', gap: 8,
+          ...(span === 2 ? { gridColumn: '1 / -1', marginBottom: 0 } : {}),
         },
       },
         h('div', { style: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 } },
@@ -668,6 +696,58 @@ window.__ModuleLoader__.load({
     /** 空态提示。 */
     function Empty({ children }) {
       return h('p', { style: { margin: '4px 0', fontSize: 12, opacity: 0.5 } }, children)
+    }
+
+    // ─────────────────── 密度组件（D4 方案 A） ───────────────────
+
+    /**
+     * 自适应网格容器：窄容器自动降列，宽容器自动多列。
+     * 不写死列数，挤不爆也不留白。
+     * @param {object} p { min?:number 一列的最小宽度，默认 160 }
+     */
+    function Grid({ min = 160, gap = 8, children }) {
+      return h('div', {
+        style: {
+          display: 'grid',
+          gridTemplateColumns: `repeat(auto-fit, minmax(${min}px, 1fr))`,
+          gap,
+          marginBottom: 4,
+        },
+      }, children)
+    }
+
+    /**
+     * 指标块：短数字/短文本专用（版本、技能数、领先 N）。
+     * 一屏能看十几项，不再一行占满全宽。
+     * @param {object} p { label, value, level?, hint?, mono? }
+     */
+    function StatTile({ label, value, level, hint, mono }) {
+      const color = level === 'pass' ? 'var(--dsw-alias-status-success, #22c55e)'
+        : level === 'warn' ? 'var(--dsw-alias-status-warning, #f59e0b)'
+          : level === 'fail' ? 'var(--dsw-alias-status-danger, #ef4444)'
+            : 'var(--dsw-alias-label-primary, inherit)'
+      return h('div', {
+        style: {
+          border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.08))',
+          borderRadius: 10, padding: '9px 12px',
+          display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0,
+        },
+      },
+        h('div', {
+          style: {
+            fontSize: 11, opacity: 0.6, lineHeight: '16px',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          },
+        }, label),
+        h('div', {
+          style: {
+            fontSize: 17, fontWeight: 600, lineHeight: '24px', color,
+            fontFamily: mono ? 'ui-monospace, SFMono-Regular, Menlo, monospace' : undefined,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          },
+        }, String(value ?? '—')),
+        hint ? h('div', { style: { fontSize: 11, opacity: 0.45, lineHeight: '15px' } }, hint) : null,
+      )
     }
 
     // ─────────────────── 全局状态条 ───────────────────
@@ -791,76 +871,82 @@ window.__ModuleLoader__.load({
           )
           : null,
 
-        // 中枢卡
+        // 中枢卡（D4 密度改造：平铺 Row → 自适应网格指标块）
         h(Card, { title: t('ov.hub') },
-          h(Row, { label: t('ov.version'), value: data?.version ?? '—', mono: true }),
-          h(Row, { label: t('ov.branch'), value: st.branch ?? '—', mono: true }),
-          h(Row, {
-            label: t('ov.lastCommit'),
-            value: st.lastCommit ? `${st.lastCommit.hash} ${st.lastCommit.subject}` : '—',
-            mono: true,
-          }),
-          h(Row, { label: t('ov.skills'), value: data?.inventory?.skills ?? '—' }),
-          h(Row, { label: t('ov.machines'), value: data?.inventory?.machines ?? '—' }),
-          h(Row, {
-            label: t('ov.tools'),
-            value: data?.tools ? `${data.tools.present}/${data.tools.total}` : '—',
-            level: (data?.tools?.missingCore?.length ?? 0) > 0 ? 'fail' : 'pass',
-          }),
+          h(Grid, { min: 140 },
+            h(StatTile, { label: t('ov.version'), value: data?.version ?? '—', mono: true }),
+            h(StatTile, { label: t('ov.branch'), value: st.branch ?? '—', mono: true }),
+            h(StatTile, { label: t('ov.skills'), value: data?.inventory?.skills ?? '—' }),
+            h(StatTile, { label: t('ov.machines'), value: data?.inventory?.machines ?? '—' }),
+            h(StatTile, {
+              label: t('ov.tools'),
+              value: data?.tools ? `${data.tools.present}/${data.tools.total}` : '—',
+              level: (data?.tools?.missingCore?.length ?? 0) > 0 ? 'fail' : 'pass',
+              mono: true,
+            }),
+            h(StatTile, {
+              label: t('ov.lastCommit'),
+              value: st.lastCommit ? st.lastCommit.hash : '—',
+              hint: st.lastCommit ? st.lastCommit.subject : null,
+              mono: true,
+            }),
+          ),
         ),
-        // 本机卡
+        // 本机卡（D4：两行信息 → 双列网格，不再各占全宽）
         h(Card, { title: t('ov.machine') },
-          h(Row, { label: t('bar.identity'), value: data?.machine?.computer ?? '—', mono: true }),
-          h(Row, { label: t('ov.dshHome'), value: data?.machine?.dshHome ?? '—', mono: true }),
+          h(Grid, { min: 220 },
+            h(StatTile, { label: t('bar.identity'), value: data?.machine?.computer ?? '—', mono: true }),
+            h(StatTile, { label: t('ov.dshHome'), value: data?.machine?.dshHome ?? '—', mono: true }),
+          ),
         ),
-        // 机器看板（N5：另一台上次什么时候同步过）
-        h(Card, { title: t('ov.board') },
-          (data?.board ?? []).length === 0
-            ? h(Empty, null, t('ov.noBoard'))
-            : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
-              (data.board ?? []).map((m) => h('div', {
-                key: m.id,
-                style: {
-                  display: 'flex', alignItems: 'center', gap: 8, fontSize: 13,
-                  padding: '5px 0', borderBottom: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.05))',
-                },
-              },
-                h(Dot, { level: m.lastWhen ? 'pass' : 'info' }),
-                h('span', { style: { flex: '0 0 auto', fontWeight: 500 } }, m.id),
-                h('span', { style: { flex: '0 0 auto', opacity: 0.5, fontSize: 12 } }, m.computer ?? '?'),
-                h('span', {
-                  style: { flex: '1 1 auto', textAlign: 'right', fontSize: 12, opacity: 0.7 },
-                  title: m.lastSubject ?? undefined,
-                }, m.lastWhen ? `${m.lastWhen}${m.lastCommit ? ' · ' + m.lastCommit : ''}` : t('ov.boardNever')),
-              )),
-            ),
-        ),
-
-        // 最近动态（N2：展开后是带机器筛选的完整时间线）
-        h(Card, {
-          title: t('ov.recent'),
-          right: h(ActionButton, {
-            label: timelineOpen ? t('tl.collapse') : t('tl.expand'),
-            small: true,
-            onClick: () => setTimelineOpen(!timelineOpen),
-          }),
-        },
-          timelineOpen
-            ? h(TimelineView, { t })
-            : (recent.length === 0
-              ? h(Empty, null, t('ov.noRecent'))
+        // 机器看板 + 最近动态（D4：内容量相近的两卡并排，不各占整行）
+        h(Grid, { min: 300 },
+          h(Card, { title: t('ov.board') },
+            (data?.board ?? []).length === 0
+              ? h(Empty, null, t('ov.noBoard'))
               : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
-                recent.slice(0, 6).map((c) => h('div', {
-                  key: c.hash,
-                  style: { display: 'flex', gap: 8, fontSize: 12, alignItems: 'baseline' },
+                (data.board ?? []).map((m) => h('div', {
+                  key: m.id,
+                  style: {
+                    display: 'flex', alignItems: 'center', gap: 8, fontSize: 13,
+                    padding: '5px 0', borderBottom: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.05))',
+                  },
                 },
-                  h('span', { style: { opacity: 0.5, fontFamily: 'ui-monospace, monospace', flex: '0 0 auto' } }, c.hash.slice(0, 7)),
+                  h(Dot, { level: m.lastWhen ? 'pass' : 'info' }),
+                  h('span', { style: { flex: '0 0 auto', fontWeight: 500 } }, m.id),
+                  h('span', { style: { flex: '0 0 auto', opacity: 0.5, fontSize: 12 } }, m.computer ?? '?'),
                   h('span', {
-                    style: { flex: '1 1 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-                  }, c.subject),
-                  h('span', { style: { opacity: 0.5, flex: '0 0 auto' } }, c.date),
+                    style: { flex: '1 1 auto', textAlign: 'right', fontSize: 12, opacity: 0.7 },
+                    title: m.lastSubject ?? undefined,
+                  }, m.lastWhen ? `${m.lastWhen}${m.lastCommit ? ' · ' + m.lastCommit : ''}` : t('ov.boardNever')),
                 )),
-              )),
+              ),
+          ),
+          h(Card, {
+            title: t('ov.recent'),
+            right: h(ActionButton, {
+              label: timelineOpen ? t('tl.collapse') : t('tl.expand'),
+              small: true,
+              onClick: () => setTimelineOpen(!timelineOpen),
+            }),
+          },
+            timelineOpen
+              ? h(TimelineView, { t })
+              : (recent.length === 0
+                ? h(Empty, null, t('ov.noRecent'))
+                : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
+                  recent.slice(0, 6).map((c) => h('div', {
+                    key: c.hash,
+                    style: { display: 'flex', gap: 8, fontSize: 12, alignItems: 'baseline' },
+                  },
+                    h('span', { style: { opacity: 0.5, fontFamily: 'ui-monospace, monospace', flex: '0 0 auto' } }, c.hash.slice(0, 7)),
+                    h('span', {
+                      style: { flex: '1 1 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+                    }, c.subject),
+                    h('span', { style: { opacity: 0.5, flex: '0 0 auto' } }, c.date),
+                  )),
+                )),
+          ),
         ),
       )
     }
@@ -1218,53 +1304,58 @@ window.__ModuleLoader__.load({
                 ),
         ),
 
-        h(Card, { title: t('sync.scope'), hint: t('sync.scopeHint') },
-          h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6 } },
-            h(ActionButton, {
-              label: t('sync.all'), small: true,
-              onClick: () => setScopes([...SCOPES]),
-            }),
-            h(ActionButton, {
-              label: t('sync.none'), small: true,
-              onClick: () => setScopes([]),
-            }),
+// 同步范围 + 动作卡（D4：左右互补，左选右执，并排不浪费）
+        h(Grid, { min: 300 },
+          h(Card, { title: t('sync.scope'), hint: t('sync.scopeHint') },
+            h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6 } },
+              h(ActionButton, {
+                label: t('sync.all'), small: true,
+                onClick: () => setScopes([...SCOPES]),
+              }),
+              h(ActionButton, {
+                label: t('sync.none'), small: true,
+                onClick: () => setScopes([]),
+              }),
+            ),
+            h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 } },
+              SCOPES.map((s) => h('button', {
+                key: s,
+                type: 'button',
+                onClick: () => toggle(s),
+                'aria-pressed': scopes.includes(s),
+                style: {
+                  appearance: 'none', cursor: 'pointer', fontSize: 12,
+                  padding: '4px 10px', borderRadius: 999,
+                  border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.12))',
+                  background: scopes.includes(s)
+                    ? 'var(--dsw-alias-button-primary-bg, #2563eb)' : 'transparent',
+                  color: scopes.includes(s) ? '#fff' : 'inherit',
+                },
+              }, s)),
+            ),
+            // 就地反馈：预演/推送结果贴在这张卡里
+            h(InlineNote, {
+              tone: note?.tone,
+            }, note?.text),
           ),
-          h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 } },
-            SCOPES.map((s) => h('button', {
-              key: s,
-              type: 'button',
-              onClick: () => toggle(s),
-              'aria-pressed': scopes.includes(s),
-              style: {
-                appearance: 'none', cursor: 'pointer', fontSize: 12,
-                padding: '4px 10px', borderRadius: 999,
-                border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.12))',
-                background: scopes.includes(s)
-                  ? 'var(--dsw-alias-button-primary-bg, #2563eb)' : 'transparent',
-                color: scopes.includes(s) ? '#fff' : 'inherit',
-              },
-            }, s)),
-          ),
-          // 就地反馈：预演/推送结果贴在这张卡里
-          h(InlineNote, {
-            tone: note?.tone,
-          }, note?.text),
-        ),
 
-        // 动作卡（v2.0.5：常驻回执 + 已用时 + 执行中禁全部按钮）
-        h(Card, { title: t('sync.resultTitle') },
+          // 动作卡（v2.0.5：常驻回执 + 已用时 + 执行中禁全部按钮）
+          h(Card, { title: t('sync.resultTitle'), hint: t('sync.term.flow') },
           h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 8 } },
             h(ActionButton, {
               label: t('sync.preview'), onClick: runPreview,
               busy: busy === 'preview', disabled: anyRunning,
+              title: t('sync.term.preview'),
             }),
             h(ActionButton, {
               label: t('sync.push'), tone: 'primary', onClick: runPush,
               busy: pushJob.running, disabled: anyRunning || scopes.length === 0,
+              title: t('sync.term.push'),
             }),
             h(ActionButton, {
               label: t('sync.pull'), onClick: runPull,
               busy: pullJob.running, disabled: anyRunning,
+              title: t('sync.term.pull'),
             }),
             h(ActionButton, {
               label: t('sync.conflicts'), onClick: runConflicts,
@@ -1312,6 +1403,7 @@ window.__ModuleLoader__.load({
             : preview
               ? h(Empty, null, t('sync.previewEmpty'))
               : null,
+          ),
         ),
       )
     }
@@ -1430,8 +1522,9 @@ window.__ModuleLoader__.load({
           ),
         ),
 
-        // 工具链
-        h(Card, { title: t('mt.tools'), hint: t('mt.toolsHint') },
+        // 工具链 + 插件更新 + 定时同步 + 凭据 + 自动推送（D4：信息量小的卡并排）
+        h(Grid, { min: 280 },
+          h(Card, { title: t('mt.tools'), hint: t('mt.toolsHint') },
           missingAll.length === 0
             ? h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 } },
               h(Dot, { level: 'pass' }), h('span', null, t('mt.toolsAll')))
@@ -1497,19 +1590,20 @@ window.__ModuleLoader__.load({
         ),
 
         // N7 自动推送开关（记忆页保存后是否立即 push；默认关）
-        h(Card, { title: t('ap.title'), hint: t('ap.hint') },
-          h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 } },
-            h(Dot, { level: autoPush ? 'pass' : 'info' }),
-            h('span', { style: { flex: '1 1 auto' } }, autoPush ? t('ap.on') : t('ap.off')),
-            h(ActionButton, {
-              label: autoPush ? t('ap.turnOff') : t('ap.turnOn'),
-              small: true,
-              tone: autoPush ? undefined : 'primary',
-              onClick: async () => {
-                const r = await apiPost('/autopush', { enabled: !autoPush })
-                if (r.ok) setAutoPush(!autoPush)
-              },
-            }),
+          h(Card, { title: t('ap.title'), hint: t('ap.hint') },
+            h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 } },
+              h(Dot, { level: autoPush ? 'pass' : 'info' }),
+              h('span', { style: { flex: '1 1 auto' } }, autoPush ? t('ap.on') : t('ap.off')),
+              h(ActionButton, {
+                label: autoPush ? t('ap.turnOff') : t('ap.turnOn'),
+                small: true,
+                tone: autoPush ? undefined : 'primary',
+                onClick: async () => {
+                  const r = await apiPost('/autopush', { enabled: !autoPush })
+                  if (r.ok) setAutoPush(!autoPush)
+                },
+              }),
+            ),
           ),
         ),
 
@@ -1616,26 +1710,6 @@ window.__ModuleLoader__.load({
 
       return h('div', null,
         // 汇总卡
-        h(Card, { title: t('sk.summary'), right: h(ActionButton, { label: t('refresh'), small: true, onClick: load }) },
-          error ? h(InlineNote, { tone: 'error' }, t('error', { e: error })) : null,
-          summary
-            ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px 14px', fontSize: 13 } },
-              h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 5 } }, h(Dot, { level: 'pass' }), `一致 ${summary.identical}`),
-              h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 5 } }, h(Dot, { level: 'warn' }), `仅本机 ${summary.onlyLocal}`),
-              h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 5 } }, h(Dot, { level: 'info' }), `仅中枢 ${summary.onlyHub}`),
-              h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 5 } }, h(Dot, { level: 'fail' }), `两边不同 ${summary.differ}`),
-              summary.placeholders > 0
-                ? h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 5 } }, h(Dot, { level: 'info' }), `占位/空壳 ${summary.placeholders}`)
-                : null,
-            )
-            : h(Empty, null, t('loading')),
-          // 非法名警示（DSH 会静默跳过它们，这里必须让人看见）
-          invalid.length > 0
-            ? h(InlineNote, { tone: 'error' },
-              `${t('sk.invalidWarn')}：${invalid.join('、')}`)
-            : null,
-        ),
-
         // 过滤 + 列表
         h(Card, { title: t('sk.list') },
           h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 } },
@@ -1681,9 +1755,32 @@ window.__ModuleLoader__.load({
             ),
         ),
 
-        // 能力边界说明（不假装已有导入/回收站）
-        h(Card, { title: t('sk.scopeTitle') },
-          h('p', { style: { margin: 0, fontSize: 12, opacity: 0.7, lineHeight: '18px' } }, t('sk.scopeBody')),
+        // 同步概览 + 能力边界说明（D4：两张矮卡并排，不各占整行）
+        h(Grid, { min: 300 },
+          h(Card, { title: t('sk.summary'), right: h(ActionButton, { label: t('refresh'), small: true, onClick: load }) },
+            error ? h(InlineNote, { tone: 'error' }, t('error', { e: error })) : null,
+            summary
+              ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px 14px', fontSize: 13 } },
+                h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 5 } }, h(Dot, { level: 'pass' }), `一致 ${summary.identical}`),
+                h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 5 } }, h(Dot, { level: 'warn' }), `仅本机 ${summary.onlyLocal}`),
+                h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 5 } }, h(Dot, { level: 'info' }), `仅中枢 ${summary.onlyHub}`),
+                h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 5 } }, h(Dot, { level: 'fail' }), `两边不同 ${summary.differ}`),
+                summary.placeholders > 0
+                  ? h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 5 } }, h(Dot, { level: 'info' }), `占位/空壳 ${summary.placeholders}`)
+                  : null,
+              )
+              : h(Empty, null, t('loading')),
+            // 非法名警示（DSH 会静默跳过它们，这里必须让人看见）
+            invalid.length > 0
+              ? h(InlineNote, { tone: 'error' },
+                `${t('sk.invalidWarn')}：${invalid.join('、')}`)
+              : null,
+          ),
+
+          // 能力边界说明（不假装已有导入/回收站）
+          h(Card, { title: t('sk.scopeTitle') },
+            h('p', { style: { margin: 0, fontSize: 12, opacity: 0.7, lineHeight: '18px' } }, t('sk.scopeBody')),
+          ),
         ),
       )
     }
@@ -1728,6 +1825,15 @@ window.__ModuleLoader__.load({
       const machines = info?.hub?.machines ?? []
 
       return h('div', null,
+        // v2.2 D1：会话轨道定位明示 —— 单向归档，不是双向同步
+        h(Card, { title: t('se.archiveTitle') },
+          h('div', { style: { display: 'flex', flexDirection: 'column', gap: 5, fontSize: 12, lineHeight: '19px' } },
+            h('div', null, t('se.archiveLine1')),
+            h('div', null, t('se.archiveLine2')),
+            h('div', null, t('se.archiveLine3')),
+          ),
+        ),
+
         h(Card, {
           title: t('se.local'), hint: t('se.localHint'),
           right: h(ActionButton, {
@@ -2136,6 +2242,127 @@ window.__ModuleLoader__.load({
       )
     }
 
+    /** 页内二级 Tab 条（内容页/知识库页复用）。 */
+    function SubTabs({ tabs, active, onPick }) {
+      return h('div', {
+        role: 'tablist',
+        style: {
+          display: 'flex', gap: 4, marginBottom: 12,
+          borderBottom: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.08))',
+        },
+      }, tabs.map((x) => h('button', {
+        key: x.id,
+        type: 'button',
+        role: 'tab',
+        'aria-selected': active === x.id,
+        onClick: () => onPick(x.id),
+        style: {
+          appearance: 'none', border: 'none', background: 'transparent', cursor: 'pointer',
+          padding: '7px 12px', fontSize: 13, lineHeight: '20px',
+          color: active === x.id
+            ? 'var(--dsw-alias-label-primary, inherit)'
+            : 'var(--dsw-alias-label-tertiary, inherit)',
+          borderBottom: active === x.id ? '2px solid var(--dsw-alias-label-primary, currentColor)' : '2px solid transparent',
+          marginBottom: -1,
+        },
+      }, x.label)))
+    }
+
+    /**
+     * 📊 状态页（v2.2 D3）：原「总览」+「同步」合并。
+     * 上半 = 一屏看完的指标，下半 = 传什么的动作（一键同步 / 范围 / 执行）。
+     */
+    function StatusPage({ t, data, onRefresh, onGoSync }) {
+      return h('div', null,
+        h(OverviewPage, { t, data, onGoSync }),
+        h('div', { style: { height: 12 } }),
+        h(SyncPage, { t, data, onRefresh }),
+      )
+    }
+
+    /**
+     * 📁 内容页（v2.2 D3）：原「技能」+「记忆配置」+「会话」合并为三 Tab。
+     * 都是"传什么"的内容，Tab 切换省去顶层页签来回跳。
+     */
+    function ContentPage({ t, data, onRefresh }) {
+      const [tab, setTab] = useState('memory')
+      const tabs = [
+        { id: 'memory', label: t('page.memory') },
+        { id: 'skills', label: t('page.skills') },
+        { id: 'sessions', label: t('page.sessionsArchive') },
+      ]
+      return h('div', null,
+        h(SubTabs, { tabs, active: tab, onPick: setTab }),
+        tab === 'memory' ? h(MemoryPage, { t, data, onRefresh })
+          : tab === 'skills' ? h(SkillsPage, { t, data, onRefresh })
+            : h(SessionsPage, { t, data, onRefresh }),
+      )
+    }
+
+    /**
+     * 📚 知识库页（v2.2 D5）：IMA 为主。
+     * 投喂（手机 App）→ 云端知识库 → 电脑端 dsh-ima-copilot 随时问。
+     * 中枢只管 memory/ 与 skills/，不建 wiki/ 轨道（避免两套维护）。
+     */
+    function KnowledgePage({ t, data }) {
+      const [q, setQ] = useState('')
+      const [state, setState] = useState({ kind: 'idle', text: null })
+      const [ask, setAsk] = useState('')
+
+      return h('div', null,
+        // IMA 状态 + 问答
+        h(Card, { title: t('kb.title'), hint: t('kb.hint') },
+          h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 } },
+            h(Dot, { level: 'pass' }),
+            h('span', null, t('kb.installed')),
+          ),
+          h(InlineNote, { tone: 'info' }, t('kb.divide')),
+          // 问一句
+          h('div', { style: { display: 'flex', gap: 6, marginTop: 4 } },
+            h('input', {
+              value: ask,
+              onChange: (e) => setAsk(e.target.value),
+              placeholder: t('kb.askPlaceholder'),
+              style: {
+                flex: '1 1 auto', minWidth: 0, padding: '7px 10px', fontSize: 13, borderRadius: 8,
+                border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.12))',
+                background: 'var(--dsw-alias-bg-base, transparent)', color: 'inherit',
+              },
+            }),
+            h(ActionButton, {
+              label: t('kb.ask'), tone: 'primary',
+              disabled: !ask.trim(),
+              onClick: () => { setState({ kind: 'idle', text: t('kb.askViaModel') }) },
+            }),
+          ),
+          state.text ? h(InlineNote, { tone: state.kind }, state.text) : null,
+        ),
+
+        // 凭据未配时的图文指引
+        h(Card, { title: t('kb.setup'), hint: t('kb.setupHint') },
+          h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12, lineHeight: '20px', opacity: 0.8 } },
+            h('div', { style: { fontWeight: 600, opacity: 1 } }, `1. ${t('kb.step1')}`),
+            h('div', null, t('kb.step1Body')),
+            h('div', { style: { fontWeight: 600, opacity: 1, marginTop: 4 } }, `2. ${t('kb.step2')}`),
+            h('div', null, t('kb.step2Body')),
+            h('div', { style: { fontWeight: 600, opacity: 1, marginTop: 4 } }, `3. ${t('kb.step3')}`),
+            h('div', null, t('kb.step3Body')),
+          ),
+        ),
+
+        // 手机投喂 + 分工
+        h(Grid, { min: 300 },
+          h(Card, { title: t('kb.mobile'), hint: t('kb.mobileHint') },
+            h('div', { style: { fontSize: 12, opacity: 0.75, lineHeight: '20px' } },
+              `${t('kb.mobile1')}\n${t('kb.mobile2')}\n${t('kb.mobile3')}`),
+          ),
+          h(Card, { title: t('kb.split'), hint: t('kb.splitHint') },
+            h('div', { style: { fontSize: 12, opacity: 0.75, lineHeight: '20px' } }, t('kb.splitBody')),
+          ),
+        ),
+      )
+    }
+
     // ─────────────────── 面板骨架 ───────────────────
 
     // ─────────────────── 首次运行引导（onboarding） ───────────────────
@@ -2253,7 +2480,7 @@ window.__ModuleLoader__.load({
      */
     function SyncHubPanel(p) {
       const t = typeof p.t === 'function' ? p.t : makeT(p.ctx ?? {}).t
-      const [pageId, setPageId] = useState('overview')
+      const [pageId, setPageId] = useState('status')
       const [data, setData] = useState(null)
       const [error, setError] = useState(null)
       const [loading, setLoading] = useState(true)
@@ -2283,7 +2510,7 @@ window.__ModuleLoader__.load({
 
       useEffect(() => { refresh() }, [refresh])
 
-      const goSync = useCallback(() => setPageId('sync'), [])
+      const goSync = useCallback(() => setPageId('status'), [])
 
       const page = PAGES.find((x) => x.id === pageId) ?? PAGES[0]
 
@@ -2302,12 +2529,10 @@ window.__ModuleLoader__.load({
           h(InlineNote, { tone: 'error' }, t('error', { e: error })),
           h(ActionButton, { label: t('retry'), small: true, onClick: refresh }),
         )
-      } else if (pageId === 'overview') body = h(OverviewPage, { t, data, onGoSync: goSync })
-      else if (pageId === 'sync') body = h(SyncPage, { t, data, onRefresh: refresh })
-      else if (pageId === 'skills') body = h(SkillsPage, { t, data, onRefresh: refresh })
-      else if (pageId === 'memory') body = h(MemoryPage, { t, data, onRefresh: refresh })
-      else if (pageId === 'sessions') body = h(SessionsPage, { t, data, onRefresh: refresh })
-      else if (pageId === 'maintain') body = h(MaintainPage, { t, data, onRefresh: refresh })
+      } else if (pageId === 'status') body = h(StatusPage, { t, data, onRefresh: refresh, onGoSync: goSync })
+      else if (pageId === 'content') body = h(ContentPage, { t, data, onRefresh: refresh })
+      else if (pageId === 'knowledge') body = h(KnowledgePage, { t, data })
+      else if (pageId === 'settings') body = h(MaintainPage, { t, data, onRefresh: refresh })
       else body = h(PageStub, { t, label: t(page.labelKey) })
 
       return h('div', {
