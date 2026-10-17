@@ -232,6 +232,18 @@ window.__ModuleLoader__.load({
       'mt.pluginNotChecked': '未检查',
       'mt.pluginUpdateAvailable': '有新版本可用，建议更新。',
 
+      // ── S3/S4：缺失工作区（"未分组"的真正解药） ──
+      'se.missingTitle': '⚠ {n} 个工作区本机不存在（会话会显示为「未分组」）',
+      'se.missingHint': 'DSH 按目录是否存在给会话归组，与里面有没有文件无关。所以建个空目录就能正确归组——不必用飞牛同步整个项目。',
+      'se.missingMeta': '{m} · {n} 个会话',
+      'se.missingMore': '…另有 {n} 个未显示',
+      'se.missingHow': '两种办法：A 点右边「一键创建空目录」立刻归组；B 项目代码用飞牛同步到同路径（中枢不管项目代码），需要哪个同步哪个。',
+      'se.mkdir': '📁 一键创建空目录',
+      'se.mkdirCreated': '【结论】已创建 {n} 个空目录，会话将正确归组。',
+      'se.mkdirExisted': '已存在 {n} 个（跳过）。',
+      'se.mkdirFailed': '{n} 个创建失败（通常是权限不足），详见下方失败项。',
+      'se.mkdirHint': '【细节】只建了空目录，没有下载任何会话。想看内容请用飞牛同步项目代码。',
+
       // ── 💬 会话归档语义（v2.2 D1：单向归档，不是双向同步） ──
       'se.archiveTitle': '会话归档说明（单向，不是双向同步）',
       'se.archiveLine1': '· 每台机器各自备份：上传备份 = 把本机会话存一份到云端归档（不是"同步"，不会来回覆盖）。',
@@ -477,6 +489,18 @@ window.__ModuleLoader__.load({
       'mt.pluginVersion': 'Version',
       'mt.pluginNotChecked': 'Not checked',
       'mt.pluginUpdateAvailable': 'A new version is available. Consider updating.',
+
+      // ── S3/S4: missing workspaces (the real fix for "ungrouped") ──
+      'se.missingTitle': '⚠ {n} workspace(s) do not exist here (sessions show as ungrouped)',
+      'se.missingHint': 'DSH groups sessions by whether the folder exists — not by its contents. So an empty folder is enough; you do not need to sync the whole project.',
+      'se.missingMeta': '{m} · {n} sessions',
+      'se.missingMore': '…and {n} more not shown',
+      'se.missingHow': 'Two options: A click "create empty folders" to group them now; B sync the project code via fnOS to the same path (the hub does not carry project code) — sync only what you need.',
+      'se.mkdir': '📁 Create empty folders',
+      'se.mkdirCreated': '[Verdict] Created {n} empty folder(s); sessions will group correctly.',
+      'se.mkdirExisted': '{n} already existed (skipped).',
+      'se.mkdirFailed': '{n} failed (usually permissions).',
+      'se.mkdirHint': '[Detail] Only empty folders were created; no session was downloaded. Use fnOS to sync project code.',
 
       // ── 💬 Session archive semantics (v2.2 D1: one-way archive) ──
       'se.archiveTitle': 'About session archiving (one-way, not two-way sync)',
@@ -1823,6 +1847,29 @@ window.__ModuleLoader__.load({
       }
 
       const machines = info?.hub?.machines ?? []
+      const missing = info?.missing ?? []
+
+      // S4：一键创建缺失空目录（只建空目录，不写任何文件）
+      const createDirs = async () => {
+        setBusy('mkdir')
+        setNote(null)
+        const r = await apiPost('/sessions', {
+          action: 'create-missing-dirs',
+          paths: missing.map((m) => m.path),
+        })
+        setBusy(null)
+        if (!r.ok) { setNote({ tone: 'error', text: r.error }); return }
+        const parts = []
+        if (r.created?.length) parts.push(t('se.mkdirCreated', { n: r.created.length }))
+        if (r.existed?.length) parts.push(t('se.mkdirExisted', { n: r.existed.length }))
+        if (r.failed?.length) parts.push(t('se.mkdirFailed', { n: r.failed.length }))
+        setNote({
+          tone: r.failed?.length ? 'error' : 'success',
+          text: parts.join('\n')
+            + '\n' + t('se.mkdirHint'),
+        })
+        load()
+      }
 
       return h('div', null,
         // v2.2 D1：会话轨道定位明示 —— 单向归档，不是双向同步
@@ -1833,6 +1880,48 @@ window.__ModuleLoader__.load({
             h('div', null, t('se.archiveLine3')),
           ),
         ),
+
+        // v2.2 S3/S4：缺失工作区检测 + 一键建空目录（"未分组"的真正解药）
+        missing.length > 0
+          ? h(Card, {
+            title: t('se.missingTitle', { n: missing.length }),
+            hint: t('se.missingHint'),
+            right: h(ActionButton, {
+              label: t('se.mkdir'), tone: 'primary', small: true,
+              onClick: createDirs, busy: busy === 'mkdir',
+            }),
+          },
+            h('div', {
+              style: {
+                display: 'flex', flexDirection: 'column', gap: 6,
+                fontSize: 12, lineHeight: '18px',
+              },
+            },
+              ...missing.slice(0, 8).map((m) => h('div', {
+                key: m.path,
+                style: {
+                  display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+                  gap: 8, padding: '5px 8px', borderRadius: 6,
+                  background: 'var(--dsw-alias-fill-quaternary, rgba(0,0,0,0.03))',
+                },
+              },
+                h('span', {
+                  style: {
+                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  },
+                }, m.path),
+                h('span', { style: { opacity: 0.6, flex: '0 0 auto', fontSize: 11 } },
+                  t('se.missingMeta', { m: m.machines.join('/'), n: m.files })),
+              )),
+              missing.length > 8
+                ? h('div', { style: { opacity: 0.55, fontSize: 11 } },
+                  t('se.missingMore', { n: missing.length - 8 }))
+                : null,
+              h('div', { style: { opacity: 0.65, marginTop: 2 } }, t('se.missingHow')),
+            ),
+          )
+          : null,
 
         h(Card, {
           title: t('se.local'), hint: t('se.localHint'),
