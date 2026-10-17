@@ -214,6 +214,7 @@ window.__ModuleLoader__.load({
       'sync.conflicts': '查看冲突',
       'sync.previewTitle': '预览结果',
       'sync.previewEmpty': '所选范围内没有可上传的改动。',
+      'sync.moreFiles': '……另有 {n} 个文件未显示',
       'sync.files': '{n} 个文件 · {size}',
       'sync.confirmPush': '确认推送这 {n} 个文件？',
       'sync.hint.pull': '拉取会应用到本机；若撞车，冲突解决器会引导你逐文件处理。',
@@ -352,6 +353,7 @@ window.__ModuleLoader__.load({
       'sk.list': '技能对比（本机 ↔ 中枢）',
       'sk.filterAll': '全部',
       'sk.noRows': '（没有匹配的技能）',
+      'sk.moreRows': '……另有 {n} 个未显示（全量对比可用对话里的「技能清单」）',
       'sk.local': '本机',
       'sk.hub': '中枢',
       'sk.placeholder': '占位/空壳',
@@ -542,6 +544,7 @@ window.__ModuleLoader__.load({
       'sync.conflicts': 'Conflicts',
       'sync.previewTitle': 'Preview result',
       'sync.previewEmpty': 'Nothing to upload in the selected scope.',
+      'sync.moreFiles': '…and {n} more file(s) not shown',
       'sync.files': '{n} file(s) · {size}',
       'sync.confirmPush': 'Push these {n} files?',
       'sync.hint.pull': 'Pull applies locally; on conflict the resolver walks you through it.',
@@ -664,6 +667,7 @@ window.__ModuleLoader__.load({
       'sk.list': 'Skill comparison (local ↔ hub)',
       'sk.filterAll': 'All',
       'sk.noRows': '(no matching skills)',
+      'sk.moreRows': '…and {n} more not shown (full compare: ask for the skill list in chat)',
       'sk.local': 'local',
       'sk.hub': 'hub',
       'sk.placeholder': 'placeholder',
@@ -1627,7 +1631,9 @@ window.__ModuleLoader__.load({
               style: {
                 marginTop: 8, padding: 8, borderRadius: 8, fontSize: 12,
                 background: 'var(--dsw-alias-bg-fill-subtle, rgba(0,0,0,0.04))',
-                maxHeight: 200, overflow: 'auto',
+                // v2.6.2：200 → 260px，并加底部计数。这是"确认要传什么"的
+                // 关键信息区，砍太矮反而要反复滚动确认。
+                maxHeight: 260, overflow: 'auto',
               },
             },
               h('div', { style: { fontWeight: 500, marginBottom: 4 } },
@@ -1638,6 +1644,10 @@ window.__ModuleLoader__.load({
                 key: f.path,
                 style: { fontFamily: 'ui-monospace, monospace', opacity: 0.8, lineHeight: '18px' },
               }, f.path)),
+              preview.files.length > 50
+                ? h('div', { style: { opacity: 0.55, fontSize: 11, marginTop: 2 } },
+                  t('sync.moreFiles', { n: preview.files.length - 50 }))
+                : null,
             )
             : preview
               ? h(Empty, null, t('sync.previewEmpty'))
@@ -1929,12 +1939,13 @@ window.__ModuleLoader__.load({
           rows.length === 0
             ? h(Empty, null, t('sk.noRows'))
             : h('div', {
+              // v2.6.2：去掉 360px 内部滚动（窄面板里憋屈，同 v2.6.1 状态页病灶）。
+              // 只列前 12 条 + 底部提示剩余数；全量对比用对话里的 sync_hub_skill_list。
               style: {
-                maxHeight: 360, overflow: 'auto',
                 border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.08))', borderRadius: 8,
               },
             },
-              rows.map((d) => h('div', {
+              rows.slice(0, 12).map((d) => h('div', {
                 key: d.name,
                 style: {
                   display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px',
@@ -1952,6 +1963,14 @@ window.__ModuleLoader__.load({
                 d.local?.placeholder || d.hub?.placeholder ? h(Tag, { text: t('sk.placeholder'), level: 'info' }) : null,
                 h(Tag, { text: DIFF_LABEL[d.kind], level: DIFF_LEVEL[d.kind] }),
               )),
+              rows.length > 12
+                ? h('div', {
+                  key: '__more',
+                  style: {
+                    padding: '6px 10px', fontSize: 11, opacity: 0.55, textAlign: 'center',
+                  },
+                }, t('sk.moreRows', { n: rows.length - 12 }))
+                : null,
             ),
         ),
 
@@ -2400,7 +2419,10 @@ window.__ModuleLoader__.load({
             style: {
               flex: '0 0 280px', border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.08))',
               borderRadius: 10, padding: 8,
-              alignSelf: 'stretch', maxHeight: 'calc(100vh - 260px)', overflow: 'auto',
+              // v2.6.2：原 calc(100vh - 260px) 是视口 hack——侧栏面板不是
+              // 全屏窗口，260px 纯拍脑袋，实际要么切底要么空一大截。
+              // 改为固定 maxHeight 内部滚动，与右列对称。
+              maxHeight: 460, overflow: 'auto',
               minWidth: 0,
             },
           },
@@ -2486,7 +2508,9 @@ window.__ModuleLoader__.load({
                   style: {
                     width: '100%', boxSizing: 'border-box', padding: 10, borderRadius: 8,
                     fontSize: 12, lineHeight: '19px', resize: 'vertical',
-                    minHeight: 320,
+                    // v2.6.2：320 → 460 与左列对齐（原来左列比编辑器高，
+                    // 左列一滚动就显得右列空）；resize 保留给要更大编辑区的人。
+                    minHeight: 460,
                     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
                     border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.12))',
                     background: 'var(--dsw-alias-bg-base, transparent)', color: 'inherit',
