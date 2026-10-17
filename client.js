@@ -231,6 +231,12 @@ window.__ModuleLoader__.load({
       'mt.log': '运行日志',
       'mt.logPath': '路径：{p}',
       'mt.openDir': '打开目录',
+      'mt.pluginUpdate': '插件更新',
+      'mt.pluginUpdateHint': '检查 dsh-sync-hub 插件是否有新版本。',
+      'mt.pluginCheck': '检查更新',
+      'mt.pluginVersion': '版本',
+      'mt.pluginNotChecked': '未检查',
+      'mt.pluginUpdateAvailable': '有新版本可用，建议更新。',
 
       // 技能页
       'sk.summary': '同步概览',
@@ -448,6 +454,12 @@ window.__ModuleLoader__.load({
       'mt.log': 'Logs',
       'mt.logPath': 'Path: {p}',
       'mt.openDir': 'Open folder',
+      'mt.pluginUpdate': 'Plugin update',
+      'mt.pluginUpdateHint': 'Check if dsh-sync-hub plugin has a new version.',
+      'mt.pluginCheck': 'Check for updates',
+      'mt.pluginVersion': 'Version',
+      'mt.pluginNotChecked': 'Not checked',
+      'mt.pluginUpdateAvailable': 'A new version is available. Consider updating.',
 
       // Skills page
       'sk.summary': 'Sync overview',
@@ -1316,6 +1328,7 @@ window.__ModuleLoader__.load({
       const [note, setNote] = useState(null)
       const [portable, setPortable] = useState(null)
       const [autoPush, setAutoPush] = useState(false)
+      const [pluginUpdate, setPluginUpdate] = useState(null)
 
       useEffect(() => {
         apiGet('/autopush').then((r) => { if (r.ok) setAutoPush(r.enabled === true) }).catch(() => {})
@@ -1427,6 +1440,29 @@ window.__ModuleLoader__.load({
               h('span', null, t('mt.toolsMissing', { n: missingAll.length, list: missingAll.join('、') }))),
           h('div', { style: { fontSize: 12, opacity: 0.6 } },
             `${t('mt.core')} ${(tools.present ?? 0)}/${tools.total ?? 0}`),
+        ),
+
+        // 插件更新
+        h(Card, {
+          title: t('mt.pluginUpdate'), hint: t('mt.pluginUpdateHint'),
+          right: h(ActionButton, {
+            label: t('mt.pluginCheck'), small: true, tone: 'primary',
+            onClick: async () => {
+              const r = await apiPost('/content', { action: 'plugin-update-check' })
+              if (r.ok) setPluginUpdate(r.update)
+            },
+          }),
+        },
+          h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 } },
+            h(Dot, { level: pluginUpdate?.hasUpdate ? 'warn' : (pluginUpdate?.checking ? 'info' : 'info') }),
+            h('span', null, pluginUpdate
+              ? `${t('mt.pluginVersion')}: ${pluginUpdate.current} → ${pluginUpdate.latest}`
+              : t('mt.pluginNotChecked')),
+          ),
+          pluginUpdate?.hasUpdate
+            ? h('div', { style: { marginTop: 6, fontSize: 12, color: 'var(--dsw-alias-status-warn, #f59e0b)' } },
+                t('mt.pluginUpdateAvailable'))
+            : null,
         ),
 
         // 定时同步
