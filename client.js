@@ -57,7 +57,36 @@ window.__ModuleLoader__.load({
       // 内容页二级 Tab（沿用旧页名，改名会丢已有中文语义）
       'page.memory': '🧠 记忆·配置',
       'page.skills': '🛠 技能',
+      'page.plugins': '🔌 插件',
       'page.sessionsArchive': '💬 会话归档',
+      // v2.5 批2：内容页语义常驻说明（歧义说清楚，不等来问）
+      'content.scopeLine': '· 这里管的是【中枢仓库】与【本机加载目录】两个地方，根名已标清（中枢 xx = 会随上传传播；本机 xx = 只影响这台机器）。',
+      'content.deleteLine': '· 删除不是真删：一律先移进中枢 backups/ 留底可反悔；「删中枢」≠「卸本机」，且拉取永远不删两台已装的内容。',
+      // ── v2.5 批2：文件管理器（内容页可管） ──
+      'fm.root.hub/memory': '🧠 中枢记忆',
+      'fm.root.hub/skills': '🎯 中枢技能',
+      'fm.root.hub/config': '⚙️ 中枢配置',
+      'fm.root.hub/plugins': '📦 插件源码',
+      'fm.root.hub/session-backup': '💬 会话归档',
+      'fm.root.local/skills': '🖥 本机技能',
+      'fm.open': '进入',
+      'fm.edit': '编辑',
+      'fm.save': '保存',
+      'fm.cancel': '取消',
+      'fm.up': '← 上一级',
+      'fm.empty': '（空目录）',
+      'fm.delete': '删除',
+      'fm.confirmYes': '确认删除',
+      'fm.confirmNo': '取消',
+      'fm.saved': '已保存 {n}（旧版已留底）',
+      'fm.oldKept': '旧版在：{p}',
+      'fm.foot': '删除不是真删：一律先移进中枢 backups/ 留底，可反悔。拉取永远不删本机已装内容。',
+      'fm.pluginsTitle': '插件区（清单 + 源码）',
+      'fm.pluginsHint': 'plugin.txt = 该装哪些插件的清单（两台共用）；plugins/ = 插件源码目录。安装/卸载本体走官方 设置→插件。',
+      'fm.sessionsTitle': '会话归档管理（中枢里的跨机归档）',
+      'fm.sessionsHint': '按机器 → 工作区浏览；过期归档可删（只删中枢副本，本机正在用的会话不在这，不受影响）。',
+      'fm.skillsTitle': '技能目录管理（中枢技能库 / 本机已装）',
+      'fm.skillsHint': '中枢技能 = 上传备份后两台都拿得到；本机技能 = DSH 实际加载处。删本机只卸这台，删中枢两机下次拉取不再补。',
       'loading': '读取中…',
       'error': '加载失败：{e}',
       'retry': '重试',
@@ -366,7 +395,34 @@ window.__ModuleLoader__.load({
       'page.settings': '⚙️ Settings',
       'page.memory': '🧠 Memory · Config',
       'page.skills': '🛠 Skills',
+      'page.plugins': '🔌 Plugins',
       'page.sessionsArchive': '💬 Session archive',
+      'content.scopeLine': '· This page manages the HUB repo and your LOCAL load folder. Root names say which: "Hub …" travels with upload backup; "Local …" only affects this machine.',
+      'content.deleteLine': '· Delete is not real deletion: everything moves to hub backups/ first — undoable. "Delete from hub" ≠ "uninstall locally", and pulling never removes installed content on either machine.',
+      'fm.root.hub/memory': '🧠 Hub memory',
+      'fm.root.hub/skills': '🎯 Hub skills',
+      'fm.root.hub/config': '⚙️ Hub config',
+      'fm.root.hub/plugins': '📦 Plugin source',
+      'fm.root.hub/session-backup': '💬 Session archive',
+      'fm.root.local/skills': '🖥 Local skills',
+      'fm.open': 'Open',
+      'fm.edit': 'Edit',
+      'fm.save': 'Save',
+      'fm.cancel': 'Cancel',
+      'fm.up': '← Up',
+      'fm.empty': '(empty folder)',
+      'fm.delete': 'Delete',
+      'fm.confirmYes': 'Confirm',
+      'fm.confirmNo': 'Cancel',
+      'fm.saved': 'Saved {n} (old version kept)',
+      'fm.oldKept': 'Old version at: {p}',
+      'fm.foot': 'Delete is not real deletion: everything moves to hub backups/ first — undoable. Pulling never removes local installed content.',
+      'fm.pluginsTitle': 'Plugins (list + source)',
+      'fm.pluginsHint': 'plugin.txt = which plugins to install (shared); plugins/ = plugin source. Install/uninstall itself goes through Settings → Plugins.',
+      'fm.sessionsTitle': 'Session archive manager (in the hub)',
+      'fm.sessionsHint': 'Browse by machine → workspace; stale archives can be deleted (hub copy only — your live local sessions are untouched).',
+      'fm.skillsTitle': 'Skill folders (hub library / local install)',
+      'fm.skillsHint': 'Hub skills: both machines get them after upload backup. Local skills: what DSH actually loads here. Delete local = uninstall here only; delete hub = no longer added on next pull.',
       'loading': 'Loading…',
       'error': 'Load failed: {e}',
       'retry': 'Retry',
@@ -2415,6 +2471,159 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * 通用文件浏览器（v2.5 批2）：列目录 / 读 / 编辑保存 / 删除（=留底）。
+     * 守卫全在后端 lib/hub/fileman.js（白名单根/路径消毒/凭据硬墙/删除必留底）。
+     * @param {object} p { t, roots:string[], title, hint, onRefresh? }
+     */
+    function FileManager({ t, roots, title, hint, onRefresh }) {
+      const [root, setRoot] = useState(roots[0])
+      const [dirPath, setDirPath] = useState('')
+      const [entries, setEntries] = useState(null)
+      const [busy, setBusy] = useState(null)
+      const [note, setNote] = useState(null)
+      const [editing, setEditing] = useState(null) // {file, text, dirty}
+      const [confirmDel, setConfirmDel] = useState(null) // entry 待确认
+
+      const load = useCallback(async () => {
+        setEntries(null)
+        setNote(null)
+        const r = await apiGet(`/files?root=${encodeURIComponent(root)}&path=${encodeURIComponent(dirPath)}`)
+        if (!r.ok) { setNote({ tone: 'error', text: r.error }); setEntries([]) ; return }
+        setEntries(r.entries ?? [])
+      }, [root, dirPath])
+      useEffect(() => { load() }, [load])
+
+      const segs = dirPath ? dirPath.split('/') : []
+      const goDir = (e) => { setEditing(null); setConfirmDel(null); setDirPath(dirPath ? `${dirPath}/${e.name}` : e.name) }
+      const goUp = () => { setEditing(null); setConfirmDel(null); setDirPath(segs.slice(0, -1).join('/')) }
+      const goSeg = (i) => { setEditing(null); setConfirmDel(null); setDirPath(segs.slice(0, i + 1).join('/')) }
+
+      const openFile = async (e) => {
+        setBusy(e.name)
+        const r = await apiGet(`/files?root=${encodeURIComponent(root)}&path=${encodeURIComponent(dirPath ? `${dirPath}/${e.name}` : e.name)}&action=read`)
+        setBusy(null)
+        if (!r.ok) { setNote({ tone: 'error', text: r.error }); return }
+        setEditing({ file: e.name, text: r.text, dirty: false })
+      }
+
+      const doSave = async () => {
+        if (!editing) return
+        setBusy('save')
+        const r = await apiPost('/files', { action: 'save', root, path: dirPath ? `${dirPath}/${editing.file}` : editing.file, text: editing.text })
+        setBusy(null)
+        if (!r.ok) { setNote({ tone: 'error', text: r.error }); return }
+        setNote({ tone: 'success', text: t('fm.saved', { n: editing.file }) + (r.backup ? `\n${t('fm.oldKept', { p: r.backup })}` : '') })
+        setEditing(null)
+        load()
+        onRefresh?.()
+      }
+
+      const doDelete = async (e) => {
+        setBusy(e.name)
+        const r = await apiPost('/files', { action: 'delete', root, path: dirPath ? `${dirPath}/${e.name}` : e.name })
+        setBusy(null)
+        setConfirmDel(null)
+        if (!r.ok) { setNote({ tone: 'error', text: r.error }); return }
+        setNote({ tone: 'success', text: `${r.receipt}\n${r.scopeNote}` })
+        load()
+        onRefresh?.()
+      }
+
+      return h(Card, { title, hint },
+        // 根切换（多根时）
+        roots.length > 1
+          ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6 } },
+            roots.map((rk) => h('button', {
+              key: rk,
+              type: 'button',
+              onClick: () => { setRoot(rk); setDirPath(''); setEditing(null) },
+              style: {
+                appearance: 'none', cursor: 'pointer', fontSize: 12, padding: '4px 10px', borderRadius: 999,
+                border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.12))',
+                background: root === rk ? 'var(--dsw-alias-button-primary-bg, #2563eb)' : 'transparent',
+                color: root === rk ? '#fff' : 'inherit',
+              },
+            }, t(`fm.root.${rk}`))))
+          : null,
+        // 面包屑
+        h('div', { style: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, flexWrap: 'wrap' } },
+          h('button', {
+            type: 'button', onClick: () => { setDirPath(''); setEditing(null) },
+            style: { appearance: 'none', border: 'none', background: 'transparent', cursor: 'pointer', color: 'inherit', padding: 2, fontSize: 12 },
+          }, t(`fm.root.${root}`)),
+          ...segs.map((s, i) => h('span', { key: `${s}-${i}`, style: { display: 'inline-flex', alignItems: 'center', gap: 4 } },
+            h('span', { style: { opacity: 0.4 } }, '/'),
+            h('button', {
+              type: 'button', onClick: () => goSeg(i),
+              style: { appearance: 'none', border: 'none', background: 'transparent', cursor: 'pointer', color: 'inherit', padding: 2, fontSize: 12 },
+            }, s)))),
+        dirPath
+          ? h(ActionButton, { label: t('fm.up'), small: true, onClick: goUp })
+          : null,
+        // 编辑器
+        editing
+          ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 } },
+            h('div', { style: { fontSize: 12, fontWeight: 600 } }, `✎ ${editing.file}`),
+            h('textarea', {
+              value: editing.text,
+              onChange: (e) => setEditing({ ...editing, text: e.target.value, dirty: true }),
+              rows: 14,
+              style: {
+                width: '100%', boxSizing: 'border-box', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                fontSize: 12, lineHeight: '17px', padding: 8, borderRadius: 8, resize: 'vertical',
+                border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.12))',
+                background: 'var(--dsw-alias-bg-fill-subtle, rgba(0,0,0,0.03))', color: 'inherit',
+              },
+            }),
+            h('div', { style: { display: 'flex', gap: 8 } },
+              h(ActionButton, { label: t('fm.save'), tone: 'primary', small: true, onClick: doSave, busy: busy === 'save', disabled: !editing.dirty }),
+              h(ActionButton, { label: t('fm.cancel'), small: true, onClick: () => setEditing(null) }),
+            ),
+          )
+          : null,
+        // 列表
+        entries === null
+          ? h(Empty, null, t('loading'))
+          : entries.length === 0
+            ? h(Empty, null, t('fm.empty'))
+            : h('div', {
+              style: {
+                border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.08))', borderRadius: 8,
+                maxHeight: 280, overflow: 'auto', marginTop: 4,
+              },
+            },
+              entries.map((e) => h('div', {
+                key: e.name,
+                style: {
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', fontSize: 12,
+                  borderBottom: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.05))',
+                },
+              },
+                h('span', { style: { flex: '0 0 auto' } }, e.dir ? '📁' : '📄'),
+                h('span', {
+                  style: { flex: '1 1 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+                }, e.name),
+                h('span', { style: { opacity: 0.45, flex: '0 0 auto', fontSize: 11 } },
+                  e.dir ? '' : `${humanBytes(e.bytes)} · ${e.mtime}`),
+                e.dir
+                  ? h(ActionButton, { label: t('fm.open'), small: true, onClick: () => goDir(e) })
+                  : textExtOk(e.name)
+                    ? h(ActionButton, { label: t('fm.edit'), small: true, onClick: () => openFile(e), busy: busy === e.name })
+                    : null,
+                confirmDel && confirmDel.name === e.name                  ? h('span', { style: { display: 'inline-flex', gap: 4, flex: '0 0 auto' } },
+                    h(ActionButton, { label: t('fm.confirmYes'), small: true, tone: 'danger', onClick: () => doDelete(e), busy: busy === e.name }),
+                    h(ActionButton, { label: t('fm.confirmNo'), small: true, onClick: () => setConfirmDel(null) }))
+                  : h(ActionButton, { label: t('fm.delete'), small: true, tone: 'danger', onClick: () => setConfirmDel(e) }),
+              ))),
+        h(InlineNote, { tone: note?.tone }, note?.text),
+        h('div', { style: { fontSize: 11, opacity: 0.55, marginTop: 4 } }, t('fm.foot')),
+      )
+    }
+
+    /** 前端粗判可编辑扩展名（后端 F6 才是硬守卫，这里只决定显不显示编辑按钮）。 */
+    const textExtOk = (name) => /\.(md|txt|json|yml|yaml|csv|ini|ps1|js|cjs|mjs|bat|cmd)$/i.test(name)
+
+    /**
      * 📊 状态页（v2.2 D3）：原「总览」+「同步」合并。
      * 上半 = 一屏看完的指标，下半 = 传什么的动作（一键同步 / 范围 / 执行）。
      */
@@ -2580,18 +2789,53 @@ window.__ModuleLoader__.load({
      * 📁 内容页（v2.2 D3）：原「技能」+「记忆配置」+「会话」合并为三 Tab。
      * 都是"传什么"的内容，Tab 切换省去顶层页签来回跳。
      */
+    /**
+     * 📁 内容页（v2.5 批2）：记忆 / 技能 / 插件 / 会话 四 Tab。
+     * 技能与插件从"只能看"升级为"能管"（FileManager），会话补管理区。
+     */
     function ContentPage({ t, data, onRefresh }) {
       const [tab, setTab] = useState('memory')
       const tabs = [
         { id: 'memory', label: t('page.memory') },
         { id: 'skills', label: t('page.skills') },
+        { id: 'plugins', label: t('page.plugins') },
         { id: 'sessions', label: t('page.sessionsArchive') },
       ]
       return h('div', null,
         h(SubTabs, { tabs, active: tab, onPick: setTab }),
+        // v2.5：语义常驻说明（老大"有歧义必须说清楚"铁律第一条实例）
+        h('div', {
+          style: {
+            fontSize: 12, lineHeight: '18px', opacity: 0.75, marginBottom: 10,
+            padding: '6px 8px', borderRadius: 8,
+            background: 'var(--dsw-alias-bg-fill-subtle, rgba(0,0,0,0.04))',
+          },
+        },
+          h('div', null, t('content.scopeLine')),
+          h('div', null, t('content.deleteLine')),
+        ),
         tab === 'memory' ? h(MemoryPage, { t, data, onRefresh })
-          : tab === 'skills' ? h(SkillsPage, { t, data, onRefresh })
-            : h(SessionsPage, { t, data, onRefresh }),
+          : tab === 'skills' ? h('div', null,
+            h(SkillsPage, { t, data, onRefresh }),
+            h('div', { style: { height: 12 } }),
+            h(FileManager, {
+              t, roots: ['hub/skills', 'local/skills'], onRefresh,
+              title: t('fm.skillsTitle'), hint: t('fm.skillsHint'),
+            }),
+          )
+            : tab === 'plugins' ? h(FileManager, {
+              t, roots: ['hub/config', 'hub/plugins'], onRefresh,
+              title: t('fm.pluginsTitle'), hint: t('fm.pluginsHint'),
+            })
+              : tab === 'sessions' ? h('div', null,
+                h(SessionsPage, { t, data, onRefresh }),
+                h('div', { style: { height: 12 } }),
+                h(FileManager, {
+                  t, roots: ['hub/session-backup'], onRefresh,
+                  title: t('fm.sessionsTitle'), hint: t('fm.sessionsHint'),
+                }),
+              )
+                : null,
       )
     }
 
