@@ -35,13 +35,18 @@ console.log('── 3) 文案键：定义了但从未使用（死文案）')
 const zhStart = src.indexOf('const ZH = {')
 const enStart = src.indexOf('const EN = {')
 const zhKeys = [...src.slice(zhStart, enStart).matchAll(/^\s{6}'([^']+)'\s*:/gm)].map((m) => m[1])
-// 真引用有三种：① t('key') 字面 ② t(cond ? 'key' : 'other') 三元 ③ labelKey 动态取用
+// 真引用有四种：① t('key') 字面 ② t(cond ? 'key' : 'other') 三元 ③ labelKey 动态取用
+//               ④ 模板串前缀：t(`scope.${s}`) —— 只要源码里有 t(`前缀. 即认整个前缀族
 // 注意：不能用"全文出现次数 > 1"当引用——那会让只定义未使用的键自己骗过自己。
 const isUsed = (k) => {
   const esc = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   if (new RegExp(`t\\([^)]*'${esc}'`, 'g').test(src)) return true
   // labelKey 机制：PAGES 里 labelKey: 'page.xxx' → 渲染时 t(page.labelKey)
-  return new RegExp(`labelKey: '${esc}'`, 'g').test(src)
+  if (new RegExp(`labelKey: '${esc}'`, 'g').test(src)) return true
+  // 模板串动态取用（v2.4 范围标签）：t(`scope.${s}`) / t(`scope.${s}.tip`)
+  const prefix = k.split('.')[0]
+  if (new RegExp('t\\(`' + prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\.', 'g').test(src)) return true
+  return false
 }
 const unused = zhKeys.filter((k) => !isUsed(k))
 if (unused.length) console.log(`  ⚠ 未被 t() 引用的键 ${unused.length} 个：${unused.join(', ')}`)

@@ -153,8 +153,27 @@ window.__ModuleLoader__.load({
       'flow.confirmRoundtrip': '确认执行「完整同步一轮」？将先拉取并应用（撞车会停下来进入冲突解决器），成功后自动推送你选的 {n} 类范围。',
 
       // 同步
-      'sync.scope': '推送范围',
-      'sync.scopeHint': '日常用「全部」即可；只改了一类就只选那一类，推得更快。',
+      'sync.scope': '上传范围',
+      // ── v2.4 操作卡整合（三卡 → 一卡；范围全中文；增量语义上界面） ──
+      'sync.opTitle': '同步操作',
+      'sync.opHint': '日常只需点蓝色「开始一键同步」；下面小按钮是手动挡，不常用。',
+      'sync.incr1': '· 上传备份 = 只传本机【新改动的部分】，不会覆盖对方没碰的文件；内容少的一方上传，多的那边原样保留。',
+      'sync.incr2': '· 注意：手动删掉中枢里的文件也算"改动"，会跟着传上去。清理请两边商量着来，别手滑。',
+      'scope.memory': '🧠 记忆',
+      'scope.skills': '🎯 技能',
+      'scope.config': '⚙️ 配置',
+      'scope.sessions': '💬 会话归档',
+      'scope.dshconfig': '🛰 DSH 运行配置',
+      'scope.plugins': '🔌 插件清单',
+      'scope.pluginsrc': '📦 插件源码',
+      'scope.memory.tip': '专业术语 memory/ —— 共享记忆 shared.md + 各机器档案',
+      'scope.skills.tip': '专业术语 skills/ —— 中枢技能库（apply 只补缺失，不覆盖同名）',
+      'scope.config.tip': '专业术语 config/ —— DSH profile 模板与 git 全局配置',
+      'scope.sessions.tip': '专业术语 session-backup/ —— 本机会话的单向归档（凭据类文件被硬守卫绝对排除）',
+      'scope.dshconfig.tip': '专业术语 config/dshconfig/ —— DSH 运行配置',
+      'scope.plugins.tip': '专业术语 config/plugin.txt —— 该装哪些插件的清单',
+      'scope.pluginsrc.tip': '专业术语 plugins/ —— 插件源码（如 dsh-our-free-model）',
+      'flow.startTip': '自动跑完：预览变化 → 你确认 → 提交 → 上传备份，一条龙',
       'sync.all': '全部',
       'sync.none': '全不选',
       // ── 飞牛叫法（D2）：主文案用飞牛叫法，专业术语小字备注 ──
@@ -165,13 +184,10 @@ window.__ModuleLoader__.load({
       'sync.previewTitle': '预览结果',
       'sync.previewEmpty': '所选范围内没有可上传的改动。',
       'sync.files': '{n} 个文件 · {size}',
-      'sync.resultTitle': '执行结果',
       'sync.confirmPush': '确认推送这 {n} 个文件？',
       'sync.hint.pull': '拉取会应用到本机；若撞车，冲突解决器会引导你逐文件处理。',
 
       // N6 一键同步流
-      'flow.title': '一键同步',
-      'flow.hint': '预演 → 确认 → 执行 → 结果，一条流走完，不用跳页。',
       'flow.start': '开始一键同步',
       'flow.picked': '已选 {n} 类',
       'flow.confirm': '确认推送',
@@ -190,7 +206,6 @@ window.__ModuleLoader__.load({
       'sync.term.push': '专业术语：push / 推送 —— 把本机内容提交并上传到云端中枢',
       'sync.term.pull': '专业术语：pull / 拉取 —— 从云端中枢取回内容到本机',
       'sync.term.preview': '专业术语：dry-run / 预演 —— 只看不传，确认将发生什么',
-      'sync.term.flow': '一条龙：下载恢复 → 提交 → 上传备份，一步跑完（push · commit · pull）',
       'sync.msg.noConflict': '当前没有冲突。',
 
       // 维护
@@ -434,8 +449,26 @@ window.__ModuleLoader__.load({
       'flow.roundtrip': 'Full round trip (pull then push)',
       'flow.roundtripTip': 'Pull and apply the other machine\'s changes first, then push yours. Use after switching machines or a long gap.',
       'flow.confirmRoundtrip': 'Run a full round trip? Pulls and applies first (stops at conflicts into the resolver), then pushes your {n} selected categories.',
-      'sync.scope': 'Push scope',
-      'sync.scopeHint': 'Use "All" for daily sync; pick one category when that is all you changed.',
+      'sync.scope': 'Upload scope',
+      'sync.opTitle': 'Sync actions',
+      'sync.opHint': 'Daily use = the blue "Start one-shot sync" only. The small buttons below are manual mode.',
+      'sync.incr1': '· Upload backup sends only what THIS machine changed — it never overwrites files the other side did not touch; the machine with less content uploading keeps the other\'s content intact.',
+      'sync.incr2': '· Heads-up: manually deleting a file in the hub folder also counts as a change and will propagate. Coordinate cleanups; do not delete casually.',
+      'scope.memory': '🧠 Memory',
+      'scope.skills': '🎯 Skills',
+      'scope.config': '⚙️ Config',
+      'scope.sessions': '💬 Session archive',
+      'scope.dshconfig': '🛰 DSH runtime config',
+      'scope.plugins': '🔌 Plugin list',
+      'scope.pluginsrc': '📦 Plugin source',
+      'scope.memory.tip': 'memory/ — shared memory + per-machine profiles',
+      'scope.skills.tip': 'skills/ — hub skill library (apply adds missing only, never overwrites)',
+      'scope.config.tip': 'config/ — DSH profile templates and global git config',
+      'scope.sessions.tip': 'session-backup/ — one-way archive of this machine\'s sessions (credentials hard-excluded)',
+      'scope.dshconfig.tip': 'config/dshconfig/ — DSH runtime configuration',
+      'scope.plugins.tip': 'config/plugin.txt — which plugins to install',
+      'scope.pluginsrc.tip': 'plugins/ — plugin source code (e.g. dsh-our-free-model)',
+      'flow.startTip': 'Runs it all: preview → you confirm → commit → upload backup',
       'sync.all': 'All',
       'sync.none': 'None',
       'sync.push': '📤 Upload backup',
@@ -445,13 +478,10 @@ window.__ModuleLoader__.load({
       'sync.previewTitle': 'Preview result',
       'sync.previewEmpty': 'Nothing to upload in the selected scope.',
       'sync.files': '{n} file(s) · {size}',
-      'sync.resultTitle': 'Result',
       'sync.confirmPush': 'Push these {n} files?',
       'sync.hint.pull': 'Pull applies locally; on conflict the resolver walks you through it.',
 
       // N6 one-shot sync flow
-      'flow.title': 'One-shot sync',
-      'flow.hint': 'Preview → confirm → run → result, all on this page.',
       'flow.start': 'Start one-shot sync',
       'flow.picked': '{n} categories selected',
       'flow.confirm': 'Confirm push',
@@ -468,7 +498,6 @@ window.__ModuleLoader__.load({
       'sync.term.push': 'Terminology: push — commit this machine\'s content and upload it to the cloud hub',
       'sync.term.pull': 'Terminology: pull — fetch content from the cloud hub back to this machine',
       'sync.term.preview': 'Terminology: dry-run — look without uploading, to confirm what will happen',
-      'sync.term.flow': 'One-shot: restore → commit → upload in a single run (push · commit · pull)',
       'sync.msg.noConflict': 'No conflicts.',
       'mt.backup': 'Local snapshots',
       'mt.backupHint': 'Undo points before touching AGENTS.md / plugin config. Local only.',
@@ -1307,21 +1336,82 @@ window.__ModuleLoader__.load({
           })
           : null,
 
-        // N6 一键同步（主路径：一条流内完成；v2.0.6 两种模式）
-        h(Card, { title: t('flow.title'), hint: t('flow.hint') },
+        // v2.4：原「一键同步/推送范围/执行结果」三卡整合成一张（老大实感"不知道点哪个"）。
+        // 主路径=一个蓝按钮；手动操作收进同行小按钮；增量语义写在卡顶（不再等人问才解释）。
+        h(Card, { title: t('sync.opTitle'), hint: t('sync.opHint') },
+          h('div', {
+            style: {
+              fontSize: 12, lineHeight: '18px', opacity: 0.8,
+              padding: '6px 8px', borderRadius: 8,
+              background: 'var(--dsw-alias-bg-fill-subtle, rgba(0,0,0,0.04))',
+            },
+          },
+            h('div', null, t('sync.incr1')),
+            h('div', null, t('sync.incr2')),
+          ),
+          h('div', { style: { marginTop: 2 } },
+            h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 } },
+              h('span', { style: { fontSize: 13, fontWeight: 600 } }, t('sync.scope')),
+              h(ActionButton, { label: t('sync.all'), small: true, onClick: () => setScopes([...SCOPES]) }),
+              h(ActionButton, { label: t('sync.none'), small: true, onClick: () => setScopes([]) }),
+              h('span', { style: { fontSize: 12, opacity: 0.6, marginLeft: 'auto' } },
+                scopes.length === 0 ? t('sync.pickCat') : t('flow.picked', { n: scopes.length })),
+            ),
+            h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6 } },
+              SCOPES.map((s) => h('button', {
+                key: s,
+                type: 'button',
+                onClick: () => toggle(s),
+                'aria-pressed': scopes.includes(s),
+                title: t(`scope.${s}.tip`),
+                style: {
+                  appearance: 'none', cursor: 'pointer', fontSize: 12,
+                  padding: '4px 10px', borderRadius: 999,
+                  border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.12))',
+                  background: scopes.includes(s)
+                    ? 'var(--dsw-alias-button-primary-bg, #2563eb)' : 'transparent',
+                  color: scopes.includes(s) ? '#fff' : 'inherit',
+                },
+              }, t(`scope.${s}`))),
+            ),
+          ),
           !flow
             ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' } },
               h(ActionButton, {
                 label: t('flow.start'), tone: 'primary',
                 onClick: flowPreview, busy: flowBusy, disabled: scopes.length === 0,
+                title: t('flow.startTip'),
               }),
               h(ActionButton, {
                 label: t('flow.roundtrip'), onClick: flowPreview, busy: flowBusy,
-                disabled: scopes.length === 0,
+                disabled: scopes.length === 0, small: true,
                 title: t('flow.roundtripTip'),
               }),
-              h('span', { style: { fontSize: 12, opacity: 0.6 } },
-                scopes.length === 0 ? t('sync.pickCat') : t('flow.picked', { n: scopes.length })),
+              h('span', {
+                style: {
+                  width: 1, alignSelf: 'stretch', margin: '2px 0',
+                  background: 'var(--dsw-alias-border-l3, rgba(0,0,0,0.1))',
+                },
+              }),
+              h(ActionButton, {
+                label: t('sync.preview'), onClick: runPreview,
+                busy: busy === 'preview', disabled: anyRunning,
+                title: t('sync.term.preview'), small: true,
+              }),
+              h(ActionButton, {
+                label: t('sync.push'), onClick: runPush,
+                busy: pushJob.running, disabled: anyRunning || scopes.length === 0,
+                title: t('sync.term.push'), small: true,
+              }),
+              h(ActionButton, {
+                label: t('sync.pull'), onClick: runPull,
+                busy: pullJob.running, disabled: anyRunning,
+                title: t('sync.term.pull'), small: true,
+              }),
+              h(ActionButton, {
+                label: t('sync.conflicts'), onClick: runConflicts,
+                busy: busy === 'conflicts', disabled: anyRunning, small: true,
+              }),
               h(InlineNote, { tone: note?.tone }, note?.text),
             )
             : flow.stage === 'confirm'
@@ -1365,64 +1455,8 @@ window.__ModuleLoader__.load({
                 ),
         ),
 
-// 同步范围 + 动作卡（D4：左右互补，左选右执，并排不浪费）
-        h(Grid, { min: 300 },
-          h(Card, { title: t('sync.scope'), hint: t('sync.scopeHint') },
-            h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6 } },
-              h(ActionButton, {
-                label: t('sync.all'), small: true,
-                onClick: () => setScopes([...SCOPES]),
-              }),
-              h(ActionButton, {
-                label: t('sync.none'), small: true,
-                onClick: () => setScopes([]),
-              }),
-            ),
-            h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 } },
-              SCOPES.map((s) => h('button', {
-                key: s,
-                type: 'button',
-                onClick: () => toggle(s),
-                'aria-pressed': scopes.includes(s),
-                style: {
-                  appearance: 'none', cursor: 'pointer', fontSize: 12,
-                  padding: '4px 10px', borderRadius: 999,
-                  border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.12))',
-                  background: scopes.includes(s)
-                    ? 'var(--dsw-alias-button-primary-bg, #2563eb)' : 'transparent',
-                  color: scopes.includes(s) ? '#fff' : 'inherit',
-                },
-              }, s)),
-            ),
-            // 就地反馈：预演/推送结果贴在这张卡里
-            h(InlineNote, {
-              tone: note?.tone,
-            }, note?.text),
-          ),
-
-          // 动作卡（v2.0.5：常驻回执 + 已用时 + 执行中禁全部按钮）
-          h(Card, { title: t('sync.resultTitle'), hint: t('sync.term.flow') },
-          h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 8 } },
-            h(ActionButton, {
-              label: t('sync.preview'), onClick: runPreview,
-              busy: busy === 'preview', disabled: anyRunning,
-              title: t('sync.term.preview'),
-            }),
-            h(ActionButton, {
-              label: t('sync.push'), tone: 'primary', onClick: runPush,
-              busy: pushJob.running, disabled: anyRunning || scopes.length === 0,
-              title: t('sync.term.push'),
-            }),
-            h(ActionButton, {
-              label: t('sync.pull'), onClick: runPull,
-              busy: pullJob.running, disabled: anyRunning,
-              title: t('sync.term.pull'),
-            }),
-            h(ActionButton, {
-              label: t('sync.conflicts'), onClick: runConflicts,
-              busy: busy === 'conflicts', disabled: anyRunning, small: true,
-            }),
-          ),
+// 同步范围 + 动作卡（v2.4：已并入上方操作卡，这里只剩回执区）
+        h('div', null,
           // 常驻回执（不消失；running 显示已用时走字）
           h(JobView, {
             t,
@@ -1475,7 +1509,6 @@ window.__ModuleLoader__.load({
             : preview
               ? h(Empty, null, t('sync.previewEmpty'))
               : null,
-          ),
         ),
       )
     }
