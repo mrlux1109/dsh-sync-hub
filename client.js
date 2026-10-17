@@ -40,6 +40,7 @@ window.__ModuleLoader__.load({
     /** 四个一级页（v2.2 D3：6 平铺页 → 状态/内容/知识库/设置）。 */
     const PAGES = [
       { id: 'status', labelKey: 'page.status' },
+      { id: 'sync', labelKey: 'page.sync' },
       { id: 'content', labelKey: 'page.content' },
       { id: 'knowledge', labelKey: 'page.knowledge' },
       { id: 'settings', labelKey: 'page.settings' },
@@ -49,6 +50,7 @@ window.__ModuleLoader__.load({
     const ZH = {
       'panel': '同步中枢',
       'page.status': '📊 状态',
+      'page.sync': '🔄 同步',
       'page.content': '📁 内容',
       'page.knowledge': '📚 知识库',
       'page.settings': '⚙️ 设置',
@@ -358,6 +360,7 @@ window.__ModuleLoader__.load({
     const EN = {
       'panel': 'Sync Hub',
       'page.status': '📊 Status',
+      'page.sync': '🔄 Sync',
       'page.content': '📁 Content',
       'page.knowledge': '📚 Knowledge',
       'page.settings': '⚙️ Settings',
@@ -1531,67 +1534,18 @@ window.__ModuleLoader__.load({
      * @param {object} p { t, data, onRefresh }
      */
     function MaintainPage({ t, data, onRefresh }) {
-      const [backups, setBackups] = useState(null)
+      // v2.5：备份/定时/自动推送已搬去同步页；这里只剩 角色/工具链/插件更新/凭据/换机/控制台。
       const [busy, setBusy] = useState(null)
       const [note, setNote] = useState(null)
       const [portable, setPortable] = useState(null)
-      const [autoPush, setAutoPush] = useState(false)
       const [pluginUpdate, setPluginUpdate] = useState(null)
 
-      useEffect(() => {
-        apiGet('/autopush').then((r) => { if (r.ok) setAutoPush(r.enabled === true) }).catch(() => {})
-      }, [])
-
-      const loadBackups = useCallback(async () => {
-        const r = await apiGet('/content')
-        if (r.ok) setBackups(r.backups.backups)
-      }, [])
-      useEffect(() => { loadBackups() }, [loadBackups])
-
-      const act = async (action, body) => {
-        setBusy(action)
-        setNote(null)
-        const r = await apiPost('/content', { action, ...(body ?? {}) })
-        setBusy(null)
-        if (!r.ok) { setNote({ tone: 'error', text: t('mt.msg.restoreFail', { e: r.error }) }); return r }
-        return r
-      }
-
-      // v2.0.5：备份/定时/换机补齐用 useJob 常驻回执
-      const backupJob = useJob()
-      const scheduleJob = useJob()
       const portableJob = useJob()
       // v2.3.1：插件更新检查也用 useJob —— 旧版按钮点击无任何反馈（无 busy、失败不显示），
       // 加上后端 execSync 卡死事件循环，看起来就像"假按钮"。
       const pluginCheckJob = useJob()
       // v2.4.1：一键更新落地（拉 tag → 备份 → 拷入 → 回读校验，失败自动回滚）
       const pluginApplyJob = useJob()
-
-      const doBackup = async () => {
-        const r = await backupJob.run(() => apiPost('/content', { action: 'backup' }))
-        if (r?.ok) loadBackups()
-      }
-      const doRestore = async (name) => {
-        const r = await act('restore', { name })
-        if (r?.ok) {
-          setNote({
-            tone: 'success',
-            text: t('mt.msg.restored', { name }) + (r.preRestore ? `\n${t('mt.msg.preRestore', { name: r.preRestore })}` : ''),
-          })
-        }
-      }
-      const doDelete = async (name) => {
-        const r = await act('delete', { name })
-        if (r?.ok) {
-          setNote({ tone: 'success', text: t('mt.msg.deleted', { name }) })
-          loadBackups()
-        }
-      }
-
-      const doSchedule = async (action) => {
-        const r = await scheduleJob.run(() => apiPost('/env', { action }))
-        if (r?.ok) onRefresh()
-      }
 
       const doPortable = async () => {
         const r = await portableJob.run(() => apiPost('/portable', { action: 'setup', profile: 'desktop', dryRun: true }))
@@ -1651,48 +1605,9 @@ window.__ModuleLoader__.load({
           h(InlineNote, { tone: note?.tone }, note?.text),
         ),
 
-        // 备份
-        h(Card, {
-          title: t('mt.backup'), hint: t('mt.backupHint'),
-          right: h(ActionButton, { label: t('mt.backupNow'), tone: 'primary', small: true, onClick: doBackup, busy: backupJob.running }),
-        },
-          h(JobView, {
-            t, job: backupJob, title: t('mt.backupNow'),
-            detail: backupJob.result ? t('mt.msg.backed', { n: backupJob.result.created?.length ?? 0 }) : null,
-            onReset: backupJob.reset,
-          }),
-          h(InlineNote, { tone: note?.tone }, note?.text),
-          h('div', { style: { marginTop: 4 } },
-            h('div', { style: { fontSize: 12, opacity: 0.6, marginBottom: 4 } }, t('mt.backups')),
-            !backups
-              ? h(Empty, null, t('loading'))
-              : backups.length === 0
-                ? h(Empty, null, t('mt.backupsEmpty'))
-                : h('div', {
-                  style: {
-                    maxHeight: 220, overflow: 'auto',
-                    border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.08))', borderRadius: 8,
-                  },
-                },
-                  backups.slice(0, 40).map((b) => h('div', {
-                    key: b.name,
-                    style: {
-                      display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px',
-                      fontSize: 12, borderBottom: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.05))',
-                    },
-                  },
-                    h('span', {
-                      style: { flex: '1 1 auto', fontFamily: 'ui-monospace, monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-                    }, b.name),
-                    h('span', { style: { opacity: 0.5, flex: '0 0 auto' } }, humanBytes(b.bytes)),
-                    h(ActionButton, { label: t('mt.restore'), small: true, onClick: () => doRestore(b.name), busy: busy === 'restore' }),
-                    h(ActionButton, { label: t('mt.delete'), small: true, tone: 'danger', onClick: () => doDelete(b.name), busy: busy === 'delete' }),
-                  )),
-                ),
-          ),
-        ),
+        // v2.5：备份快照/定时同步/自动推送 已搬去 🔄同步页（老大反馈"同步的事分散在状态页和设置页"）
 
-        // 工具链 + 插件更新 + 定时同步 + 凭据 + 自动推送（D4：信息量小的卡并排）
+        // 工具链 + 插件更新 + 凭据（D4：信息量小的卡并排）
         h(Grid, { min: 280 },
           h(Card, { title: t('mt.tools'), hint: t('mt.toolsHint') },
           missingAll.length === 0
@@ -1762,27 +1677,6 @@ window.__ModuleLoader__.load({
           }),
         ),
 
-        // 定时同步
-        h(Card, {
-          title: t('mt.schedule'), hint: t('mt.scheduleHint'),
-          right: data?.schedule?.installed
-            ? h(ActionButton, { label: t('mt.scheduleRemove'), small: true, onClick: () => doSchedule('schedule-remove'), busy: scheduleJob.running })
-            : h(ActionButton, { label: t('mt.scheduleInstall'), small: true, tone: 'primary', onClick: () => doSchedule('schedule-install'), busy: scheduleJob.running }),
-        },
-          h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 } },
-            h(Dot, { level: data?.schedule?.installed ? 'pass' : 'info' }),
-            h('span', null, data?.schedule?.installed ? t('mt.scheduleOn') : t('mt.scheduleOff')),
-            data?.schedule?.nextRun ? h('span', { style: { opacity: 0.6, fontSize: 12 } }, t('mt.scheduleNext', { t: data.schedule.nextRun })) : null,
-          ),
-          h(JobView, {
-            t, job: scheduleJob, title: t('mt.schedule'),
-            detail: scheduleJob.result
-              ? (scheduleJob.result.partial ? scheduleJob.result.error : t(scheduleJob.result.tasks ? 'mt.msg.scheduleOn' : 'mt.msg.scheduleOff'))
-              : null,
-            onReset: scheduleJob.reset,
-          }),
-        ),
-
         // 凭据
         h(Card, { title: t('mt.credential') },
           h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 } },
@@ -1792,23 +1686,6 @@ window.__ModuleLoader__.load({
               : t('mt.credentialMissing')),
           ),
         ),
-
-        // N7 自动推送开关（记忆页保存后是否立即 push；默认关）
-          h(Card, { title: t('ap.title'), hint: t('ap.hint') },
-            h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 } },
-              h(Dot, { level: autoPush ? 'pass' : 'info' }),
-              h('span', { style: { flex: '1 1 auto' } }, autoPush ? t('ap.on') : t('ap.off')),
-              h(ActionButton, {
-                label: autoPush ? t('ap.turnOff') : t('ap.turnOn'),
-                small: true,
-                tone: autoPush ? undefined : 'primary',
-                onClick: async () => {
-                  const r = await apiPost('/autopush', { enabled: !autoPush })
-                  if (r.ok) setAutoPush(!autoPush)
-                },
-              }),
-            ),
-          ),
         ),
 
         // 换机补齐
@@ -2541,11 +2418,161 @@ window.__ModuleLoader__.load({
      * 📊 状态页（v2.2 D3）：原「总览」+「同步」合并。
      * 上半 = 一屏看完的指标，下半 = 传什么的动作（一键同步 / 范围 / 执行）。
      */
+    /**
+     * 同步页下半部（v2.5 从设置页搬来）：定时同步 / 自动推送 / 本机备份快照。
+     * 与同步操作同属"同步节奏怎么安排"，放一页才不成两截。
+     */
+    function SyncExtrasPage({ t, data, onRefresh }) {
+      const [backups, setBackups] = useState(null)
+      const [busy, setBusy] = useState(null)
+      const [note, setNote] = useState(null)
+      const [autoPush, setAutoPush] = useState(false)
+      const backupJob = useJob()
+      const scheduleJob = useJob()
+
+      useEffect(() => {
+        apiGet('/autopush').then((r) => { if (r.ok) setAutoPush(r.enabled === true) }).catch(() => {})
+      }, [])
+
+      const loadBackups = useCallback(async () => {
+        const r = await apiGet('/content')
+        if (r.ok) setBackups(r.backups.backups)
+      }, [])
+      useEffect(() => { loadBackups() }, [loadBackups])
+
+      const act = async (action, body) => {
+        setBusy(action)
+        setNote(null)
+        const r = await apiPost('/content', { action, ...(body ?? {}) })
+        setBusy(null)
+        if (!r.ok) { setNote({ tone: 'error', text: t('mt.msg.restoreFail', { e: r.error }) }); return r }
+        return r
+      }
+
+      const doBackup = async () => {
+        const r = await backupJob.run(() => apiPost('/content', { action: 'backup' }))
+        if (r?.ok) loadBackups()
+      }
+      const doRestore = async (name) => {
+        const r = await act('restore', { name })
+        if (r?.ok) {
+          setNote({
+            tone: 'success',
+            text: t('mt.msg.restored', { name }) + (r.preRestore ? `\n${t('mt.msg.preRestore', { name: r.preRestore })}` : ''),
+          })
+        }
+      }
+      const doDelete = async (name) => {
+        const r = await act('delete', { name })
+        if (r?.ok) {
+          setNote({ tone: 'success', text: t('mt.msg.deleted', { name }) })
+          loadBackups()
+        }
+      }
+      const doSchedule = async (action) => {
+        const r = await scheduleJob.run(() => apiPost('/env', { action }))
+        if (r?.ok) onRefresh()
+      }
+
+      return h('div', null,
+        // 定时同步 + 自动推送（并排：都是"同步节奏"开关）
+        h(Grid, { min: 280 },
+          h(Card, {
+            title: t('mt.schedule'), hint: t('mt.scheduleHint'),
+            right: data?.schedule?.installed
+              ? h(ActionButton, { label: t('mt.scheduleRemove'), small: true, onClick: () => doSchedule('schedule-remove'), busy: scheduleJob.running })
+              : h(ActionButton, { label: t('mt.scheduleInstall'), small: true, tone: 'primary', onClick: () => doSchedule('schedule-install'), busy: scheduleJob.running }),
+          },
+            h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 } },
+              h(Dot, { level: data?.schedule?.installed ? 'pass' : 'info' }),
+              h('span', null, data?.schedule?.installed ? t('mt.scheduleOn') : t('mt.scheduleOff')),
+              data?.schedule?.nextRun ? h('span', { style: { opacity: 0.6, fontSize: 12 } }, t('mt.scheduleNext', { t: data.schedule.nextRun })) : null,
+            ),
+            h(JobView, {
+              t, job: scheduleJob, title: t('mt.schedule'),
+              detail: scheduleJob.result
+                ? (scheduleJob.result.partial ? scheduleJob.result.error : t(scheduleJob.result.tasks ? 'mt.msg.scheduleOn' : 'mt.msg.scheduleOff'))
+                : null,
+              onReset: scheduleJob.reset,
+            }),
+          ),
+          // N7 自动推送开关（记忆页保存后是否立即 push；默认关）
+          h(Card, { title: t('ap.title'), hint: t('ap.hint') },
+            h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 } },
+              h(Dot, { level: autoPush ? 'pass' : 'info' }),
+              h('span', { style: { flex: '1 1 auto' } }, autoPush ? t('ap.on') : t('ap.off')),
+              h(ActionButton, {
+                label: autoPush ? t('ap.turnOff') : t('ap.turnOn'),
+                small: true,
+                tone: autoPush ? undefined : 'primary',
+                onClick: async () => {
+                  const r = await apiPost('/autopush', { enabled: !autoPush })
+                  if (r.ok) setAutoPush(!autoPush)
+                },
+              }),
+            ),
+          ),
+        ),
+
+        // 本机备份快照
+        h(Card, {
+          title: t('mt.backup'), hint: t('mt.backupHint'),
+          right: h(ActionButton, { label: t('mt.backupNow'), tone: 'primary', small: true, onClick: doBackup, busy: backupJob.running }),
+        },
+          h(JobView, {
+            t, job: backupJob, title: t('mt.backupNow'),
+            detail: backupJob.result ? t('mt.msg.backed', { n: backupJob.result.created?.length ?? 0 }) : null,
+            onReset: backupJob.reset,
+          }),
+          h(InlineNote, { tone: note?.tone }, note?.text),
+          h('div', { style: { marginTop: 4 } },
+            h('div', { style: { fontSize: 12, opacity: 0.6, marginBottom: 4 } }, t('mt.backups')),
+            !backups
+              ? h(Empty, null, t('loading'))
+              : backups.length === 0
+                ? h(Empty, null, t('mt.backupsEmpty'))
+                : h('div', {
+                  style: {
+                    maxHeight: 220, overflow: 'auto',
+                    border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.08))', borderRadius: 8,
+                  },
+                },
+                  backups.slice(0, 40).map((b) => h('div', {
+                    key: b.name,
+                    style: {
+                      display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px',
+                      fontSize: 12, borderBottom: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.05))',
+                    },
+                  },
+                    h('span', {
+                      style: { flex: '1 1 auto', fontFamily: 'ui-monospace, monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+                    }, b.name),
+                    h('span', { style: { opacity: 0.5, flex: '0 0 auto' } }, humanBytes(b.bytes)),
+                    h(ActionButton, { label: t('mt.restore'), small: true, onClick: () => doRestore(b.name), busy: busy === 'restore' }),
+                    h(ActionButton, { label: t('mt.delete'), small: true, tone: 'danger', onClick: () => doDelete(b.name), busy: busy === 'delete' }),
+                  )),
+                ),
+          ),
+        ),
+      )
+    }
+
+    /**
+     * 🔄 同步页（v2.5：同步的事一页说完）。
+     * 同步操作（一键/范围/手动挡）+ 定时同步 + 自动推送 + 本机备份快照。
+     * 原来分散在状态页（操作）和设置页（定时/自动推送/备份），老大反馈"分散混乱"。
+     */
+    function SyncPageWrapper({ t, data, onRefresh }) {
+      return h('div', null,
+        h(SyncPage, { t, data, onRefresh }),
+        h('div', { style: { height: 12 } }),
+        h(SyncExtrasPage, { t, data, onRefresh }),
+      )
+    }
+
     function StatusPage({ t, data, onRefresh, onGoSync }) {
       return h('div', null,
         h(OverviewPage, { t, data, onGoSync }),
-        h('div', { style: { height: 12 } }),
-        h(SyncPage, { t, data, onRefresh }),
       )
     }
 
@@ -2779,7 +2806,7 @@ window.__ModuleLoader__.load({
 
       useEffect(() => { refresh() }, [refresh])
 
-      const goSync = useCallback(() => setPageId('status'), [])
+      const goSync = useCallback(() => setPageId('sync'), [])
 
       const page = PAGES.find((x) => x.id === pageId) ?? PAGES[0]
 
@@ -2799,6 +2826,7 @@ window.__ModuleLoader__.load({
           h(ActionButton, { label: t('retry'), small: true, onClick: refresh }),
         )
       } else if (pageId === 'status') body = h(StatusPage, { t, data, onRefresh: refresh, onGoSync: goSync })
+      else if (pageId === 'sync') body = h(SyncPageWrapper, { t, data, onRefresh: refresh })
       else if (pageId === 'content') body = h(ContentPage, { t, data, onRefresh: refresh })
       else if (pageId === 'knowledge') body = h(KnowledgePage, { t, data })
       else if (pageId === 'settings') body = h(MaintainPage, { t, data, onRefresh: refresh })
