@@ -861,17 +861,22 @@ window.__ModuleLoader__.load({
     // ─────────────────── 密度组件（D4 方案 A） ───────────────────
 
     /**
-     * 自适应网格容器：窄容器自动降列，宽容器自动多列。
-     * 不写死列数，挤不爆也不留白。
-     * @param {object} p { min?:number 一列的最小宽度，默认 160 }
+     * 自适应网格容器：窄容器自动降列，宽容器自动多列。不写死列数。
+     *
+     * v2.6：默认 stretch=false —— 修复"同一行卡片被强制等高，内容多的把整行
+     * 撑高、内容少的跟着一片空白"（老大 2026-10-17 实锤：最近动态内容多，
+     * 同行机器看板大片空白）。false = 每张卡按自身内容高，空隙留在卡外。
+     * 需要等高的场景（并排输入区等）显式传 stretch。
+     * @param {object} p { min?:number, gap?:number, stretch?:boolean }
      */
-    function Grid({ min = 160, gap = 8, children }) {
+    function Grid({ min = 160, gap = 8, stretch = false, children }) {
       return h('div', {
         style: {
           display: 'grid',
           gridTemplateColumns: `repeat(auto-fit, minmax(${min}px, 1fr))`,
           gap,
           marginBottom: 4,
+          alignItems: stretch ? 'stretch' : 'start',
         },
       }, children)
     }
@@ -986,50 +991,54 @@ window.__ModuleLoader__.load({
       const [timelineOpen, setTimelineOpen] = useState(false)
 
       return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 0 } },
-        // 待办卡
-        h(Card, { title: t('ov.todo') },
-          todos.length === 0
-            ? h(Empty, null, t('ov.todo.empty'))
-            : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
-              todos.map((item) => h('div', {
-                key: item.key,
-                style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 },
-              },
-                h(Dot, { level: item.level }),
-                h('span', { style: { flex: '1 1 auto' } }, item.text),
-                item.key === 'core'
-                  ? null
-                  : h(ActionButton, { label: t('ov.goSync'), small: true, onClick: onGoSync }),
-              )),
-            ),
+        // v2.6：待办 + 健康分都是短内容，并排不占整行（Grid 默认按各自内容高，
+        // 谁也不会被同行撑出一片空白）。
+        h(Grid, { min: 300 },
+          // 待办卡
+          h(Card, { title: t('ov.todo') },
+            todos.length === 0
+              ? h(Empty, null, t('ov.todo.empty'))
+              : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
+                todos.map((item) => h('div', {
+                  key: item.key,
+                  style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 },
+                },
+                  h(Dot, { level: item.level }),
+                  h('span', { style: { flex: '1 1 auto' } }, item.text),
+                  item.key === 'core'
+                    ? null
+                    : h(ActionButton, { label: t('ov.goSync'), small: true, onClick: onGoSync }),
+                )),
+              ),
+          ),
+          // 健康分卡（N4：0–100 单一指标 + 点击拆明细）
+          data?.health?.items?.length
+            ? h(Card, {
+              title: t('ov.health'),
+              right: h('span', {
+                style: {
+                  fontSize: 20, fontWeight: 600,
+                  color: (data.health.score ?? 0) >= 90 ? 'var(--dsw-alias-status-success, #22c55e)'
+                    : (data.health.score ?? 0) >= 60 ? 'var(--dsw-alias-status-warning, #f59e0b)'
+                      : 'var(--dsw-alias-status-danger, #ef4444)',
+                },
+                'data-sync-hub-health': 'score',
+              }, String(data.health.score ?? 0)),
+            },
+              h('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
+                data.health.items.map((it) => h('div', {
+                  key: it.key,
+                  style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 },
+                },
+                  h(Dot, { level: it.level }),
+                  h('span', { style: { flex: '0 0 auto', opacity: 0.7 } }, it.label),
+                  h('span', { style: { flex: '1 1 auto', textAlign: 'right', opacity: 0.6 } }, it.reason),
+                  h('span', { style: { flex: '0 0 auto', fontVariantNumeric: 'tabular-nums', opacity: 0.8 } }, `${it.got}/${it.max}`),
+                )),
+              ),
+            )
+            : null,
         ),
-        // 健康分卡（N4：0–100 单一指标 + 点击拆明细）
-        data?.health?.items?.length
-          ? h(Card, {
-            title: t('ov.health'),
-            right: h('span', {
-              style: {
-                fontSize: 20, fontWeight: 600,
-                color: (data.health.score ?? 0) >= 90 ? 'var(--dsw-alias-status-success, #22c55e)'
-                  : (data.health.score ?? 0) >= 60 ? 'var(--dsw-alias-status-warning, #f59e0b)'
-                    : 'var(--dsw-alias-status-danger, #ef4444)',
-              },
-              'data-sync-hub-health': 'score',
-            }, String(data.health.score ?? 0)),
-          },
-            h('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
-              data.health.items.map((it) => h('div', {
-                key: it.key,
-                style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 },
-              },
-                h(Dot, { level: it.level }),
-                h('span', { style: { flex: '0 0 auto', opacity: 0.7 } }, it.label),
-                h('span', { style: { flex: '1 1 auto', textAlign: 'right', opacity: 0.6 } }, it.reason),
-                h('span', { style: { flex: '0 0 auto', fontVariantNumeric: 'tabular-nums', opacity: 0.8 } }, `${it.got}/${it.max}`),
-              )),
-            ),
-          )
-          : null,
 
         // 中枢卡（D4 密度改造：平铺 Row → 自适应网格指标块）
         h(Card, { title: t('ov.hub') },
@@ -1094,7 +1103,14 @@ window.__ModuleLoader__.load({
               ? h(TimelineView, { t })
               : (recent.length === 0
                 ? h(Empty, null, t('ov.noRecent'))
-                : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
+                : h('div', {
+                  // v2.6：限高 + 内部滚动。提交信息长短不一，不限高会把
+                  // 同行卡片的位置顶得忽高忽低；要看全量点右上「展开」。
+                  style: {
+                    display: 'flex', flexDirection: 'column', gap: 4,
+                    maxHeight: 220, overflow: 'auto',
+                  },
+                },
                   recent.slice(0, 6).map((c) => h('div', {
                     key: c.hash,
                     style: { display: 'flex', gap: 8, fontSize: 12, alignItems: 'baseline' },
@@ -1406,8 +1422,9 @@ window.__ModuleLoader__.load({
           })
           : null,
 
-        // v2.4：原「一键同步/推送范围/执行结果」三卡整合成一张（老大实感"不知道点哪个"）。
-        // 主路径=一个蓝按钮；手动操作收进同行小按钮；增量语义写在卡顶（不再等人问才解释）。
+        // v2.6：重排为「说明 / 范围+主操作 并排两列 / 回执」三区。
+        // 原来范围 chips 与按钮行上下堆叠占满整卡高度；现在两列并排，
+        // 左边选范围、右边点主操作，一眼看完不用滚动（窄屏自动降列）。
         h(Card, { title: t('sync.opTitle'), hint: t('sync.opHint') },
           h('div', {
             style: {
@@ -1419,72 +1436,74 @@ window.__ModuleLoader__.load({
             h('div', null, t('sync.incr1')),
             h('div', null, t('sync.incr2')),
           ),
-          h('div', { style: { marginTop: 2 } },
-            h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 } },
-              h('span', { style: { fontSize: 13, fontWeight: 600 } }, t('sync.scope')),
-              h(ActionButton, { label: t('sync.all'), small: true, onClick: () => setScopes([...SCOPES]) }),
-              h(ActionButton, { label: t('sync.none'), small: true, onClick: () => setScopes([]) }),
-              h('span', { style: { fontSize: 12, opacity: 0.6, marginLeft: 'auto' } },
-                scopes.length === 0 ? t('sync.pickCat') : t('flow.picked', { n: scopes.length })),
-            ),
-            h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6 } },
-              SCOPES.map((s) => h('button', {
-                key: s,
-                type: 'button',
-                onClick: () => toggle(s),
-                'aria-pressed': scopes.includes(s),
-                title: t(`scope.${s}.tip`),
-                style: {
-                  appearance: 'none', cursor: 'pointer', fontSize: 12,
-                  padding: '4px 10px', borderRadius: 999,
-                  border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.12))',
-                  background: scopes.includes(s)
-                    ? 'var(--dsw-alias-button-primary-bg, #2563eb)' : 'transparent',
-                  color: scopes.includes(s) ? '#fff' : 'inherit',
-                },
-              }, t(`scope.${s}`))),
-            ),
-          ),
           !flow
-            ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' } },
-              h(ActionButton, {
-                label: t('flow.start'), tone: 'primary',
-                onClick: flowPreview, busy: flowBusy, disabled: scopes.length === 0,
-                title: t('flow.startTip'),
-              }),
-              h(ActionButton, {
-                label: t('flow.roundtrip'), onClick: flowPreview, busy: flowBusy,
-                disabled: scopes.length === 0, small: true,
-                title: t('flow.roundtripTip'),
-              }),
-              h('span', {
-                style: {
-                  width: 1, alignSelf: 'stretch', margin: '2px 0',
-                  background: 'var(--dsw-alias-border-l3, rgba(0,0,0,0.1))',
-                },
-              }),
-              h(ActionButton, {
-                label: t('sync.preview'), onClick: runPreview,
-                busy: busy === 'preview', disabled: anyRunning,
-                title: t('sync.term.preview'), small: true,
-              }),
-              h(ActionButton, {
-                label: t('sync.push'), onClick: runPush,
-                busy: pushJob.running, disabled: anyRunning || scopes.length === 0,
-                title: t('sync.term.push'), small: true,
-              }),
-              h(ActionButton, {
-                label: t('sync.pull'), onClick: runPull,
-                busy: pullJob.running, disabled: anyRunning,
-                title: t('sync.term.pull'), small: true,
-              }),
-              h(ActionButton, {
-                label: t('sync.conflicts'), onClick: runConflicts,
-                busy: busy === 'conflicts', disabled: anyRunning, small: true,
-              }),
-              h(InlineNote, { tone: note?.tone }, note?.text),
+            ? h(Grid, { min: 320, gap: 10 },
+              // 左列：选范围
+              h('div', null,
+                h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 } },
+                  h('span', { style: { fontSize: 13, fontWeight: 600 } }, t('sync.scope')),
+                  h(ActionButton, { label: t('sync.all'), small: true, onClick: () => setScopes([...SCOPES]) }),
+                  h(ActionButton, { label: t('sync.none'), small: true, onClick: () => setScopes([]) }),
+                  h('span', { style: { fontSize: 12, opacity: 0.6, marginLeft: 'auto' } },
+                    scopes.length === 0 ? t('sync.pickCat') : t('flow.picked', { n: scopes.length })),
+                ),
+                h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6 } },
+                  SCOPES.map((s) => h('button', {
+                    key: s,
+                    type: 'button',
+                    onClick: () => toggle(s),
+                    'aria-pressed': scopes.includes(s),
+                    title: t(`scope.${s}.tip`),
+                    style: {
+                      appearance: 'none', cursor: 'pointer', fontSize: 12,
+                      padding: '4px 10px', borderRadius: 999,
+                      border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.12))',
+                      background: scopes.includes(s)
+                        ? 'var(--dsw-alias-button-primary-bg, #2563eb)' : 'transparent',
+                      color: scopes.includes(s) ? '#fff' : 'inherit',
+                    },
+                  }, t(`scope.${s}`))),
+                ),
+              ),
+              // 右列：主操作（主路径一个蓝按钮 + 手动挡小按钮）
+              h('div', { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
+                h(ActionButton, {
+                  label: t('flow.start'), tone: 'primary',
+                  onClick: flowPreview, busy: flowBusy, disabled: scopes.length === 0,
+                  title: t('flow.startTip'),
+                }),
+                h(ActionButton, {
+                  label: t('flow.roundtrip'), onClick: flowPreview, busy: flowBusy,
+                  disabled: scopes.length === 0, small: true,
+                  title: t('flow.roundtripTip'),
+                }),
+                h('div', { style: { height: 1, background: 'var(--dsw-alias-border-l3, rgba(0,0,0,0.08))' } }),
+                h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6 } },
+                  h(ActionButton, {
+                    label: t('sync.preview'), onClick: runPreview,
+                    busy: busy === 'preview', disabled: anyRunning,
+                    title: t('sync.term.preview'), small: true,
+                  }),
+                  h(ActionButton, {
+                    label: t('sync.push'), onClick: runPush,
+                    busy: pushJob.running, disabled: anyRunning || scopes.length === 0,
+                    title: t('sync.term.push'), small: true,
+                  }),
+                  h(ActionButton, {
+                    label: t('sync.pull'), onClick: runPull,
+                    busy: pullJob.running, disabled: anyRunning,
+                    title: t('sync.term.pull'), small: true,
+                  }),
+                  h(ActionButton, {
+                    label: t('sync.conflicts'), onClick: runConflicts,
+                    busy: busy === 'conflicts', disabled: anyRunning, small: true,
+                  }),
+                ),
+              ),
             )
-            : flow.stage === 'confirm'
+            : null,
+          h(InlineNote, { tone: note?.tone }, note?.text),
+          flow && flow.stage === 'confirm'
               ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
                 flow.roundtrip
                   ? h('p', { style: { margin: 0, fontSize: 13 } }, t('flow.confirmRoundtrip', { n: scopes.length }))
@@ -1508,7 +1527,8 @@ window.__ModuleLoader__.load({
                   h(ActionButton, { label: t('act.cancel'), onClick: () => setFlow(null) }),
                 ),
               )
-              : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
+              : (flow && flow.stage !== 'confirm'
+                ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
                   // v2.0.5：running 态由 flowJob 渲染（带已用时），done 态常驻
                   flow.stage === 'running'
                     ? h(JobView, { t, job: flowJob, title: t('sync.push') })
@@ -1522,7 +1542,8 @@ window.__ModuleLoader__.load({
                   flow.stage !== 'running'
                     ? h('div', null, h(ActionButton, { label: t('flow.again'), small: true, onClick: () => setFlow(null) }))
                     : null,
-                ),
+                )
+                : null),
         ),
 
 // 同步范围 + 动作卡（v2.4：已并入上方操作卡，这里只剩回执区）
