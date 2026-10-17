@@ -49,6 +49,14 @@ window.__ModuleLoader__.load({
     /** 扁平键文案表：zh 为真相源，en 必须同键集。 */
     const ZH = {
       'panel': '同步中枢',
+      // v2.7 主从导航栏
+      'nav.status': '状态',
+      'nav.sync': '同步',
+      'nav.content': '内容',
+      'nav.knowledge': '知识库',
+      'nav.settings': '设置',
+      'rail.credOk': '凭据已配置',
+      'rail.credMissing': '凭据缺失',
       'page.status': '📊 状态',
       'page.sync': '🔄 同步',
       'page.content': '📁 内容',
@@ -112,7 +120,6 @@ window.__ModuleLoader__.load({
       'ov.todo.behind': '远端领先 {n} 个提交，建议先拉取',
       'ov.todo.credential': 'Gitee 凭据没配，推拉都会失败',
       'ov.todo.core': '缺必需工具：{list}，同步会受影响',
-      'ov.hub': '中枢',
       'ov.version': '版本',
       'ov.branch': '分支',
       'ov.lastCommit': '最近提交',
@@ -130,6 +137,11 @@ window.__ModuleLoader__.load({
       'ov.board': '机器看板',
       'ov.noBoard': '（没有机器档案）',
       'ov.boardNever': '未见同步记录',
+      'ov.verdict.ok': '正常',
+      'ov.verdict.warn': '有隐患',
+      'ov.verdict.fail': '需处理',
+      'ov.section.basic': '基础信息',
+      'ov.section.sync': '同步状态',
 
       // 首次运行引导（onboarding）
       'ob.title': '欢迎使用同步中枢',
@@ -185,6 +197,8 @@ window.__ModuleLoader__.load({
 
       // 同步
       'sync.scope': '上传范围',
+      'sync.actions': '执行',
+      'sync.receipt': '回执',
       // ── v2.4 操作卡整合（三卡 → 一卡；范围全中文；增量语义上界面） ──
       'sync.opTitle': '同步操作',
       'sync.opHint': '日常只需点蓝色「开始一键同步」；下面小按钮是手动挡，不常用。',
@@ -253,6 +267,7 @@ window.__ModuleLoader__.load({
       'mt.msg.preRestore': '原文件已另存为 {name}',
       'mt.msg.deleted': '已删除 {name}',
       'mt.msg.restoreFail': '恢复失败：{e}',
+      'mt.env': '环境',
       'mt.tools': '工具链体检',
       'mt.toolsHint': '必需 / 开发 / 可选三档。缺失只报告，不自动装。',
       'mt.core': '必需',
@@ -390,6 +405,13 @@ window.__ModuleLoader__.load({
     }
     const EN = {
       'panel': 'Sync Hub',
+      'nav.status': 'Status',
+      'nav.sync': 'Sync',
+      'nav.content': 'Content',
+      'nav.knowledge': 'Knowledge',
+      'nav.settings': 'Settings',
+      'rail.credOk': 'Credential set',
+      'rail.credMissing': 'Credential missing',
       'page.status': '📊 Status',
       'page.sync': '🔄 Sync',
       'page.content': '📁 Content',
@@ -446,7 +468,6 @@ window.__ModuleLoader__.load({
       'ov.todo.behind': 'Remote is ahead by {n} commit(s) — pull first',
       'ov.todo.credential': 'Gitee credential missing — push/pull will fail',
       'ov.todo.core': 'Missing core tools: {list}',
-      'ov.hub': 'Hub',
       'ov.version': 'Version',
       'ov.branch': 'Branch',
       'ov.lastCommit': 'Last commit',
@@ -464,6 +485,11 @@ window.__ModuleLoader__.load({
       'ov.board': 'Machines',
       'ov.noBoard': '(no machine profiles)',
       'ov.boardNever': 'no sync seen',
+      'ov.verdict.ok': 'All good',
+      'ov.verdict.warn': 'Needs attention',
+      'ov.verdict.fail': 'Action required',
+      'ov.section.basic': 'Basics',
+      'ov.section.sync': 'Sync status',
 
       // Onboarding
       'ob.title': 'Welcome to Sync Hub',
@@ -517,6 +543,8 @@ window.__ModuleLoader__.load({
       'flow.roundtripTip': 'Pull and apply the other machine\'s changes first, then push yours. Use after switching machines or a long gap.',
       'flow.confirmRoundtrip': 'Run a full round trip? Pulls and applies first (stops at conflicts into the resolver), then pushes your {n} selected categories.',
       'sync.scope': 'Upload scope',
+      'sync.actions': 'Run',
+      'sync.receipt': 'Receipt',
       'sync.opTitle': 'Sync actions',
       'sync.opHint': 'Daily use = the blue "Start one-shot sync" only. The small buttons below are manual mode.',
       'sync.incr1': '· Upload backup sends only what THIS machine changed — it never overwrites files the other side did not touch; the machine with less content uploading keeps the other\'s content intact.',
@@ -579,6 +607,7 @@ window.__ModuleLoader__.load({
       'mt.msg.preRestore': 'Previous file saved as {name}',
       'mt.msg.deleted': 'Deleted {name}',
       'mt.msg.restoreFail': 'Restore failed: {e}',
+      'mt.env': 'Environment',
       'mt.tools': 'Toolchain',
       'mt.toolsHint': 'core / dev / nice. Missing tools are reported, never auto-installed.',
       'mt.core': 'core',
@@ -835,25 +864,6 @@ window.__ModuleLoader__.load({
       })
     }
 
-    /** 一张卡片（标题 + 子内容）。span=2 时在双列网格里占整行。 */
-    function Card({ title, hint, children, right, span }) {
-      return h('section', {
-        style: {
-          border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.08))',
-          borderRadius: 10, padding: '12px 14px', marginBottom: 12,
-          display: 'flex', flexDirection: 'column', gap: 8,
-          ...(span === 2 ? { gridColumn: '1 / -1', marginBottom: 0 } : {}),
-        },
-      },
-        h('div', { style: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 } },
-          h('h3', { style: { margin: 0, fontSize: 14, fontWeight: 600 } }, title),
-          right ?? null,
-        ),
-        hint ? h('p', { style: { margin: 0, fontSize: 12, opacity: 0.6, lineHeight: '18px' } }, hint) : null,
-        children,
-      )
-    }
-
     /** 主按钮（就地反馈：busy 时禁用并显示转圈文案）。 */
     function ActionButton({ label, onClick, busy, tone, disabled, small, title }) {
       const bg = tone === 'primary'
@@ -933,8 +943,7 @@ window.__ModuleLoader__.load({
             : 'var(--dsw-alias-label-primary, inherit)'
       return h('div', {
         style: {
-          border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.08))',
-          borderRadius: 10, padding: '9px 12px',
+          border: T.border, borderRadius: T.r, padding: T.pad,
           display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0,
         },
       },
@@ -983,7 +992,7 @@ window.__ModuleLoader__.load({
         style: {
           display: 'flex', flexWrap: 'wrap', gap: '6px 16px', alignItems: 'center',
           padding: '6px 20px', fontSize: 12,
-          borderBottom: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.08))',
+          borderBottom: T.border,
           flex: '0 0 auto',
         },
         'data-sync-hub-status': 'bar',
@@ -996,6 +1005,185 @@ window.__ModuleLoader__.load({
         h('span', { style: { opacity: 0.6 } }, it.label),
         h('span', { style: { fontWeight: 500 } }, String(it.value)),
       )))
+    }
+
+    // ─────────────────── B2 设计系统（v2.7 主从工作台重设计） ───────────────────
+    // 单一 token 量表：间距 4/8/12/16/24，圆角 8，容器 padding 12，maxHeight 240。
+    // 全文件只此一处定义，页面组件一律引用 T，杜绝 9 种 gap / 5 种 min 的乱源（memory 4.17）。
+    const T = {
+      s4: 4, s8: 8, s12: 12, s16: 16, s24: 24,
+      r: 8, pad: 12, padL: 16, maxH: 240, gap: 12, gapSm: 8,
+      border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.08))',
+      divider: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.05))',
+      fill: 'var(--dsw-alias-bg-fill-subtle, rgba(0,0,0,0.04))',
+    }
+
+    /** 页面头：标题 + 右侧动作（默认刷新）。各页不再各自画 h2。 */
+    function PageHeader({ t, title, onRefresh, loading, right }) {
+      return h('div', {
+        style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: T.s8, marginBottom: T.s12 },
+      },
+        h('h2', { style: { margin: 0, fontSize: 16, fontWeight: 600 } }, title),
+        h('div', { style: { display: 'flex', alignItems: 'center', gap: T.s8 } },
+          right ?? null,
+          onRefresh ? h(ActionButton, { label: t('refresh'), small: true, onClick: onRefresh, busy: loading }) : null,
+        ),
+      )
+    }
+
+    /** B2「Section」：无边框逻辑分组（标题 + 可选说明 + 内容）。 */
+    function Section({ title, hint, right, children }) {
+      return h('div', { style: { marginBottom: T.s24 } },
+        h('div', { style: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: T.s8, marginBottom: T.s8 } },
+          h('h3', { style: { margin: 0, fontSize: 13, fontWeight: 600, opacity: 0.9 } }, title),
+          right ?? null,
+        ),
+        hint ? h('p', { style: { margin: '0 0 8px', fontSize: 12, opacity: 0.6, lineHeight: '18px' } }, hint) : null,
+        children,
+      )
+    }
+
+    /** B2「Panel」：带边框卡片（标题 + 可选说明 + 内容）。 */
+    function Panel({ title, hint, right, children }) {
+      return h('section', {
+        style: { border: T.border, borderRadius: T.r, padding: T.pad, marginBottom: T.s12, display: 'flex', flexDirection: 'column', gap: T.s8 },
+      },
+        title || right
+          ? h('div', { style: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: T.s8 } },
+            title ? h('h3', { style: { margin: 0, fontSize: 14, fontWeight: 600 } }, title) : null,
+            right ?? null,
+          )
+          : null,
+        hint ? h('p', { style: { margin: 0, fontSize: 12, opacity: 0.6, lineHeight: '18px' } }, hint) : null,
+        children,
+      )
+    }
+
+    /** 键值行：左侧标签 + 右侧内容（可带状态点）。 */
+    function KVRow({ label, children, level }) {
+      return h('div', { style: { display: 'flex', alignItems: 'center', gap: T.s8, fontSize: 13, padding: '4px 0' } },
+        level ? h(Dot, { level }) : null,
+        h('span', { style: { flex: '0 0 auto', opacity: 0.65, minWidth: 64 } }, label),
+        h('span', { style: { flex: '1 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, children),
+      )
+    }
+
+    /** 范围选择芯片（同步范围多选复用）。 */
+    function Check({ label, active, onClick, title }) {
+      return h('button', {
+        type: 'button', onClick, 'aria-pressed': active, title,
+        style: {
+          appearance: 'none', cursor: 'pointer', fontSize: 12,
+          padding: '4px 10px', borderRadius: 999,
+          border: T.border,
+          background: active ? 'var(--dsw-alias-button-primary-bg, #2563eb)' : 'transparent',
+          color: active ? '#fff' : 'inherit',
+        },
+      }, label)
+    }
+
+    /** 结论条（B2 工作台顶部总判断）。 */
+    function Verdict({ level, title, children }) {
+      const bg = level === 'pass' ? 'var(--dsw-alias-status-success, #22c55e)'
+        : level === 'warn' ? 'var(--dsw-alias-status-warning, #f59e0b)'
+          : level === 'fail' ? 'var(--dsw-alias-status-danger, #ef4444)'
+            : 'var(--dsw-alias-label-tertiary, #888)'
+      return h('div', {
+        style: {
+          display: 'flex', alignItems: 'flex-start', gap: T.s8,
+          padding: T.pad, borderRadius: T.r, marginBottom: T.s16,
+          background: 'var(--dsw-alias-bg-fill-subtle, rgba(0,0,0,0.04))',
+          borderLeft: `3px solid ${bg}`,
+        },
+      },
+        h(Dot, { level }),
+        h('div', { style: { flex: '1 1 auto', minWidth: 0 } },
+          h('div', { style: { fontSize: 13, fontWeight: 600 } }, title),
+          children ? h('div', { style: { fontSize: 12, opacity: 0.75, lineHeight: '18px', marginTop: 2 } }, children) : null,
+        ),
+      )
+    }
+
+    /** 指标行（自适应多列，统一 gap）。 */
+    function StatRow({ items, min = 140 }) {
+      return h('div', { style: { display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(${min}px, 1fr))`, gap: T.s8 } },
+        (items ?? []).map((it, i) => h(StatTile, { key: i, ...it })),
+      )
+    }
+
+    /** 左导航栏（B2 主从骨架的「主」）。220px 固定，含品牌 / 导航 / 状态脚。 */
+    function Rail({ t, data, pageId, onPick }) {
+      const st = data?.status ?? {}
+      const nav = [
+        { id: 'status', label: t('nav.status'), icon: 'IconGaugeOutlineMedium' },
+        { id: 'sync', label: t('nav.sync'), icon: 'IconRefreshOutlineMedium' },
+        { id: 'content', label: t('nav.content'), icon: 'IconFolderOpenOutlineMedium' },
+        { id: 'knowledge', label: t('nav.knowledge'), icon: 'IconDatabaseOutlineMedium' },
+        { id: 'settings', label: t('nav.settings'), icon: 'IconSettingsOutlineMedium' },
+      ]
+      const Icon = (name) => { const C = P[name]; return C ? h(C, { size: 18 }) : null }
+      const credOk = data?.credential?.haveCredential
+      const behind = st.behind ?? 0
+      const dirty = st.dirtyCount ?? 0
+      const scheduleOn = data?.schedule?.installed
+      return h('aside', {
+        style: {
+          width: 220, flex: '0 0 220px', alignSelf: 'stretch',
+          borderRight: T.border,
+          display: 'flex', flexDirection: 'column',
+          background: 'var(--dsw-alias-bg-fill-subtle, rgba(0,0,0,0.02))',
+        },
+        'data-sync-hub-rail': 'nav',
+      },
+        // 品牌区
+        h('div', { style: { padding: '16px 16px 12px', borderBottom: T.border } },
+          h('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+            h(P.IconCompareSplitOutlineMedium, { size: 20 }),
+            h('div', null,
+              h('div', { style: { fontSize: 14, fontWeight: 600, lineHeight: '18px' } }, t('panel')),
+              h('div', { style: { fontSize: 11, opacity: 0.5 } }, `v${data?.version ?? '—'}`),
+            ),
+          ),
+        ),
+        // 导航
+        h('nav', { style: { flex: '1 1 auto', overflow: 'auto', padding: '8px 8px' } },
+          nav.map((n) => {
+            const active = pageId === n.id
+            return h('button', {
+              key: n.id, type: 'button', onClick: () => onPick(n.id),
+              'aria-current': active ? 'page' : undefined,
+              style: {
+                width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                appearance: 'none', border: 'none', cursor: 'pointer',
+                padding: '8px 10px', marginBottom: 4, borderRadius: T.r,
+                fontSize: 13, textAlign: 'left',
+                background: active ? 'var(--dsw-alias-button-primary-bg, #2563eb)' : 'transparent',
+                color: active ? '#fff' : 'inherit',
+              },
+            },
+              Icon(n.icon),
+              h('span', null, n.label),
+            )
+          }),
+        ),
+        // 状态脚
+        h('div', { style: { padding: '10px 12px', borderTop: T.border, fontSize: 12, display: 'flex', flexDirection: 'column', gap: 6 } },
+          h('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+            h(Dot, { level: credOk ? 'pass' : 'fail' }),
+            h('span', { style: { opacity: 0.7 } }, credOk ? t('rail.credOk') : t('rail.credMissing')),
+          ),
+          h('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+            h(Dot, { level: behind > 0 ? 'warn' : 'pass' }),
+            h('span', { style: { opacity: 0.7 } }, `${t('bar.behind')} ${behind}`),
+            h(Dot, { level: dirty > 0 ? 'warn' : 'pass' }),
+            h('span', { style: { opacity: 0.7 } }, `${t('bar.dirty')} ${dirty}`),
+          ),
+          h('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+            h(Dot, { level: scheduleOn ? 'pass' : 'info' }),
+            h('span', { style: { opacity: 0.7 } }, scheduleOn ? `${t('bar.schedule')} ${t('bar.on')}` : `${t('bar.schedule')} ${t('bar.off')}`),
+          ),
+        ),
+      )
     }
 
     // ─────────────────── 总览页 ───────────────────
@@ -1029,13 +1217,59 @@ window.__ModuleLoader__.load({
       const todos = buildTodos(t, data)
       const recent = data?.recent ?? []
       const [timelineOpen, setTimelineOpen] = useState(false)
+      const score = data?.health?.score ?? 0
+      const vlevel = score >= 90 ? 'pass' : score >= 60 ? 'warn' : 'fail'
+      const vtitle = vlevel === 'pass' ? t('ov.verdict.ok') : vlevel === 'warn' ? t('ov.verdict.warn') : t('ov.verdict.fail')
 
-      return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 0 } },
-        // v2.6：待办 + 健康分都是短内容，并排不占整行（Grid 默认按各自内容高，
-        // 谁也不会被同行撑出一片空白）。
-        h(Grid, { min: 300 },
-          // 待办卡
-          h(Card, { title: t('ov.todo') },
+      return h('div', { style: { display: 'flex', flexDirection: 'column' } },
+        // 结论条（B2 工作台顶部总判断）
+        h(Verdict, { level: todos.some((x) => x.level === 'fail') ? 'fail' : vlevel, title: vtitle },
+          todos.length ? h('span', null, todos.map((x) => x.text).slice(0, 2).join(' · ')) : null,
+        ),
+
+        // 指标行：版本 / 分支 / 技能 / 机器 / 工具 / 最近提交
+        h(StatRow, { items: [
+          { label: t('ov.version'), value: data?.version ?? '—', mono: true },
+          { label: t('ov.branch'), value: st.branch ?? '—', mono: true },
+          { label: t('ov.skills'), value: data?.inventory?.skills ?? '—' },
+          { label: t('ov.machines'), value: data?.inventory?.machines ?? '—' },
+          { label: t('ov.tools'), value: data?.tools ? `${data.tools.present}/${data.tools.total}` : '—', mono: true,
+            level: (data?.tools?.missingCore?.length ?? 0) > 0 ? 'fail' : 'pass' },
+          { label: t('ov.lastCommit'), value: st.lastCommit ? st.lastCommit.hash : '—', mono: true },
+        ] }),
+
+        // 基础信息区
+        h(Section, { title: t('ov.section.basic') },
+          h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: T.s8 } },
+            h(KVRow, { label: t('bar.identity') }, data?.machine?.computer ?? '—'),
+            h(KVRow, { label: t('ov.dshHome') }, data?.machine?.dshHome ?? '—'),
+          ),
+        ),
+
+        // 同步状态区：健康分 + 本机落后/脏 + 待办
+        h(Section, { title: t('ov.section.sync') },
+          h(Panel, { title: t('ov.health'), right: h('span', {
+            style: { fontSize: 18, fontWeight: 600,
+              color: vlevel === 'pass' ? 'var(--dsw-alias-status-success, #22c55e)'
+                : vlevel === 'warn' ? 'var(--dsw-alias-status-warning, #f59e0b)'
+                : 'var(--dsw-alias-status-danger, #ef4444)' },
+            'data-sync-hub-health': 'score',
+          }, String(score)) },
+            data?.health?.items?.length
+              ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
+                data.health.items.map((it) => h('div', {
+                  key: it.key,
+                  style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 },
+                },
+                  h(Dot, { level: it.level }),
+                  h('span', { style: { flex: '0 0 auto', opacity: 0.7 } }, it.label),
+                  h('span', { style: { flex: '1 1 auto', textAlign: 'right', opacity: 0.6 } }, it.reason),
+                  h('span', { style: { flex: '0 0 auto', fontVariantNumeric: 'tabular-nums', opacity: 0.8 } }, `${it.got}/${it.max}`),
+                )),
+              )
+              : null,
+          ),
+          h(Panel, { title: t('ov.todo') },
             todos.length === 0
               ? h(Empty, null, t('ov.todo.empty'))
               : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
@@ -1051,124 +1285,55 @@ window.__ModuleLoader__.load({
                 )),
               ),
           ),
-          // 健康分卡（N4：0–100 单一指标 + 点击拆明细）
-          data?.health?.items?.length
-            ? h(Card, {
-              title: t('ov.health'),
-              right: h('span', {
-                style: {
-                  fontSize: 20, fontWeight: 600,
-                  color: (data.health.score ?? 0) >= 90 ? 'var(--dsw-alias-status-success, #22c55e)'
-                    : (data.health.score ?? 0) >= 60 ? 'var(--dsw-alias-status-warning, #f59e0b)'
-                      : 'var(--dsw-alias-status-danger, #ef4444)',
-                },
-                'data-sync-hub-health': 'score',
-              }, String(data.health.score ?? 0)),
-            },
-              h('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
-                data.health.items.map((it) => h('div', {
-                  key: it.key,
-                  style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 },
-                },
-                  h(Dot, { level: it.level }),
-                  h('span', { style: { flex: '0 0 auto', opacity: 0.7 } }, it.label),
-                  h('span', { style: { flex: '1 1 auto', textAlign: 'right', opacity: 0.6 } }, it.reason),
-                  h('span', { style: { flex: '0 0 auto', fontVariantNumeric: 'tabular-nums', opacity: 0.8 } }, `${it.got}/${it.max}`),
-                )),
-              ),
-            )
-            : null,
         ),
 
-        // 中枢卡（v2.6.1：commit message 从 tile hint 移到网格下方单独一行——
-        // 原来挂在 hint 里把该 tile 撑成双倍高，同行其他 tile 底部一片空白）
-        h(Card, { title: t('ov.hub') },
-          h(Grid, { min: 140 },
-            h(StatTile, { label: t('ov.version'), value: data?.version ?? '—', mono: true }),
-            h(StatTile, { label: t('ov.branch'), value: st.branch ?? '—', mono: true }),
-            h(StatTile, { label: t('ov.skills'), value: data?.inventory?.skills ?? '—' }),
-            h(StatTile, { label: t('ov.machines'), value: data?.inventory?.machines ?? '—' }),
-            h(StatTile, {
-              label: t('ov.tools'),
-              value: data?.tools ? `${data.tools.present}/${data.tools.total}` : '—',
-              level: (data?.tools?.missingCore?.length ?? 0) > 0 ? 'fail' : 'pass',
-              mono: true,
-            }),
-            h(StatTile, {
-              label: t('ov.lastCommit'),
-              value: st.lastCommit ? st.lastCommit.hash : '—',
-              mono: true,
-            }),
-          ),
-          st.lastCommit?.subject
-            ? h('div', {
-              style: {
-                marginTop: 2, fontSize: 11, lineHeight: '16px', opacity: 0.55,
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        // 机器看板 + 最近动态
+        h(Section, { title: t('ov.board') },
+          (data?.board ?? []).length === 0
+            ? h(Empty, null, t('ov.noBoard'))
+            : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
+              (data.board ?? []).map((m) => h('div', {
+                key: m.id,
+                style: {
+                  display: 'flex', alignItems: 'center', gap: 8, fontSize: 13,
+                  padding: '5px 0', borderBottom: T.border,
+                },
               },
-              title: st.lastCommit.subject,
-            }, st.lastCommit.subject)
-            : null,
-        ),
-        // 本机卡（D4：两行信息 → 双列网格，不再各占全宽）
-        h(Card, { title: t('ov.machine') },
-          h(Grid, { min: 220 },
-            h(StatTile, { label: t('bar.identity'), value: data?.machine?.computer ?? '—', mono: true }),
-            h(StatTile, { label: t('ov.dshHome'), value: data?.machine?.dshHome ?? '—', mono: true }),
+                h(Dot, { level: staleLevel(m.lastWhen) }),
+                h('span', { style: { flex: '0 0 auto', fontWeight: 500 } }, m.id),
+                h('span', { style: { flex: '0 0 auto', opacity: 0.5, fontSize: 12 } }, m.computer ?? '?'),
+                (data.machine && m.computer && m.computer === data.machine.computer)
+                  ? h('span', { style: { flex: '0 0 auto', fontSize: 11, fontWeight: 600, color: 'var(--dsw-alias-status-pass, #16a34a)' } }, t('ov.machine'))
+                  : null,
+                h('span', {
+                  style: { flex: '1 1 auto', textAlign: 'right', fontSize: 12, opacity: 0.7 },
+                  title: m.lastSubject ?? undefined,
+                }, m.lastWhen ? `${fmtWhen(m.lastWhen)}${staleNote(m.lastWhen) ? ` · ${staleNote(m.lastWhen)}` : ''}${m.lastCommit ? ` · ${m.lastCommit}` : ''}` : t('ov.boardNever')),
+              )),
           ),
         ),
-        // 机器看板 + 最近动态（D4：内容量相近的两卡并排，不各占整行）
-        h(Grid, { min: 300 },
-          h(Card, { title: t('ov.board') },
-            (data?.board ?? []).length === 0
-              ? h(Empty, null, t('ov.noBoard'))
+
+        // 最近动态（B2 Section + 右上展开时间线）
+        h(Section, {
+          title: t('ov.recent'),
+          right: h(ActionButton, { label: timelineOpen ? t('tl.collapse') : t('tl.expand'), small: true, onClick: () => setTimelineOpen(!timelineOpen) }),
+        },
+          timelineOpen
+            ? h(TimelineView, { t })
+            : (recent.length === 0
+              ? h(Empty, null, t('ov.noRecent'))
               : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
-                (data.board ?? []).map((m) => h('div', {
-                  key: m.id,
-                  style: {
-                    display: 'flex', alignItems: 'center', gap: 8, fontSize: 13,
-                    padding: '5px 0', borderBottom: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.05))',
-                  },
+                recent.slice(0, 4).map((c) => h('div', {
+                  key: c.hash,
+                  style: { display: 'flex', gap: 8, fontSize: 12, alignItems: 'baseline' },
                 },
-                  h(Dot, { level: staleLevel(m.lastWhen) }),
-                  h('span', { style: { flex: '0 0 auto', fontWeight: 500 } }, m.id),
-                  h('span', { style: { flex: '0 0 auto', opacity: 0.5, fontSize: 12 } }, m.computer ?? '?'),
+                  h('span', { style: { opacity: 0.5, fontFamily: 'ui-monospace, monospace', flex: '0 0 auto' } }, c.hash.slice(0, 7)),
                   h('span', {
-                    style: { flex: '1 1 auto', textAlign: 'right', fontSize: 12, opacity: 0.7 },
-                    title: m.lastSubject ?? undefined,
-                  }, m.lastWhen ? `${fmtWhen(m.lastWhen)}${staleNote(m.lastWhen) ? ` · ${staleNote(m.lastWhen)}` : ''}${m.lastCommit ? ` · ${m.lastCommit}` : ''}` : t('ov.boardNever')),
+                    style: { flex: '1 1 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+                  }, c.subject),
+                  h('span', { style: { opacity: 0.5, flex: '0 0 auto' } }, fmtWhen(c.date)),
                 )),
-              ),
-          ),
-          h(Card, {
-            title: t('ov.recent'),
-            right: h(ActionButton, {
-              label: timelineOpen ? t('tl.collapse') : t('tl.expand'),
-              small: true,
-              onClick: () => setTimelineOpen(!timelineOpen),
-            }),
-          },
-            timelineOpen
-              ? h(TimelineView, { t })
-              : (recent.length === 0
-                ? h(Empty, null, t('ov.noRecent'))
-                : h('div', {
-                  // v2.6.1：去掉内部滚动条（窄面板里很憋屈，老大"好看吗"实锤）。
-                  // 只列 4 条 + 提交信息超长省略；要看全量点右上「展开」。
-                  style: { display: 'flex', flexDirection: 'column', gap: 4 },
-                },
-                  recent.slice(0, 4).map((c) => h('div', {
-                    key: c.hash,
-                    style: { display: 'flex', gap: 8, fontSize: 12, alignItems: 'baseline' },
-                  },
-                    h('span', { style: { opacity: 0.5, fontFamily: 'ui-monospace, monospace', flex: '0 0 auto' } }, c.hash.slice(0, 7)),
-                    h('span', {
-                      style: { flex: '1 1 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-                    }, c.subject),
-                    h('span', { style: { opacity: 0.5, flex: '0 0 auto' } }, fmtWhen(c.date)),
-                  )),
-                )),
-          ),
+              )),
         ),
       )
     }
@@ -1217,15 +1382,15 @@ window.__ModuleLoader__.load({
             ? h(Empty, null, t('tl.noRows'))
             : h('div', {
               style: {
-                maxHeight: 420, overflow: 'auto',
-                border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.08))', borderRadius: 8,
+                maxHeight: T.maxH, overflow: 'auto',
+                border: T.border, borderRadius: T.r,
               },
             },
               rows.map((c) => h('div', {
                 key: c.hash,
                 style: {
                   display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', fontSize: 12,
-                  borderBottom: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.05))',
+                  borderBottom: T.divider,
                 },
               },
                 h('span', { style: { opacity: 0.5, fontFamily: 'ui-monospace, monospace', flex: '0 0 auto' } }, c.short),
@@ -1458,7 +1623,7 @@ window.__ModuleLoader__.load({
         else setFlow(null)
       }
 
-      return h('div', null,
+      return h('div', { style: { display: 'flex', flexDirection: 'column' } },
         // 冲突解决器（撞车时置顶展开）
         resolverOpen && conflicts.length > 0
           ? h(ConflictResolver, {
@@ -1468,190 +1633,162 @@ window.__ModuleLoader__.load({
           })
           : null,
 
-        // v2.6：重排为「说明 / 范围+主操作 并排两列 / 回执」三区。
-        // 原来范围 chips 与按钮行上下堆叠占满整卡高度；现在两列并排，
-        // 左边选范围、右边点主操作，一眼看完不用滚动（窄屏自动降列）。
-        h(Card, { title: t('sync.opTitle'), hint: t('sync.opHint') },
+        // B2：说明 + 范围 + 主操作 三块分区
+        h(Section, { title: t('sync.opTitle'), hint: t('sync.opHint') },
           h('div', {
             style: {
               fontSize: 12, lineHeight: '18px', opacity: 0.8,
-              padding: '6px 8px', borderRadius: 8,
-              background: 'var(--dsw-alias-bg-fill-subtle, rgba(0,0,0,0.04))',
+              padding: '6px 8px', borderRadius: T.r, background: T.fill,
             },
           },
             h('div', null, t('sync.incr1')),
             h('div', null, t('sync.incr2')),
           ),
+        ),
+
+        // 范围 + 动作（并排两列，窄屏降列）
+        h(Panel, { title: t('sync.scope') },
+          h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: T.s8 } },
+            h(ActionButton, { label: t('sync.all'), small: true, onClick: () => setScopes([...SCOPES]) }),
+            h(ActionButton, { label: t('sync.none'), small: true, onClick: () => setScopes([]) }),
+            h('span', { style: { fontSize: 12, opacity: 0.6, marginLeft: 'auto' } },
+              scopes.length === 0 ? t('sync.pickCat') : t('flow.picked', { n: scopes.length })),
+          ),
+          h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: T.s8 } },
+            SCOPES.map((s) => h(Check, {
+              key: s, label: t(`scope.${s}`), active: scopes.includes(s),
+              title: t(`scope.${s}.tip`), onClick: () => toggle(s),
+            })),
+          ),
+        ),
+
+        h(Panel, { title: t('sync.actions') },
           !flow
-            ? h(Grid, { min: 320, gap: 10 },
-              // 左列：选范围
-              h('div', null,
-                h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 } },
-                  h('span', { style: { fontSize: 13, fontWeight: 600 } }, t('sync.scope')),
-                  h(ActionButton, { label: t('sync.all'), small: true, onClick: () => setScopes([...SCOPES]) }),
-                  h(ActionButton, { label: t('sync.none'), small: true, onClick: () => setScopes([]) }),
-                  h('span', { style: { fontSize: 12, opacity: 0.6, marginLeft: 'auto' } },
-                    scopes.length === 0 ? t('sync.pickCat') : t('flow.picked', { n: scopes.length })),
-                ),
-                h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6 } },
-                  SCOPES.map((s) => h('button', {
-                    key: s,
-                    type: 'button',
-                    onClick: () => toggle(s),
-                    'aria-pressed': scopes.includes(s),
-                    title: t(`scope.${s}.tip`),
-                    style: {
-                      appearance: 'none', cursor: 'pointer', fontSize: 12,
-                      padding: '4px 10px', borderRadius: 999,
-                      border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.12))',
-                      background: scopes.includes(s)
-                        ? 'var(--dsw-alias-button-primary-bg, #2563eb)' : 'transparent',
-                      color: scopes.includes(s) ? '#fff' : 'inherit',
-                    },
-                  }, t(`scope.${s}`))),
-                ),
-              ),
-              // 右列：主操作（主路径一个蓝按钮 + 手动挡小按钮）
-              h('div', { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
-                h(ActionButton, {
-                  label: t('flow.start'), tone: 'primary',
-                  onClick: flowPreview, busy: flowBusy, disabled: scopes.length === 0,
-                  title: t('flow.startTip'),
-                }),
-                h(ActionButton, {
-                  label: t('flow.roundtrip'), onClick: flowPreview, busy: flowBusy,
-                  disabled: scopes.length === 0, small: true,
-                  title: t('flow.roundtripTip'),
-                }),
-                h('div', { style: { height: 1, background: 'var(--dsw-alias-border-l3, rgba(0,0,0,0.08))' } }),
-                h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6 } },
-                  h(ActionButton, {
-                    label: t('sync.preview'), onClick: runPreview,
-                    busy: busy === 'preview', disabled: anyRunning,
-                    title: t('sync.term.preview'), small: true,
-                  }),
-                  h(ActionButton, {
-                    label: t('sync.push'), onClick: runPush,
-                    busy: pushJob.running, disabled: anyRunning || scopes.length === 0,
-                    title: t('sync.term.push'), small: true,
-                  }),
-                  h(ActionButton, {
-                    label: t('sync.pull'), onClick: runPull,
-                    busy: pullJob.running, disabled: anyRunning,
-                    title: t('sync.term.pull'), small: true,
-                  }),
-                  h(ActionButton, {
-                    label: t('sync.conflicts'), onClick: runConflicts,
-                    busy: busy === 'conflicts', disabled: anyRunning, small: true,
-                  }),
-                ),
-              ),
+            ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: T.s8 } },
+              h(ActionButton, {
+                label: t('flow.start'), tone: 'primary',
+                onClick: flowPreview, busy: flowBusy, disabled: scopes.length === 0,
+                title: t('flow.startTip'),
+              }),
+              h(ActionButton, {
+                label: t('flow.roundtrip'), onClick: flowPreview, busy: flowBusy,
+                disabled: scopes.length === 0, small: true,
+                title: t('flow.roundtripTip'),
+              }),
+              h(ActionButton, {
+                label: t('sync.preview'), onClick: runPreview,
+                busy: busy === 'preview', disabled: anyRunning,
+                title: t('sync.term.preview'), small: true,
+              }),
+              h(ActionButton, {
+                label: t('sync.push'), onClick: runPush,
+                busy: pushJob.running, disabled: anyRunning || scopes.length === 0,
+                title: t('sync.term.push'), small: true,
+              }),
+              h(ActionButton, {
+                label: t('sync.pull'), onClick: runPull,
+                busy: pullJob.running, disabled: anyRunning,
+                title: t('sync.term.pull'), small: true,
+              }),
+              h(ActionButton, {
+                label: t('sync.conflicts'), onClick: runConflicts,
+                busy: busy === 'conflicts', disabled: anyRunning, small: true,
+              }),
             )
             : null,
           h(InlineNote, { tone: note?.tone }, note?.text),
           flow && flow.stage === 'confirm'
-              ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
-                flow.roundtrip
-                  ? h('p', { style: { margin: 0, fontSize: 13 } }, t('flow.confirmRoundtrip', { n: scopes.length }))
-                  : h('p', { style: { margin: 0, fontSize: 13 } },
-                    t('sync.confirmPush', { n: flow.files.length }) + ' · ' + t('sync.files', {
-                      n: flow.files.length, size: humanBytes(flow.totalBytes),
-                    })),
-                !flow.roundtrip
-                  ? h('div', {
-                    style: {
-                      maxHeight: 160, overflow: 'auto', padding: 8, borderRadius: 8, fontSize: 11,
-                      background: 'var(--dsw-alias-bg-fill-subtle, rgba(0,0,0,0.04))',
-                      fontFamily: 'ui-monospace, monospace', lineHeight: '17px',
-                    },
+            ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: T.s8 } },
+              flow.roundtrip
+                ? h('p', { style: { margin: 0, fontSize: 13 } }, t('flow.confirmRoundtrip', { n: scopes.length }))
+                : h('p', { style: { margin: 0, fontSize: 13 } },
+                  t('sync.confirmPush', { n: flow.files.length }) + ' · ' + t('sync.files', {
+                    n: flow.files.length, size: humanBytes(flow.totalBytes),
+                  })),
+              !flow.roundtrip
+                ? h('div', {
+                  style: {
+                    maxHeight: T.maxH, overflow: 'auto', padding: T.pad, borderRadius: T.r, fontSize: 11,
+                    background: T.fill, fontFamily: 'ui-monospace, monospace', lineHeight: '17px',
                   },
-                    flow.files.slice(0, 60).map((f) => h('div', { key: f.path }, f.path)),
-                  )
-                  : null,
-                h('div', { style: { display: 'flex', gap: 8 } },
-                  h(ActionButton, { label: t('flow.confirm'), tone: 'primary', onClick: flowRun }),
-                  h(ActionButton, { label: t('act.cancel'), onClick: () => setFlow(null) }),
-                ),
-              )
-              : (flow && flow.stage !== 'confirm'
-                ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
-                  // v2.0.5：running 态由 flowJob 渲染（带已用时），done 态常驻
-                  flow.stage === 'running'
-                    ? h(JobView, { t, job: flowJob, title: t('sync.push') })
-                    : h(JobView, {
-                      t,
-                      job: { state: 'success', elapsed: flowJob.elapsed, result: flow, error: null },
-                      title: t('sync.push'),
-                      detail: t('flow.done', { n: flow.fileCount, commit: flow.commit }) + '\n' + t('flow.restartHint'),
-                      onReset: () => { flowJob.reset(); setFlow(null) },
-                    }),
-                  flow.stage !== 'running'
-                    ? h('div', null, h(ActionButton, { label: t('flow.again'), small: true, onClick: () => setFlow(null) }))
-                    : null,
+                },
+                  flow.files.slice(0, 60).map((f) => h('div', { key: f.path }, f.path)),
                 )
-                : null),
+                : null,
+              h('div', { style: { display: 'flex', gap: T.s8 } },
+                h(ActionButton, { label: t('flow.confirm'), tone: 'primary', onClick: flowRun }),
+                h(ActionButton, { label: t('act.cancel'), onClick: () => setFlow(null) }),
+              ),
+            )
+            : (flow && flow.stage !== 'confirm'
+              ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: T.s8 } },
+                flow.stage === 'running'
+                  ? h(JobView, { t, job: flowJob, title: t('sync.push') })
+                  : h(JobView, {
+                    t,
+                    job: { state: 'success', elapsed: flowJob.elapsed, result: flow, error: null },
+                    title: t('sync.push'),
+                    detail: t('flow.done', { n: flow.fileCount, commit: flow.commit }) + '\n' + t('flow.restartHint'),
+                    onReset: () => { flowJob.reset(); setFlow(null) },
+                  }),
+                flow.stage !== 'running'
+                  ? h('div', null, h(ActionButton, { label: t('flow.again'), small: true, onClick: () => setFlow(null) }))
+                  : null,
+              )
+              : null),
         ),
 
-// 同步范围 + 动作卡（v2.4：已并入上方操作卡，这里只剩回执区）
-        h('div', null,
-          // 常驻回执（不消失；running 显示已用时走字）
-          h(JobView, {
-            t,
-            job: pushJob,
-            title: t('sync.push'),
-            detail: pushJob.result
-              ? t('sync.msg.pushed', { n: pushJob.result.fileCount ?? 0, commit: pushJob.result.commit ?? '' })
-                + (pushJob.result.files?.length ? `\n${pushJob.result.files.slice(0, 8).join('\n')}${pushJob.result.files.length > 8 ? `\n…共 ${pushJob.result.files.length} 个文件` : ''}` : '')
-              : null,
-            onReset: pushJob.reset,
-          }),
-          h(JobView, {
-            t,
-            job: pullJob,
-            title: t('sync.pull'),
-            detail: pullJob.result
-              ? (() => {
-                const ap = pullJob.result.applied
-                const lines = [t('sync.pullCommit', { commit: pullJob.result.commit ?? '' })]
-                if (ap) {
-                  lines.push(ap.agentsOk
-                    ? t('sync.pullAgents', { bytes: `${Math.round((ap.agentsBytes ?? 0) / 1024)}KB` })
-                    : t('sync.pullAgentsFail', { e: ap.agentsError ?? t('sync.pullNoId') }))
-                  if (ap.skillsAdded > 0) lines.push(t('sync.pullSkills', { n: ap.skillsAdded }))
-                }
-                lines.push(t('sync.pullRestart'))
-                return lines.join('\n')
-              })()
-              : null,
-            onReset: pullJob.reset,
-          }),
-          h('p', { style: { margin: '6px 0 0', fontSize: 12, opacity: 0.6 } }, t('sync.hint.pull')),
-          preview && preview.files?.length > 0
-            ? h('div', {
-              style: {
-                marginTop: 8, padding: 8, borderRadius: 8, fontSize: 12,
-                background: 'var(--dsw-alias-bg-fill-subtle, rgba(0,0,0,0.04))',
-                // v2.6.2：200 → 260px，并加底部计数。这是"确认要传什么"的
-                // 关键信息区，砍太矮反而要反复滚动确认。
-                maxHeight: 260, overflow: 'auto',
-              },
-            },
-              h('div', { style: { fontWeight: 500, marginBottom: 4 } },
-                t('sync.previewTitle') + ' · ' + t('sync.files', {
-                  n: preview.files.length, size: humanBytes(preview.totalBytes),
-                })),
-              preview.files.slice(0, 50).map((f) => h('div', {
-                key: f.path,
-                style: { fontFamily: 'ui-monospace, monospace', opacity: 0.8, lineHeight: '18px' },
-              }, f.path)),
-              preview.files.length > 50
-                ? h('div', { style: { opacity: 0.55, fontSize: 11, marginTop: 2 } },
-                  t('sync.moreFiles', { n: preview.files.length - 50 }))
+        // 回执区
+        h(Section, { title: t('sync.receipt') },
+          h('div', { style: { display: 'flex', flexDirection: 'column', gap: T.s8 } },
+            h(JobView, {
+              t, job: pushJob, title: t('sync.push'),
+              detail: pushJob.result
+                ? t('sync.msg.pushed', { n: pushJob.result.fileCount ?? 0, commit: pushJob.result.commit ?? '' })
+                  + (pushJob.result.files?.length ? `\n${pushJob.result.files.slice(0, 8).join('\n')}${pushJob.result.files.length > 8 ? `\n…共 ${pushJob.result.files.length} 个文件` : ''}` : '')
                 : null,
-            )
-            : preview
-              ? h(Empty, null, t('sync.previewEmpty'))
-              : null,
+              onReset: pushJob.reset,
+            }),
+            h(JobView, {
+              t, job: pullJob, title: t('sync.pull'),
+              detail: pullJob.result
+                ? (() => {
+                  const ap = pullJob.result.applied
+                  const lines = [t('sync.pullCommit', { commit: pullJob.result.commit ?? '' })]
+                  if (ap) {
+                    lines.push(ap.agentsOk
+                      ? t('sync.pullAgents', { bytes: `${Math.round((ap.agentsBytes ?? 0) / 1024)}KB` })
+                      : t('sync.pullAgentsFail', { e: ap.agentsError ?? t('sync.pullNoId') }))
+                    if (ap.skillsAdded > 0) lines.push(t('sync.pullSkills', { n: ap.skillsAdded }))
+                  }
+                  lines.push(t('sync.pullRestart'))
+                  return lines.join('\n')
+                })()
+                : null,
+              onReset: pullJob.reset,
+            }),
+            h('p', { style: { margin: '6px 0 0', fontSize: 12, opacity: 0.6 } }, t('sync.hint.pull')),
+            preview && preview.files?.length > 0
+              ? h('div', {
+                style: { padding: T.pad, borderRadius: T.r, fontSize: 12, background: T.fill, maxHeight: T.maxH, overflow: 'auto' },
+              },
+                h('div', { style: { fontWeight: 500, marginBottom: 4 } },
+                  t('sync.previewTitle') + ' · ' + t('sync.files', {
+                    n: preview.files.length, size: humanBytes(preview.totalBytes),
+                  })),
+                preview.files.slice(0, 50).map((f) => h('div', {
+                  key: f.path,
+                  style: { fontFamily: 'ui-monospace, monospace', opacity: 0.8, lineHeight: '18px' },
+                }, f.path)),
+                preview.files.length > 50
+                  ? h('div', { style: { opacity: 0.55, fontSize: 11, marginTop: 2 } },
+                    t('sync.moreFiles', { n: preview.files.length - 50 }))
+                  : null,
+              )
+              : preview
+                ? h(Empty, null, t('sync.previewEmpty'))
+                : null,
+          ),
         ),
       )
     }
@@ -1707,119 +1844,105 @@ window.__ModuleLoader__.load({
         { id: 'both', icon: '🔄', label: t('mt.role.both'), desc: t('mt.role.bothDesc') },
       ]
 
-      return h('div', null,
+      return h('div', { style: { display: 'flex', flexDirection: 'column' } },
         // 本机角色（S5：设置页第一位——先说清"这台机器是谁"，再谈别的）
-        h(Card, {
-          title: t('mt.role.title'),
-          hint: t('mt.role.hint'),
-        },
-          h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 8 } },
-            ...ROLE_META.map((m) => h('button', {
+        h(Section, { title: t('mt.role.title'), hint: t('mt.role.hint') },
+          h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: T.s8 } },
+            ...ROLE_META.map((m) => h(Check, {
               key: m.id,
+              label: `${m.icon} ${m.label}${myRole === m.id ? t('mt.role.current') : ''}`,
+              active: myRole === m.id,
+              busy: busy === 'set-role',
+              title: m.desc,
               onClick: () => setRole(m.id),
-              disabled: busy === 'set-role',
-              style: {
-                flex: '1 1 160px', textAlign: 'left', cursor: 'pointer',
-                border: `1px solid ${myRole === m.id ? 'var(--dsw-alias-brand, #4f7cff)' : 'var(--dsw-alias-border-l3, rgba(0,0,0,0.08))'}`,
-                borderRadius: 8, padding: '8px 10px', fontSize: 12, lineHeight: '18px',
-                background: myRole === m.id ? 'var(--dsw-alias-fill-brand, rgba(79,124,255,0.08))' : 'transparent',
-                color: 'inherit',
-              },
-            },
-              h('div', { style: { fontWeight: 600, fontSize: 13, marginBottom: 2 } },
-                `${m.icon} ${m.label}${myRole === m.id ? t('mt.role.current') : ''}`),
-              h('div', { style: { opacity: 0.65 } }, m.desc),
-            )),
+            })),
           ),
           h(InlineNote, { tone: note?.tone }, note?.text),
         ),
 
-        // v2.5：备份快照/定时同步/自动推送 已搬去 🔄同步页（老大反馈"同步的事分散在状态页和设置页"）
-
-        // 工具链 + 插件更新 + 凭据（D4：信息量小的卡并排）
-        h(Grid, { min: 280 },
-          h(Card, { title: t('mt.tools'), hint: t('mt.toolsHint') },
-          missingAll.length === 0
-            ? h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 } },
-              h(Dot, { level: 'pass' }), h('span', null, t('mt.toolsAll')))
-            : h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 } },
-              h(Dot, { level: (tools.missingCore?.length ?? 0) > 0 ? 'fail' : 'warn' }),
-              h('span', null, t('mt.toolsMissing', { n: missingAll.length, list: missingAll.join('、') }))),
-          h('div', { style: { fontSize: 12, opacity: 0.6 } },
-            `${t('mt.core')} ${(tools.present ?? 0)}/${tools.total ?? 0}`),
+        // 环境：工具链 + 凭据
+        h(Section, { title: t('mt.env') },
+          h(Panel, { title: t('mt.tools'), hint: t('mt.toolsHint') },
+            missingAll.length === 0
+              ? h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 } },
+                h(Dot, { level: 'pass' }), h('span', null, t('mt.toolsAll')))
+              : h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 } },
+                h(Dot, { level: (tools.missingCore?.length ?? 0) > 0 ? 'fail' : 'warn' }),
+                h('span', null, t('mt.toolsMissing', { n: missingAll.length, list: missingAll.join('、') }))),
+            h('div', { style: { fontSize: 12, opacity: 0.6 } },
+              `${t('mt.core')} ${(tools.present ?? 0)}/${tools.total ?? 0}`),
+          ),
+          h(Panel, { title: t('mt.credential') },
+            h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 } },
+              h(Dot, { level: data?.credential?.haveCredential ? 'pass' : 'fail' }),
+              h('span', null, data?.credential?.haveCredential
+                ? t('mt.credentialOk', { user: data.credential.user })
+                : t('mt.credentialMissing')),
+            ),
+          ),
         ),
 
-        // 插件更新（v2.3.1：useJob 常驻回执 + 检查中反馈 + 失败显示原因）
-        h(Card, {
-          title: t('mt.pluginUpdate'), hint: t('mt.pluginUpdateHint'),
-          right: h(ActionButton, {
-            label: pluginCheckJob.running ? t('mt.pluginChecking') : t('mt.pluginCheck'),
-            small: true, tone: 'primary',
-            busy: pluginCheckJob.running,
-            disabled: pluginCheckJob.running,
-            onClick: async () => {
-              const r = await pluginCheckJob.run(() => apiPost('/content', { action: 'plugin-update-check' }))
-              if (r?.ok) setPluginUpdate(r.update)
-            },
-          }),
-        },
-          h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 } },
-            h(Dot, { level: pluginCheckJob.running ? 'info' : (pluginUpdate?.hasUpdate ? 'warn' : 'info') }),
-            h('span', null, pluginCheckJob.running
-              ? t('mt.pluginChecking')
-              : (pluginUpdate
-                ? `${t('mt.pluginVersion')}: ${pluginUpdate.current} → ${pluginUpdate.latest}`
-                : t('mt.pluginNotChecked'))),
-          ),
-          pluginUpdate?.hasUpdate
-            ? h('div', { style: { marginTop: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
-              h('span', { style: { fontSize: 12, color: 'var(--dsw-alias-status-warn, #f59e0b)' } },
-                t('mt.pluginUpdateAvailable')),
-              h(ActionButton, {
-                label: t('mt.pluginApply'), small: true, tone: 'primary',
-                busy: pluginApplyJob.running, disabled: pluginApplyJob.running,
-                title: t('mt.pluginApplyTip'),
-                onClick: async () => {
-                  await pluginApplyJob.run(() => apiPost('/content', {
-                    action: 'plugin-update-apply', tag: pluginUpdate.latest,
-                  }))
-                },
-              }),
-            )
-            : null,
-          pluginUpdate && !pluginUpdate.hasUpdate
-            ? h('div', { style: { marginTop: 6, fontSize: 12, opacity: 0.6 } },
-              t('mt.pluginUpToDate', { v: pluginUpdate.current }))
-            : null,
-          h(JobView, {
-            t, job: pluginApplyJob, title: t('mt.pluginApply'),
-            detail: pluginApplyJob.result
-              ? t('mt.pluginApplied', { v: pluginApplyJob.result.version ?? '' }) + '\n' + t('mt.pluginRestart')
-                + (pluginApplyJob.result.backup ? `\n${t('mt.pluginBackup', { p: pluginApplyJob.result.backup })}` : '')
+        // 插件维护（v2.3.1：useJob 常驻回执 + 检查中反馈 + 失败显示原因）
+        h(Section, { title: t('mt.pluginUpdate') },
+          h(Panel, { title: t('mt.pluginUpdate'), hint: t('mt.pluginUpdateHint'),
+            right: h(ActionButton, {
+              label: pluginCheckJob.running ? t('mt.pluginChecking') : t('mt.pluginCheck'),
+              small: true, tone: 'primary',
+              busy: pluginCheckJob.running,
+              disabled: pluginCheckJob.running,
+              onClick: async () => {
+                const r = await pluginCheckJob.run(() => apiPost('/content', { action: 'plugin-update-check' }))
+                if (r?.ok) setPluginUpdate(r.update)
+              },
+            }),
+          },
+            h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 } },
+              h(Dot, { level: pluginCheckJob.running ? 'info' : (pluginUpdate?.hasUpdate ? 'warn' : 'info') }),
+              h('span', null, pluginCheckJob.running
+                ? t('mt.pluginChecking')
+                : (pluginUpdate
+                  ? `${t('mt.pluginVersion')}: ${pluginUpdate.current} → ${pluginUpdate.latest}`
+                  : t('mt.pluginNotChecked'))),
+            ),
+            pluginUpdate?.hasUpdate
+              ? h('div', { style: { marginTop: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
+                h('span', { style: { fontSize: 12, color: 'var(--dsw-alias-status-warn, #f59e0b)' } },
+                  t('mt.pluginUpdateAvailable')),
+                h(ActionButton, {
+                  label: t('mt.pluginApply'), small: true, tone: 'primary',
+                  busy: pluginApplyJob.running, disabled: pluginApplyJob.running,
+                  title: t('mt.pluginApplyTip'),
+                  onClick: async () => {
+                    await pluginApplyJob.run(() => apiPost('/content', {
+                      action: 'plugin-update-apply', tag: pluginUpdate.latest,
+                    }))
+                  },
+                }),
+              )
               : null,
-            onReset: pluginApplyJob.reset,
-          }),
-          h(JobView, {
-            t, job: pluginCheckJob, title: t('mt.pluginCheck'),
-            detail: null,
-            onReset: pluginCheckJob.reset,
-          }),
-        ),
-
-        // 凭据
-        h(Card, { title: t('mt.credential') },
-          h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 } },
-            h(Dot, { level: data?.credential?.haveCredential ? 'pass' : 'fail' }),
-            h('span', null, data?.credential?.haveCredential
-              ? t('mt.credentialOk', { user: data.credential.user })
-              : t('mt.credentialMissing')),
+            pluginUpdate && !pluginUpdate.hasUpdate
+              ? h('div', { style: { marginTop: 6, fontSize: 12, opacity: 0.6 } },
+                t('mt.pluginUpToDate', { v: pluginUpdate.current }))
+              : null,
+            h(JobView, {
+              t, job: pluginApplyJob, title: t('mt.pluginApply'),
+              detail: pluginApplyJob.result
+                ? t('mt.pluginApplied', { v: pluginApplyJob.result.version ?? '' }) + '\n' + t('mt.pluginRestart')
+                  + (pluginApplyJob.result.backup ? `\n${t('mt.pluginBackup', { p: pluginApplyJob.result.backup })}` : '')
+                : null,
+              onReset: pluginApplyJob.reset,
+            }),
+            h(JobView, {
+              t, job: pluginCheckJob, title: t('mt.pluginCheck'),
+              detail: null,
+              onReset: pluginCheckJob.reset,
+            }),
           ),
-        ),
         ),
 
         // 换机补齐
-        h(Card, { title: t('mt.portable'), hint: t('mt.portableHint') },
-          h('div', { style: { display: 'flex', gap: 8, alignItems: 'center' } },
+        h(Section, { title: t('mt.portable'), hint: t('mt.portableHint') },
+          h('div', { style: { display: 'flex', gap: T.s8, alignItems: 'center' } },
             h(ActionButton, { label: t('mt.portableRun'), small: true, onClick: doPortable, busy: portableJob.running }),
           ),
           h(JobView, {
@@ -1830,8 +1953,8 @@ window.__ModuleLoader__.load({
           portable
             ? h('div', {
               style: {
-                marginTop: 6, padding: 8, borderRadius: 8, fontSize: 12,
-                background: 'var(--dsw-alias-bg-fill-subtle, rgba(0,0,0,0.04))',
+                marginTop: 6, padding: T.pad, borderRadius: T.r, fontSize: 12,
+                background: T.fill,
               },
             },
               portable.steps?.map((s) => h('div', {
@@ -1847,22 +1970,21 @@ window.__ModuleLoader__.load({
         ),
 
         // 控制台 + 使用手册 + 日志
-        h(Card, { title: t('mt.console'), hint: t('mt.consoleHint') },
-          h(ActionButton, { label: t('mt.console'), small: true, onClick: openConsole }),
-          h(ActionButton, {
-            label: t('mt.manual'), small: true,
-            onClick: () => {
-              const hub = data?.hub
-              if (hub) {
-                // 用宿主同源 API 打开手册（复用受控入口），失败则复制路径
-                apiPost('/env', { action: 'open-manual', hub }).catch(() => {})
-              }
-            },
-          }),
-        ),
-        h(Card, { title: t('mt.log') },
-          h('div', { style: { fontSize: 12, opacity: 0.7, fontFamily: 'ui-monospace, monospace' } },
-            t('mt.logPath', { p: data?.logFile ?? '—' })),
+        h(Section, { title: t('mt.console'), hint: t('mt.consoleHint') },
+          h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: T.s8 } },
+            h(ActionButton, { label: t('mt.console'), small: true, onClick: openConsole }),
+            h(ActionButton, {
+              label: t('mt.manual'), small: true,
+              onClick: () => {
+                const hub = data?.hub
+                if (hub) apiPost('/env', { action: 'open-manual', hub }).catch(() => {})
+              },
+            }),
+          ),
+          h(Panel, { title: t('mt.log') },
+            h('div', { style: { fontSize: 12, opacity: 0.7, fontFamily: 'ui-monospace, monospace' } },
+              t('mt.logPath', { p: data?.logFile ?? '—' })),
+          ),
         ),
       )
     }
@@ -1918,11 +2040,10 @@ window.__ModuleLoader__.load({
       const rows = (skills?.diff ?? []).filter((d) => (filter === 'all' ? true : d.kind === filter))
       const invalid = [...(summary?.invalidLocal ?? []), ...(summary?.invalidHub ?? [])]
 
-      return h('div', null,
-        // 汇总卡
+      return h('div', { style: { display: 'flex', flexDirection: 'column' } },
         // 过滤 + 列表
-        h(Card, { title: t('sk.list') },
-          h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 } },
+        h(Panel, { title: t('sk.list') },
+          h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: T.s8, marginBottom: T.s8 } },
             ['all', 'only-local', 'only-hub', 'differ', 'identical'].map((k) => h('button', {
               key: k,
               type: 'button',
@@ -1930,7 +2051,7 @@ window.__ModuleLoader__.load({
               style: {
                 appearance: 'none', cursor: 'pointer', fontSize: 12,
                 padding: '3px 10px', borderRadius: 999,
-                border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.12))',
+                border: T.border,
                 background: filter === k ? 'var(--dsw-alias-button-primary-bg, #2563eb)' : 'transparent',
                 color: filter === k ? '#fff' : 'inherit',
               },
@@ -1939,17 +2060,13 @@ window.__ModuleLoader__.load({
           rows.length === 0
             ? h(Empty, null, t('sk.noRows'))
             : h('div', {
-              // v2.6.2：去掉 360px 内部滚动（窄面板里憋屈，同 v2.6.1 状态页病灶）。
-              // 只列前 12 条 + 底部提示剩余数；全量对比用对话里的 sync_hub_skill_list。
-              style: {
-                border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.08))', borderRadius: 8,
-              },
+              style: { border: T.border, borderRadius: T.r },
             },
               rows.slice(0, 12).map((d) => h('div', {
                 key: d.name,
                 style: {
                   display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px',
-                  fontSize: 13, borderBottom: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.05))',
+                  fontSize: 13, borderBottom: T.border,
                 },
               },
                 h(Dot, { level: DIFF_LEVEL[d.kind] }),
@@ -1966,17 +2083,15 @@ window.__ModuleLoader__.load({
               rows.length > 12
                 ? h('div', {
                   key: '__more',
-                  style: {
-                    padding: '6px 10px', fontSize: 11, opacity: 0.55, textAlign: 'center',
-                  },
+                  style: { padding: '6px 10px', fontSize: 11, opacity: 0.55, textAlign: 'center' },
                 }, t('sk.moreRows', { n: rows.length - 12 }))
                 : null,
             ),
         ),
 
-        // 同步概览 + 能力边界说明（D4：两张矮卡并排，不各占整行）
+        // 同步概览 + 能力边界说明
         h(Grid, { min: 300 },
-          h(Card, { title: t('sk.summary'), right: h(ActionButton, { label: t('refresh'), small: true, onClick: load }) },
+          h(Panel, { title: t('sk.summary'), right: h(ActionButton, { label: t('refresh'), small: true, onClick: load }) },
             error ? h(InlineNote, { tone: 'error' }, t('error', { e: error })) : null,
             summary
               ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px 14px', fontSize: 13 } },
@@ -1989,15 +2104,11 @@ window.__ModuleLoader__.load({
                   : null,
               )
               : h(Empty, null, t('loading')),
-            // 非法名警示（DSH 会静默跳过它们，这里必须让人看见）
             invalid.length > 0
-              ? h(InlineNote, { tone: 'error' },
-                `${t('sk.invalidWarn')}：${invalid.join('、')}`)
+              ? h(InlineNote, { tone: 'error' }, `${t('sk.invalidWarn')}：${invalid.join('、')}`)
               : null,
           ),
-
-          // 能力边界说明（不假装已有导入/回收站）
-          h(Card, { title: t('sk.scopeTitle') },
+          h(Panel, { title: t('sk.scopeTitle') },
             h('p', { style: { margin: 0, fontSize: 12, opacity: 0.7, lineHeight: '18px' } }, t('sk.scopeBody')),
           ),
         ),
@@ -2066,9 +2177,9 @@ window.__ModuleLoader__.load({
         load()
       }
 
-      return h('div', null,
+      return h('div', { style: { display: 'flex', flexDirection: 'column' } },
         // v2.2 D1：会话轨道定位明示 —— 单向归档，不是双向同步
-        h(Card, { title: t('se.archiveTitle') },
+        h(Panel, { title: t('se.archiveTitle') },
           h('div', { style: { display: 'flex', flexDirection: 'column', gap: 5, fontSize: 12, lineHeight: '19px' } },
             h('div', null, t('se.archiveLine1')),
             h('div', null, t('se.archiveLine2')),
@@ -2078,7 +2189,7 @@ window.__ModuleLoader__.load({
 
         // v2.2 S3/S4：缺失工作区检测 + 一键建空目录（"未分组"的真正解药）
         missing.length > 0
-          ? h(Card, {
+          ? h(Panel, {
             title: t('se.missingTitle', { n: missing.length }),
             hint: t('se.missingHint'),
             right: h(ActionButton, {
@@ -2086,25 +2197,16 @@ window.__ModuleLoader__.load({
               onClick: createDirs, busy: busy === 'mkdir',
             }),
           },
-            h('div', {
-              style: {
-                display: 'flex', flexDirection: 'column', gap: 6,
-                fontSize: 12, lineHeight: '18px',
-              },
-            },
+            h('div', { style: { display: 'flex', flexDirection: 'column', gap: T.s8, fontSize: 12, lineHeight: '18px' } },
               ...missing.slice(0, 8).map((m) => h('div', {
                 key: m.path,
                 style: {
                   display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
-                  gap: 8, padding: '5px 8px', borderRadius: 6,
-                  background: 'var(--dsw-alias-fill-quaternary, rgba(0,0,0,0.03))',
+                  gap: 8, padding: '5px 8px', borderRadius: T.r, background: T.fill,
                 },
               },
                 h('span', {
-                  style: {
-                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  },
+                  style: { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
                 }, m.path),
                 h('span', { style: { opacity: 0.6, flex: '0 0 auto', fontSize: 11 } },
                   t('se.missingMeta', { m: m.machines.join('/'), n: m.files })),
@@ -2118,32 +2220,24 @@ window.__ModuleLoader__.load({
           )
           : null,
 
-        h(Card, {
-          title: t('se.local'), hint: t('se.localHint'),
-          right: h(ActionButton, {
-            label: t('se.backup'), tone: 'primary', small: true,
-            onClick: () => act('backup'), busy: busy === 'backup',
-          }),
-        },
+        h(Section, { title: t('se.local'), hint: t('se.localHint') },
+          h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: T.s8 } },
+            h('div', { style: { fontSize: 13 } },
+              info?.local
+                ? `${t('se.files')} ${info.local.files} · ${humanBytes(info.local.bytes)}`
+                : t('loading')),
+            h(ActionButton, { label: t('se.backup'), tone: 'primary', small: true, onClick: () => act('backup'), busy: busy === 'backup' }),
+          ),
           h(InlineNote, { tone: note?.tone }, note?.text),
-          h('div', { style: { fontSize: 13 } },
-            info?.local
-              ? `${t('se.files')} ${info.local.files} · ${humanBytes(info.local.bytes)}`
-              : t('loading')),
         ),
 
-        h(Card, { title: t('se.hub'), hint: t('se.hubHint') },
+        h(Section, { title: t('se.hub'), hint: t('se.hubHint') },
           machines.length === 0
             ? h(Empty, null, t('se.noMachines'))
-            : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
-              machines.map((m) => h('div', {
+            : h('div', { style: { display: 'flex', flexDirection: 'column', gap: T.s8 } },
+              machines.map((m) => h(Panel, {
                 key: m.machine,
-                style: {
-                  border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.08))',
-                  borderRadius: 8, padding: '8px 10px',
-                },
-              },
-                h('div', {
+                title: h('div', {
                   style: { display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' },
                   onClick: () => setOpen(open === m.machine ? null : m.machine),
                 },
@@ -2151,8 +2245,9 @@ window.__ModuleLoader__.load({
                   h('span', { style: { fontSize: 12, opacity: 0.6 } }, `${t('se.files')} ${m.files} · ${humanBytes(m.bytes)}`),
                   h('span', { style: { opacity: 0.5, fontSize: 12 } }, open === m.machine ? '▾' : '▸'),
                 ),
+              },
                 open === m.machine
-                  ? h('div', { style: { marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 } },
+                  ? h('div', { style: { marginTop: 6, display: 'flex', flexDirection: 'column', gap: T.s4 } },
                     m.workspaces.map((w) => h('div', {
                       key: w.folder,
                       style: { fontSize: 12, display: 'flex', gap: 8, alignItems: 'baseline' },
@@ -2257,7 +2352,7 @@ window.__ModuleLoader__.load({
           style: {
             margin: 0, padding: 8, borderRadius: 8, fontSize: 11, lineHeight: '16px',
             background: 'var(--dsw-alias-bg-fill-subtle, rgba(0,0,0,0.04))',
-            maxHeight: 220, overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+            maxHeight: T.maxH, overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
             fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
             opacity: text == null ? 0.4 : 1,
           },
@@ -2267,7 +2362,7 @@ window.__ModuleLoader__.load({
       return h('div', {
         style: {
           border: '1px solid var(--dsw-alias-status-danger, #ef4444)',
-          borderRadius: 10, padding: 12, marginBottom: 12,
+          borderRadius: T.r, padding: T.pad, marginBottom: T.s12,
         },
         'data-sync-hub-conflict': 'resolver',
       },
@@ -2298,7 +2393,7 @@ window.__ModuleLoader__.load({
               width: '100%', boxSizing: 'border-box', padding: 8, borderRadius: 8,
               fontSize: 12, lineHeight: '18px', resize: 'vertical',
               fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-              border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.12))',
+              border: T.border,
               background: 'var(--dsw-alias-bg-base, transparent)',
               color: 'inherit',
             },
@@ -2404,8 +2499,8 @@ window.__ModuleLoader__.load({
 
       const tab = tabs.find((x) => x.path === activeTab) ?? null
 
-      return h('div', null,
-        h(Card, {
+      return h('div', { style: { display: 'flex', flexDirection: 'column' } },
+        h(Panel, {
           title: t('mm.title'), hint: t('mm.hint'),
           right: h(ActionButton, { label: t('refresh'), small: true, onClick: load }),
         },
@@ -2413,16 +2508,13 @@ window.__ModuleLoader__.load({
           h(InlineNote, { tone: note?.tone }, note?.text),
         ),
 
-        h('div', { style: { display: 'flex', gap: 12, alignItems: 'flex-start' } },
+        h('div', { style: { display: 'flex', gap: T.s12, alignItems: 'flex-start' } },
           // 左：文件列表
           h('div', {
             style: {
-              flex: '0 0 280px', border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.08))',
-              borderRadius: 10, padding: 8,
-              // v2.6.2：原 calc(100vh - 260px) 是视口 hack——侧栏面板不是
-              // 全屏窗口，260px 纯拍脑袋，实际要么切底要么空一大截。
-              // 改为固定 maxHeight 内部滚动，与右列对称。
-              maxHeight: 460, overflow: 'auto',
+              flex: '0 0 280px', border: T.border, borderRadius: T.r, padding: T.s8,
+              // 固定高度内部滚动：侧栏面板不是全屏窗口，原视口 hack 会切底或留白。
+              maxHeight: T.maxH, overflow: 'auto',
               minWidth: 0,
             },
           },
@@ -2431,22 +2523,21 @@ window.__ModuleLoader__.load({
               onChange: (e) => setFilter(e.target.value),
               placeholder: t('mm.search'),
               style: {
-                width: '100%', boxSizing: 'border-box', padding: '6px 8px', marginBottom: 8,
-                fontSize: 12, borderRadius: 6,
-                border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.12))',
+                width: '100%', boxSizing: 'border-box', padding: '6px 8px', marginBottom: T.s8,
+                fontSize: 12, borderRadius: T.r, border: T.border,
                 background: 'var(--dsw-alias-bg-base, transparent)', color: 'inherit',
               },
             }),
             !files
               ? h(Empty, null, t('loading'))
-              : [...groups.entries()].map(([group, list]) => h('div', { key: group, style: { marginBottom: 8 } },
+              : [...groups.entries()].map(([group, list]) => h('div', { key: group, style: { marginBottom: T.s8 } },
                 h('div', { style: { fontSize: 11, opacity: 0.5, marginBottom: 3 } }, `${group} · ${list.length}`),
                 list.map((f) => h('div', {
                   key: f.path,
                   onClick: () => openFile(f.path),
                   style: {
-                    fontSize: 12, padding: '4px 6px', borderRadius: 6, cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', gap: 6,
+                    fontSize: 12, padding: '4px 6px', borderRadius: T.r, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: T.s4,
                     background: activeTab === f.path ? 'var(--dsw-alias-bg-fill-subtle, rgba(0,0,0,0.05))' : 'transparent',
                   },
                 },
@@ -2465,7 +2556,7 @@ window.__ModuleLoader__.load({
           h('div', { style: { flex: '1 1 auto', minWidth: 0 } },
             !tab
               ? h(Empty, null, t('mm.pick'))
-              : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
+              : h('div', { style: { display: 'flex', flexDirection: 'column', gap: T.s8 } },
                 // 标签页条
                 h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 4 } },
                   tabs.map((x) => h('span', {
@@ -2474,7 +2565,7 @@ window.__ModuleLoader__.load({
                     style: {
                       fontSize: 12, padding: '3px 8px', borderRadius: 999, cursor: 'pointer',
                       display: 'inline-flex', alignItems: 'center', gap: 5,
-                      border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.12))',
+                      border: T.border,
                       background: activeTab === x.path ? 'var(--dsw-alias-bg-fill-subtle, rgba(0,0,0,0.05))' : 'transparent',
                     },
                   },
@@ -2506,13 +2597,12 @@ window.__ModuleLoader__.load({
                   onChange: (e) => edit(e.target.value),
                   spellCheck: false,
                   style: {
-                    width: '100%', boxSizing: 'border-box', padding: 10, borderRadius: 8,
+                    width: '100%', boxSizing: 'border-box', padding: T.pad, borderRadius: T.r,
                     fontSize: 12, lineHeight: '19px', resize: 'vertical',
-                    // v2.6.2：320 → 460 与左列对齐（原来左列比编辑器高，
-                    // 左列一滚动就显得右列空）；resize 保留给要更大编辑区的人。
+                    // 320 → 460 与左列对齐（左列一滚动就显得右列空）；resize 保留给要更大编辑区的人。
                     minHeight: 460,
                     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                    border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.12))',
+                    border: T.border,
                     background: 'var(--dsw-alias-bg-base, transparent)', color: 'inherit',
                   },
                 }),
@@ -2536,8 +2626,8 @@ window.__ModuleLoader__.load({
       return h('div', {
         role: 'tablist',
         style: {
-          display: 'flex', gap: 4, marginBottom: 12,
-          borderBottom: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.08))',
+          display: 'flex', gap: 4, marginBottom: T.s12,
+          borderBottom: T.border,
         },
       }, tabs.map((x) => h('button', {
         key: x.id,
@@ -2616,7 +2706,7 @@ window.__ModuleLoader__.load({
         onRefresh?.()
       }
 
-      return h(Card, { title, hint },
+      return h(Panel, { title, hint },
         // 根切换（多根时）
         roots.length > 1
           ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6 } },
@@ -2626,7 +2716,7 @@ window.__ModuleLoader__.load({
               onClick: () => { setRoot(rk); setDirPath(''); setEditing(null) },
               style: {
                 appearance: 'none', cursor: 'pointer', fontSize: 12, padding: '4px 10px', borderRadius: 999,
-                border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.12))',
+                border: T.border,
                 background: root === rk ? 'var(--dsw-alias-button-primary-bg, #2563eb)' : 'transparent',
                 color: root === rk ? '#fff' : 'inherit',
               },
@@ -2657,8 +2747,8 @@ window.__ModuleLoader__.load({
               rows: 14,
               style: {
                 width: '100%', boxSizing: 'border-box', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                fontSize: 12, lineHeight: '17px', padding: 8, borderRadius: 8, resize: 'vertical',
-                border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.12))',
+                fontSize: 12, lineHeight: '17px', padding: 8, borderRadius: T.r, resize: 'vertical',
+                border: T.border,
                 background: 'var(--dsw-alias-bg-fill-subtle, rgba(0,0,0,0.03))', color: 'inherit',
               },
             }),
@@ -2675,15 +2765,15 @@ window.__ModuleLoader__.load({
             ? h(Empty, null, t('fm.empty'))
             : h('div', {
               style: {
-                border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.08))', borderRadius: 8,
-                maxHeight: 280, overflow: 'auto', marginTop: 4,
+                border: T.border, borderRadius: T.r,
+                maxHeight: T.maxH, overflow: 'auto', marginTop: 4,
               },
             },
               entries.map((e) => h('div', {
                 key: e.name,
                 style: {
                   display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', fontSize: 12,
-                  borderBottom: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.05))',
+                  borderBottom: T.divider,
                 },
               },
                 h('span', { style: { flex: '0 0 auto' } }, e.dir ? '📁' : '📄'),
@@ -2770,10 +2860,10 @@ window.__ModuleLoader__.load({
         if (r?.ok) onRefresh()
       }
 
-      return h('div', null,
+      return h('div', { style: { display: 'flex', flexDirection: 'column' } },
         // 定时同步 + 自动推送（并排：都是"同步节奏"开关）
         h(Grid, { min: 280 },
-          h(Card, {
+          h(Panel, {
             title: t('mt.schedule'), hint: t('mt.scheduleHint'),
             right: data?.schedule?.installed
               ? h(ActionButton, { label: t('mt.scheduleRemove'), small: true, onClick: () => doSchedule('schedule-remove'), busy: scheduleJob.running })
@@ -2793,7 +2883,7 @@ window.__ModuleLoader__.load({
             }),
           ),
           // N7 自动推送开关（记忆页保存后是否立即 push；默认关）
-          h(Card, { title: t('ap.title'), hint: t('ap.hint') },
+          h(Panel, { title: t('ap.title'), hint: t('ap.hint') },
             h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 } },
               h(Dot, { level: autoPush ? 'pass' : 'info' }),
               h('span', { style: { flex: '1 1 auto' } }, autoPush ? t('ap.on') : t('ap.off')),
@@ -2811,7 +2901,7 @@ window.__ModuleLoader__.load({
         ),
 
         // 本机备份快照
-        h(Card, {
+        h(Panel, {
           title: t('mt.backup'), hint: t('mt.backupHint'),
           right: h(ActionButton, { label: t('mt.backupNow'), tone: 'primary', small: true, onClick: doBackup, busy: backupJob.running }),
         },
@@ -2829,15 +2919,15 @@ window.__ModuleLoader__.load({
                 ? h(Empty, null, t('mt.backupsEmpty'))
                 : h('div', {
                   style: {
-                    maxHeight: 220, overflow: 'auto',
-                    border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.08))', borderRadius: 8,
+                    maxHeight: T.maxH, overflow: 'auto',
+                    border: T.border, borderRadius: T.r,
                   },
                 },
                   backups.slice(0, 40).map((b) => h('div', {
                     key: b.name,
                     style: {
                       display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px',
-                      fontSize: 12, borderBottom: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.05))',
+                      fontSize: 12, borderBottom: T.border,
                     },
                   },
                     h('span', {
@@ -2888,23 +2978,17 @@ window.__ModuleLoader__.load({
         { id: 'plugins', label: t('page.plugins') },
         { id: 'sessions', label: t('page.sessionsArchive') },
       ]
-      return h('div', null,
+      return h('div', { style: { display: 'flex', flexDirection: 'column' } },
         h(SubTabs, { tabs, active: tab, onPick: setTab }),
         // v2.5：语义常驻说明（老大"有歧义必须说清楚"铁律第一条实例）
-        h('div', {
-          style: {
-            fontSize: 12, lineHeight: '18px', opacity: 0.75, marginBottom: 10,
-            padding: '6px 8px', borderRadius: 8,
-            background: 'var(--dsw-alias-bg-fill-subtle, rgba(0,0,0,0.04))',
-          },
-        },
+        h(InlineNote, { tone: 'info' },
           h('div', null, t('content.scopeLine')),
           h('div', null, t('content.deleteLine')),
         ),
         tab === 'memory' ? h(MemoryPage, { t, data, onRefresh })
-          : tab === 'skills' ? h('div', null,
+          : tab === 'skills' ? h('div', { style: { display: 'flex', flexDirection: 'column' } },
             h(SkillsPage, { t, data, onRefresh }),
-            h('div', { style: { height: 12 } }),
+            h('div', { style: { height: T.s12 } }),
             h(FileManager, {
               t, roots: ['hub/skills', 'local/skills'], onRefresh,
               title: t('fm.skillsTitle'), hint: t('fm.skillsHint'),
@@ -2914,9 +2998,9 @@ window.__ModuleLoader__.load({
               t, roots: ['hub/config', 'hub/plugins'], onRefresh,
               title: t('fm.pluginsTitle'), hint: t('fm.pluginsHint'),
             })
-              : tab === 'sessions' ? h('div', null,
+              : tab === 'sessions' ? h('div', { style: { display: 'flex', flexDirection: 'column' } },
                 h(SessionsPage, { t, data, onRefresh }),
-                h('div', { style: { height: 12 } }),
+                h('div', { style: { height: T.s12 } }),
                 h(FileManager, {
                   t, roots: ['hub/session-backup'], onRefresh,
                   title: t('fm.sessionsTitle'), hint: t('fm.sessionsHint'),
@@ -2936,24 +3020,23 @@ window.__ModuleLoader__.load({
       const [state, setState] = useState({ kind: 'idle', text: null })
       const [ask, setAsk] = useState('')
 
-      return h('div', null,
+      return h('div', { style: { display: 'flex', flexDirection: 'column' } },
         // IMA 状态 + 问答
-        h(Card, { title: t('kb.title'), hint: t('kb.hint') },
+        h(Panel, { title: t('kb.title'), hint: t('kb.hint') },
           h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 } },
             h(Dot, { level: 'pass' }),
             h('span', null, t('kb.installed')),
           ),
           h(InlineNote, { tone: 'info' }, t('kb.divide')),
           // 问一句
-          h('div', { style: { display: 'flex', gap: 6, marginTop: 4 } },
+          h('div', { style: { display: 'flex', gap: T.s8, marginTop: T.s4 } },
             h('input', {
               value: ask,
               onChange: (e) => setAsk(e.target.value),
               placeholder: t('kb.askPlaceholder'),
               style: {
-                flex: '1 1 auto', minWidth: 0, padding: '7px 10px', fontSize: 13, borderRadius: 8,
-                border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.12))',
-                background: 'var(--dsw-alias-bg-base, transparent)', color: 'inherit',
+                flex: '1 1 auto', minWidth: 0, padding: '7px 10px', fontSize: 13, borderRadius: T.r,
+                border: T.border, background: 'var(--dsw-alias-bg-base, transparent)', color: 'inherit',
               },
             }),
             h(ActionButton, {
@@ -2966,24 +3049,24 @@ window.__ModuleLoader__.load({
         ),
 
         // 凭据未配时的图文指引
-        h(Card, { title: t('kb.setup'), hint: t('kb.setupHint') },
-          h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12, lineHeight: '20px', opacity: 0.8 } },
+        h(Panel, { title: t('kb.setup'), hint: t('kb.setupHint') },
+          h('div', { style: { display: 'flex', flexDirection: 'column', gap: T.s8, fontSize: 12, lineHeight: '20px', opacity: 0.8 } },
             h('div', { style: { fontWeight: 600, opacity: 1 } }, `1. ${t('kb.step1')}`),
             h('div', null, t('kb.step1Body')),
-            h('div', { style: { fontWeight: 600, opacity: 1, marginTop: 4 } }, `2. ${t('kb.step2')}`),
+            h('div', { style: { fontWeight: 600, opacity: 1, marginTop: T.s4 } }, `2. ${t('kb.step2')}`),
             h('div', null, t('kb.step2Body')),
-            h('div', { style: { fontWeight: 600, opacity: 1, marginTop: 4 } }, `3. ${t('kb.step3')}`),
+            h('div', { style: { fontWeight: 600, opacity: 1, marginTop: T.s4 } }, `3. ${t('kb.step3')}`),
             h('div', null, t('kb.step3Body')),
           ),
         ),
 
         // 手机投喂 + 分工
-        h(Grid, { min: 300 },
-          h(Card, { title: t('kb.mobile'), hint: t('kb.mobileHint') },
-            h('div', { style: { fontSize: 12, opacity: 0.75, lineHeight: '20px' } },
+        h(Section, { title: t('kb.usage') },
+          h(Panel, { title: t('kb.mobile'), hint: t('kb.mobileHint') },
+            h('div', { style: { fontSize: 12, opacity: 0.75, lineHeight: '20px', whiteSpace: 'pre-line' } },
               `${t('kb.mobile1')}\n${t('kb.mobile2')}\n${t('kb.mobile3')}`),
           ),
-          h(Card, { title: t('kb.split'), hint: t('kb.splitHint') },
+          h(Panel, { title: t('kb.split'), hint: t('kb.splitHint') },
             h('div', { style: { fontSize: 12, opacity: 0.75, lineHeight: '20px' } }, t('kb.splitBody')),
           ),
         ),
@@ -3046,14 +3129,13 @@ window.__ModuleLoader__.load({
       const credOk = Boolean(info?.credential?.haveCredential)
 
       return h('div', {
-        style: { maxWidth: 560, margin: '0 auto', paddingTop: 24 },
+        style: { display: 'flex', flexDirection: 'column', maxWidth: 560, margin: '0 auto', paddingTop: T.s24 },
         'data-sync-hub-onboarding': 'wizard',
       },
-        h('h2', { style: { margin: '0 0 4px', fontSize: 17, fontWeight: 600 } }, t('ob.title')),
-        h('p', { style: { margin: '0 0 16px', fontSize: 13, opacity: 0.7, lineHeight: '20px' } }, t('ob.subtitle')),
+        h(PageHeader, { title: t('ob.title'), desc: t('ob.subtitle') }),
 
         // 环境体检行
-        h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px 16px', marginBottom: 16, fontSize: 13 } },
+        h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px 16px', marginBottom: T.s16, fontSize: 13 } },
           h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 5 } },
             h(Dot, { level: gitOk ? 'pass' : 'fail' }), `git ${info?.git ?? t('ob.checking')}`),
           h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 5 } },
@@ -3065,7 +3147,7 @@ window.__ModuleLoader__.load({
           : null,
 
         // 路径输入 + 两个动作
-        h('div', { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
+        h(Panel, null,
           h('label', { style: { fontSize: 12, opacity: 0.7 } }, t('ob.pathLabel')),
           h('input', {
             value: hubPath,
@@ -3073,13 +3155,13 @@ window.__ModuleLoader__.load({
             placeholder: t('ob.pathPlaceholder'),
             spellCheck: false,
             style: {
-              padding: '8px 10px', borderRadius: 8, fontSize: 13,
-              border: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.12))',
-              background: 'var(--dsw-alias-bg-base, transparent)',
+              width: '100%', boxSizing: 'border-box', marginTop: T.s4,
+              padding: '8px 10px', borderRadius: T.r, fontSize: 13,
+              border: T.border, background: 'var(--dsw-alias-bg-base, transparent)',
               color: 'inherit', fontFamily: 'ui-monospace, monospace',
             },
           }),
-          h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 8 } },
+          h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: T.s8, marginTop: T.s8 } },
             h(ActionButton, {
               label: t('ob.useExisting'), tone: 'primary',
               onClick: savePath, busy: busy === 'save',
@@ -3164,47 +3246,25 @@ window.__ModuleLoader__.load({
       else body = h(PageStub, { t, label: t(page.labelKey) })
 
       return h('div', {
-        style: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 },
+        style: { display: 'flex', flexDirection: 'row', height: '100%', minHeight: 0 },
         'data-sync-hub-panel': PANEL_ID,
       },
-        // 全局状态条
-        h(StatusBar, { t, data }),
-        // 页签条：固定尺寸，不随内容跳动（memory 4.20）。
+        // 主从工作台：左侧 220px 导航栏（v2.7 B 方案）
+        h(Rail, { t, data, pageId, onPick: setPageId }),
+        // 右侧内容区
         h('div', {
-          role: 'tablist', 'aria-label': t('panel'),
-          style: {
-            display: 'flex', gap: 4, padding: '8px 20px 0',
-            borderBottom: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.08))',
-            flex: '0 0 auto',
-          },
-        }, PAGES.map((x) => h('button', {
-          key: x.id,
-          type: 'button',
-          role: 'tab',
-          'aria-selected': pageId === x.id,
-          onClick: () => setPageId(x.id),
-          style: {
-            appearance: 'none', border: 'none', background: 'transparent', cursor: 'pointer',
-            padding: '8px 12px', fontSize: 13, lineHeight: '20px',
-            color: pageId === x.id
-              ? 'var(--dsw-alias-label-primary, inherit)'
-              : 'var(--dsw-alias-label-tertiary, inherit)',
-            borderBottom: pageId === x.id
-              ? '2px solid var(--dsw-alias-border-brand, currentColor)'
-              : '2px solid transparent',
-          },
-          'data-sync-hub-tab': x.id,
-        }, t(x.labelKey)))),
-        // 页体
-        h('div', {
-          style: { flex: '1 1 auto', minHeight: 0, overflow: 'auto', padding: '12px 20px 20px' },
-          'data-sync-hub-page': pageId,
+          style: { flex: '1 1 auto', minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' },
         },
-          h('div', { style: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 } },
-            h('h2', { style: { margin: 0, fontSize: 16, fontWeight: 600 } }, t(page.labelKey)),
-            h(ActionButton, { label: t('refresh'), small: true, onClick: refresh, busy: loading }),
+          // 全局状态条
+          h(StatusBar, { t, data }),
+          // 页体
+          h('div', {
+            style: { flex: '1 1 auto', minHeight: 0, overflow: 'auto', padding: '16px 20px 20px' },
+            'data-sync-hub-page': pageId,
+          },
+            h(PageHeader, { t, title: t(page.labelKey), onRefresh: refresh, loading }),
+            body,
           ),
-          body,
         ),
       )
     }

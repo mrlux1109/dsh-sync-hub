@@ -6,3 +6,6 @@ Thumbs.db
 # 开发期诊断脚本（硬编码本机路径，仅开发用，不进公开仓库）
 tests/_diag*
 tests/check-unused.mjs
+
+# 设计提案线框（本地评审用，不发布进插件仓库）
+design/
