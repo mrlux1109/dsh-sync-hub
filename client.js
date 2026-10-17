@@ -39,11 +39,11 @@ window.__ModuleLoader__.load({
 
     /** 四个一级页（v2.2 D3：6 平铺页 → 状态/内容/知识库/设置）。 */
     const PAGES = [
-      { id: 'status', labelKey: 'page.status' },
-      { id: 'sync', labelKey: 'page.sync' },
-      { id: 'content', labelKey: 'page.content' },
-      { id: 'knowledge', labelKey: 'page.knowledge' },
-      { id: 'settings', labelKey: 'page.settings' },
+      { id: 'status', labelKey: 'page.status', iconKey: 'pageIcon.status' },
+      { id: 'sync', labelKey: 'page.sync', iconKey: 'pageIcon.sync' },
+      { id: 'content', labelKey: 'page.content', iconKey: 'pageIcon.content' },
+      { id: 'knowledge', labelKey: 'page.knowledge', iconKey: 'pageIcon.knowledge' },
+      { id: 'settings', labelKey: 'page.settings', iconKey: 'pageIcon.settings' },
     ]
 
     /** 扁平键文案表：zh 为真相源，en 必须同键集。 */
@@ -57,26 +57,36 @@ window.__ModuleLoader__.load({
       'nav.settings': '设置',
       'rail.credOk': '凭据已配置',
       'rail.credMissing': '凭据缺失',
-      'page.status': '📊 状态',
-      'page.sync': '🔄 同步',
-      'page.content': '📁 内容',
-      'page.knowledge': '📚 知识库',
-      'page.settings': '⚙️ 设置',
+      'rail.collapse': '收起侧栏（变窄图标条）',
+      'rail.expand': '展开侧栏',
+      'rail.version': '版本',
+      // 页面标题（纯中文，emoji 已剥离：图标由 PageHeader 单独用 SVG 渲染，见 PAGE_ICON）
+      'page.status': '状态',
+      'page.sync': '同步',
+      'page.content': '内容',
+      'page.knowledge': '知识库',
+      'page.settings': '设置',
       // 内容页二级 Tab（沿用旧页名，改名会丢已有中文语义）
-      'page.memory': '🧠 记忆·配置',
-      'page.skills': '🛠 技能',
-      'page.plugins': '🔌 插件',
-      'page.sessionsArchive': '💬 会话归档',
+      'page.memory': '记忆·配置',
+      'page.skills': '技能',
+      'page.plugins': '插件',
+      'page.sessionsArchive': '会话归档',
+      // 页面图标（SVG 名，PageHeader 据此画图标，不用 emoji）
+      'pageIcon.status': 'IconGaugeOutlineMedium',
+      'pageIcon.sync': 'IconRefreshOutlineMedium',
+      'pageIcon.content': 'IconFolderOpenOutlineMedium',
+      'pageIcon.knowledge': 'IconDatabaseOutlineMedium',
+      'pageIcon.settings': 'IconSettingsOutlineMedium',
       // v2.5 批2：内容页语义常驻说明（歧义说清楚，不等来问）
       'content.scopeLine': '· 这里管的是【中枢仓库】与【本机加载目录】两个地方，根名已标清（中枢 xx = 会随上传传播；本机 xx = 只影响这台机器）。',
       'content.deleteLine': '· 删除不是真删：一律先移进中枢 backups/ 留底可反悔；「删中枢」≠「卸本机」，且拉取永远不删两台已装的内容。',
       // ── v2.5 批2：文件管理器（内容页可管） ──
-      'fm.root.hub/memory': '🧠 中枢记忆',
-      'fm.root.hub/skills': '🎯 中枢技能',
-      'fm.root.hub/config': '⚙️ 中枢配置',
-      'fm.root.hub/plugins': '📦 插件源码',
-      'fm.root.hub/session-backup': '💬 会话归档',
-      'fm.root.local/skills': '🖥 本机技能',
+      'fm.root.hub/memory': '中枢记忆',
+      'fm.root.hub/skills': '中枢技能',
+      'fm.root.hub/config': '中枢配置',
+      'fm.root.hub/plugins': '插件源码',
+      'fm.root.hub/session-backup': '会话归档',
+      'fm.root.local/skills': '本机技能',
       'fm.open': '进入',
       'fm.edit': '编辑',
       'fm.save': '保存',
@@ -204,13 +214,13 @@ window.__ModuleLoader__.load({
       'sync.opHint': '日常只需点蓝色「开始一键同步」；下面小按钮是手动挡，不常用。',
       'sync.incr1': '· 上传备份 = 只传本机【新改动的部分】，不会覆盖对方没碰的文件；内容少的一方上传，多的那边原样保留。',
       'sync.incr2': '· 注意：手动删掉中枢里的文件也算"改动"，会跟着传上去。清理请两边商量着来，别手滑。',
-      'scope.memory': '🧠 记忆',
-      'scope.skills': '🎯 技能',
-      'scope.config': '⚙️ 配置',
-      'scope.sessions': '💬 会话归档',
-      'scope.dshconfig': '🛰 DSH 运行配置',
-      'scope.plugins': '🔌 插件清单',
-      'scope.pluginsrc': '📦 插件源码',
+      'scope.memory': '记忆',
+      'scope.skills': '技能',
+      'scope.config': '配置',
+      'scope.sessions': '会话归档',
+      'scope.dshconfig': 'DSH 运行配置',
+      'scope.plugins': '插件清单',
+      'scope.pluginsrc': '插件源码',
       'scope.memory.tip': '专业术语 memory/ —— 共享记忆 shared.md + 各机器档案',
       'scope.skills.tip': '专业术语 skills/ —— 中枢技能库（apply 只补缺失，不覆盖同名）',
       'scope.config.tip': '专业术语 config/ —— DSH profile 模板与 git 全局配置',
@@ -222,9 +232,9 @@ window.__ModuleLoader__.load({
       'sync.all': '全部',
       'sync.none': '全不选',
       // ── 飞牛叫法（D2）：主文案用飞牛叫法，专业术语小字备注 ──
-      'sync.push': '📤 上传备份',
-      'sync.pull': '📥 下载恢复',
-      'sync.preview': '👁 预览变化',
+      'sync.push': '上传备份',
+      'sync.pull': '下载恢复',
+      'sync.preview': '预览变化',
       'sync.conflicts': '查看冲突',
       'sync.previewTitle': '预览结果',
       'sync.previewEmpty': '所选范围内没有可上传的改动。',
@@ -309,12 +319,12 @@ window.__ModuleLoader__.load({
       'mt.pluginBackup': '旧版已留底：{p}',
 
       // ── S3/S4：缺失工作区（"未分组"的真正解药） ──
-      'se.missingTitle': '⚠ {n} 个工作区本机不存在（会话会显示为「未分组」）',
+      'se.missingTitle': '{n} 个工作区本机不存在（会话会显示为「未分组」）',
       'se.missingHint': 'DSH 按目录是否存在给会话归组，与里面有没有文件无关。所以建个空目录就能正确归组——不必用飞牛同步整个项目。',
       'se.missingMeta': '{m} · {n} 个会话',
       'se.missingMore': '…另有 {n} 个未显示',
       'se.missingHow': '两种办法：A 点右边「一键创建空目录」立刻归组；B 项目代码用飞牛同步到同路径（中枢不管项目代码），需要哪个同步哪个。',
-      'se.mkdir': '📁 一键创建空目录',
+      'se.mkdir': '一键创建空目录',
       'se.mkdirCreated': '【结论】已创建 {n} 个空目录，会话将正确归组。',
       'se.mkdirExisted': '已存在 {n} 个（跳过）。',
       'se.mkdirFailed': '{n} 个创建失败（通常是权限不足），详见下方失败项。',
@@ -364,7 +374,7 @@ window.__ModuleLoader__.load({
 
       // 技能页
       'sk.summary': '同步概览',
-      'sk.invalidWarn': '⚠ 以下技能目录名不合法（DSH 要求 kebab-case，会静默跳过它们，装了也不生效）',
+      'sk.invalidWarn': '以下技能目录名不合法（DSH 要求 kebab-case，会静默跳过它们，装了也不生效）',
       'sk.list': '技能对比（本机 ↔ 中枢）',
       'sk.filterAll': '全部',
       'sk.noRows': '（没有匹配的技能）',
@@ -379,17 +389,17 @@ window.__ModuleLoader__.load({
       'se.local': '本机会话',
       'se.localHint': '对话记录只读拷贝进中枢；凭据类文件永不被包含（硬守卫，负例单测覆盖）。',
       'se.files': '文件',
-      'se.backup': '📤 上传备份（存到中枢）',
+      'se.backup': '上传备份（存到中枢）',
       'se.hub': '跨机会话归档（只读浏览）',
       'se.hubHint': '按机器 → 工作区逐层展开，看另一台电脑聊过什么。全程只读，不会改回本机。',
       'se.noMachines': '（中枢里还没有任何机器的会话归档）',
-      'se.restoreFrom': '📥 下载恢复到本机（{machine}）',
+      'se.restoreFrom': '下载恢复到本机（{machine}）',
       'se.msg.backed': '【结论】已归档 {n} 个会话到中枢。\n【关键】新归档 {n} 个 · 跳过未变更 {skipped} 个\n【细节】G1 密钥守卫已通过：未发现凭据类文件，零外传。另一台机器不会自动拿到，需要它主动"下载恢复"。',
       'se.msg.restored': '【结论】已恢复 {n} 个会话（跳过本机已有的 {same} 个）。\n【关键】恢复 {n} 个 · 跳过已有 {same} 个 · 路径映射 {mapped} 个\n【细节】若会话显示未分组：确认该项目目录已用飞牛同步到本机（本机会话永远不会被覆盖）。',
 
       // 冲突解决器（N1）
       'cf.title': '拉取撞车 · 冲突解决器',
-      'cf.warn': '⚠ 语义提醒：本栏「对端」是另一台电脑的版本，「本机」是你这台刚提交的版本。选错边会丢内容，请看清再选。',
+      'cf.warn': '语义提醒：本栏「对端」是另一台电脑的版本，「本机」是你这台刚提交的版本。选错边会丢内容，请看清再选。',
       'cf.base': '共同祖先',
       'cf.remote': '对端（另一台）',
       'cf.local': '本机（这台）',
@@ -412,23 +422,31 @@ window.__ModuleLoader__.load({
       'nav.settings': 'Settings',
       'rail.credOk': 'Credential set',
       'rail.credMissing': 'Credential missing',
-      'page.status': '📊 Status',
-      'page.sync': '🔄 Sync',
-      'page.content': '📁 Content',
-      'page.knowledge': '📚 Knowledge',
-      'page.settings': '⚙️ Settings',
-      'page.memory': '🧠 Memory · Config',
-      'page.skills': '🛠 Skills',
-      'page.plugins': '🔌 Plugins',
-      'page.sessionsArchive': '💬 Session archive',
+      'rail.collapse': 'Collapse sidebar (to icon bar)',
+      'rail.expand': 'Expand sidebar',
+      'rail.version': 'version',
+      'page.status': 'Status',
+      'page.sync': 'Sync',
+      'page.content': 'Content',
+      'page.knowledge': 'Knowledge',
+      'page.settings': 'Settings',
+      'page.memory': 'Memory · Config',
+      'page.skills': 'Skills',
+      'page.plugins': 'Plugins',
+      'page.sessionsArchive': 'Session archive',
+      'pageIcon.status': 'IconGaugeOutlineMedium',
+      'pageIcon.sync': 'IconRefreshOutlineMedium',
+      'pageIcon.content': 'IconFolderOpenOutlineMedium',
+      'pageIcon.knowledge': 'IconDatabaseOutlineMedium',
+      'pageIcon.settings': 'IconSettingsOutlineMedium',
       'content.scopeLine': '· This page manages the HUB repo and your LOCAL load folder. Root names say which: "Hub …" travels with upload backup; "Local …" only affects this machine.',
       'content.deleteLine': '· Delete is not real deletion: everything moves to hub backups/ first — undoable. "Delete from hub" ≠ "uninstall locally", and pulling never removes installed content on either machine.',
-      'fm.root.hub/memory': '🧠 Hub memory',
-      'fm.root.hub/skills': '🎯 Hub skills',
-      'fm.root.hub/config': '⚙️ Hub config',
-      'fm.root.hub/plugins': '📦 Plugin source',
-      'fm.root.hub/session-backup': '💬 Session archive',
-      'fm.root.local/skills': '🖥 Local skills',
+      'fm.root.hub/memory': 'Hub memory',
+      'fm.root.hub/skills': 'Hub skills',
+      'fm.root.hub/config': 'Hub config',
+      'fm.root.hub/plugins': 'Plugin source',
+      'fm.root.hub/session-backup': 'Session archive',
+      'fm.root.local/skills': 'Local skills',
       'fm.open': 'Open',
       'fm.edit': 'Edit',
       'fm.save': 'Save',
@@ -549,13 +567,13 @@ window.__ModuleLoader__.load({
       'sync.opHint': 'Daily use = the blue "Start one-shot sync" only. The small buttons below are manual mode.',
       'sync.incr1': '· Upload backup sends only what THIS machine changed — it never overwrites files the other side did not touch; the machine with less content uploading keeps the other\'s content intact.',
       'sync.incr2': '· Heads-up: manually deleting a file in the hub folder also counts as a change and will propagate. Coordinate cleanups; do not delete casually.',
-      'scope.memory': '🧠 Memory',
-      'scope.skills': '🎯 Skills',
-      'scope.config': '⚙️ Config',
-      'scope.sessions': '💬 Session archive',
-      'scope.dshconfig': '🛰 DSH runtime config',
-      'scope.plugins': '🔌 Plugin list',
-      'scope.pluginsrc': '📦 Plugin source',
+      'scope.memory': 'Memory',
+      'scope.skills': 'Skills',
+      'scope.config': 'Config',
+      'scope.sessions': 'Session archive',
+      'scope.dshconfig': 'DSH runtime config',
+      'scope.plugins': 'Plugin list',
+      'scope.pluginsrc': 'Plugin source',
       'scope.memory.tip': 'memory/ — shared memory + per-machine profiles',
       'scope.skills.tip': 'skills/ — hub skill library (apply adds missing only, never overwrites)',
       'scope.config.tip': 'config/ — DSH profile templates and global git config',
@@ -566,9 +584,9 @@ window.__ModuleLoader__.load({
       'flow.startTip': 'Runs it all: preview → you confirm → commit → upload backup',
       'sync.all': 'All',
       'sync.none': 'None',
-      'sync.push': '📤 Upload backup',
-      'sync.pull': '📥 Download & restore',
-      'sync.preview': '👁 Preview changes',
+      'sync.push': 'Upload backup',
+      'sync.pull': 'Download & restore',
+      'sync.preview': 'Preview changes',
       'sync.conflicts': 'Conflicts',
       'sync.previewTitle': 'Preview result',
       'sync.previewEmpty': 'Nothing to upload in the selected scope.',
@@ -648,12 +666,12 @@ window.__ModuleLoader__.load({
       'mt.pluginBackup': 'Previous version kept at: {p}',
 
       // ── S3/S4: missing workspaces (the real fix for "ungrouped") ──
-      'se.missingTitle': '⚠ {n} workspace(s) do not exist here (sessions show as ungrouped)',
+      'se.missingTitle': '{n} workspace(s) do not exist here (sessions show as ungrouped)',
       'se.missingHint': 'DSH groups sessions by whether the folder exists — not by its contents. So an empty folder is enough; you do not need to sync the whole project.',
       'se.missingMeta': '{m} · {n} sessions',
       'se.missingMore': '…and {n} more not shown',
       'se.missingHow': 'Two options: A click "create empty folders" to group them now; B sync the project code via fnOS to the same path (the hub does not carry project code) — sync only what you need.',
-      'se.mkdir': '📁 Create empty folders',
+      'se.mkdir': 'Create empty folders',
       'se.mkdirCreated': '[Verdict] Created {n} empty folder(s); sessions will group correctly.',
       'se.mkdirExisted': '{n} already existed (skipped).',
       'se.mkdirFailed': '{n} failed (usually permissions).',
@@ -692,7 +710,7 @@ window.__ModuleLoader__.load({
 
       // Skills page
       'sk.summary': 'Sync overview',
-      'sk.invalidWarn': '⚠ These skill folder names are invalid (DSH requires kebab-case and skips them silently — installed but never loaded)',
+      'sk.invalidWarn': 'These skill folder names are invalid (DSH requires kebab-case and skips them silently — installed but never loaded)',
       'sk.list': 'Skill comparison (local ↔ hub)',
       'sk.filterAll': 'All',
       'sk.noRows': '(no matching skills)',
@@ -718,17 +736,17 @@ window.__ModuleLoader__.load({
       'se.local': 'Local sessions',
       'se.localHint': 'Chat history is copied read-only into the hub; credential files are never included (hard guard, covered by negative tests).',
       'se.files': 'files',
-      'se.backup': '📤 Upload backup (to hub)',
+      'se.backup': 'Upload backup (to hub)',
       'se.hub': 'Cross-machine session archive (read-only)',
       'se.hubHint': 'Expand by machine → workspace to browse what the other PC chatted about. Read-only; nothing is written back.',
       'se.noMachines': '(no session archives in the hub yet)',
-      'se.restoreFrom': '📥 Download & restore here ({machine})',
+      'se.restoreFrom': 'Download & restore here ({machine})',
       'se.msg.backed': '[Verdict] Archived {n} session(s) to the hub.\n[Key] Archived {n} · skipped unchanged {skipped}\n[Detail] Secret guard passed: no credential files found, zero leakage. The other machine will not get them automatically — it must run "download & restore" itself.',
       'se.msg.restored': '[Verdict] Restored {n} session(s) (skipped {same} already present here).\n[Key] Restored {n} · skipped existing {same} · path-mapped {mapped}\n[Detail] If sessions show as ungrouped: make sure that project folder was synced here via fnOS (existing local sessions are never overwritten).',
 
       // Conflict resolver (N1)
       'cf.title': 'Pull conflict · resolver',
-      'cf.warn': '⚠ "Remote" is the other machine version, "Local" is what this machine just committed. Picking the wrong side loses content.',
+      'cf.warn': '"Remote" is the other machine version, "Local" is what this machine just committed. Picking the wrong side loses content.',
       'cf.base': 'Common ancestor',
       'cf.remote': 'Remote (other machine)',
       'cf.local': 'Local (this machine)',
@@ -886,7 +904,7 @@ window.__ModuleLoader__.load({
           opacity: (busy || disabled) ? 0.6 : 1,
           display: 'inline-flex', alignItems: 'center', gap: 6,
         },
-      }, busy ? h('span', null, '…') : null, label)
+      }, busy ? h(Spinner, { size: small ? 12 : 14 }) : null, label)
     }
 
     /** 就地反馈条（memory 4.20：贴在被触发的控件旁）。 */
@@ -1018,13 +1036,70 @@ window.__ModuleLoader__.load({
       fill: 'var(--dsw-alias-bg-fill-subtle, rgba(0,0,0,0.04))',
     }
 
+    /** 内联 SVG 图标库（决策：用 SVG 元素而非 emoji，符合"图标不可用 emoji"硬规则）。
+     *  全部 24×24 viewBox、currentColor 描边，size 控制像素尺寸。返回 React SVG 元素，
+     *  在测试环境（mini-React）也能正常序列化，便于结构断言。 */
+    function SvgIcon ({ name, size = 18, className, style }) {
+      const common = { viewBox: '0 0 24 24', width: size, height: size, fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true }
+      if (className) common.className = className
+      if (style) common.style = style
+      const shapes = {
+        // 收起态：指向左的箭头（点击向左展开）；展开态：指向右的箭头（收起）
+        chevronLeft: [h('path', { d: 'M15 18l-6-6 6-6' })],
+        chevronRight: [h('path', { d: 'M9 18l6-6-6-6' })],
+        // 本机角色：主机（房子）/ 副机（显示器）/ 双向（双向箭头）
+        host: [h('path', { d: 'M3 10.5 12 4l9 6.5' }), h('path', { d: 'M5 9.5V20h14V9.5' }), h('path', { d: 'M9.5 20v-5.5h5V20' })],
+        follower: [h('rect', { x: 3, y: 4, width: 18, height: 12, rx: 2 }), h('path', { d: 'M8 20h8M12 16v4' })],
+        both: [h('path', { d: 'M4 9h13l-3-3' }), h('path', { d: 'M20 15H7l3 3' })],
+        // 文件管理器：目录 / 文件
+        folder: [h('path', { d: 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z' })],
+        file: [h('path', { d: 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z' }), h('path', { d: 'M14 3v5h5' })],
+        // 页面图标兜底（原生 P[name] 缺失时用语义等价的本地 SVG，保证图标不空）
+        gauge: [h('circle', { cx: 12, cy: 13, r: 8 }), h('path', { d: 'M12 13l4-4' }), h('path', { d: 'M9 3h6' })],
+        refresh: [h('path', { d: 'M20 11a8 8 0 1 0-2.3 5.7' }), h('path', { d: 'M20 5v6h-6' })],
+        database: [h('ellipse', { cx: 12, cy: 6, rx: 7, ry: 3 }), h('path', { d: 'M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6' }), h('path', { d: 'M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3' })],
+        gear: [h('circle', { cx: 12, cy: 12, r: 3.5 }), h('path', { d: 'M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M16.9 16.9l2.1 2.1M19.1 4.9l-2.1 2.1M7.1 16.9l-2.1 2.1' })],
+        // 状态标记（替代 ✓/✗ 字符，统一走 SVG）
+        check: [h('path', { d: 'M5 13l4 4L19 7' })],
+        cross: [h('path', { d: 'M6 6l12 12M18 6L6 18' })],
+        pencil: [h('path', { d: 'M4 20h4L19 9l-4-4L4 16z' }), h('path', { d: 'M14 6l4 4' })],
+      }
+      const kids = shapes[name]
+      if (!kids) return null
+      return h('svg', common, ...kids)
+    }
+
+    /** busy 转圈（SVG，currentColor 描边；spin 由注入的 CSS 动画驱动，见 injectStyles）。 */
+    function Spinner ({ size = 14 }) {
+      return h('svg', { className: 'synchub-spin', viewBox: '0 0 24 24', width: size, height: size, fill: 'none', stroke: 'currentColor', strokeWidth: 2.4, strokeLinecap: 'round', 'aria-hidden': true },
+        h('path', { d: 'M12 3a9 9 0 1 0 9 9', opacity: 0.9 }),
+      )
+    }
+
     /** 页面头：标题 + 右侧动作（默认刷新）。各页不再各自画 h2。 */
-    function PageHeader({ t, title, onRefresh, loading, right }) {
+    /** 页面图标：优先用 DSH 原生图标组件（P[name]），缺失时回退到内联 SVG（Icon）。 */
+    function PageIcon({ name, size = 18 }) {
+      const C = P[name]
+      if (C) return h(C, { size })
+      // 原生缺失时，用语义等价的本地 SVG 兜底（保证图标永远不空）
+      const fallback = {
+        IconGaugeOutlineMedium: 'gauge', IconRefreshOutlineMedium: 'refresh',
+        IconFolderOpenOutlineMedium: 'folder', IconDatabaseOutlineMedium: 'database',
+        IconSettingsOutlineMedium: 'gear',
+      }[name] || 'gauge'
+      return h(SvgIcon, { name: fallback, size })
+    }
+
+    function PageHeader({ t, title, iconName, onRefresh, loading, right }) {
       return h('div', {
+        className: 'synchub-page-header',
         style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: T.s8, marginBottom: T.s12 },
       },
-        h('h2', { style: { margin: 0, fontSize: 16, fontWeight: 600 } }, title),
-        h('div', { style: { display: 'flex', alignItems: 'center', gap: T.s8 } },
+        h('div', { style: { display: 'flex', alignItems: 'center', gap: T.s8, minWidth: 0 } },
+          iconName ? h(PageIcon, { name: iconName, size: 18 }) : null,
+          h('h2', { style: { margin: 0, fontSize: 16, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, title),
+        ),
+        h('div', { style: { display: 'flex', alignItems: 'center', gap: T.s8, flex: '0 0 auto' } },
           right ?? null,
           onRefresh ? h(ActionButton, { label: t('refresh'), small: true, onClick: onRefresh, busy: loading }) : null,
         ),
@@ -1068,18 +1143,19 @@ window.__ModuleLoader__.load({
       )
     }
 
-    /** 范围选择芯片（同步范围多选复用）。 */
-    function Check({ label, active, onClick, title }) {
+    /** 范围选择芯片（同步范围多选复用）。busy 时禁用并显示转圈；icon 为可选内联 SVG 节点。 */
+    function Check({ label, active, onClick, title, busy, icon }) {
       return h('button', {
-        type: 'button', onClick, 'aria-pressed': active, title,
+        type: 'button', onClick, 'aria-pressed': active, title, disabled: busy,
         style: {
-          appearance: 'none', cursor: 'pointer', fontSize: 12,
+          appearance: 'none', cursor: busy ? 'default' : 'pointer', fontSize: 12,
           padding: '4px 10px', borderRadius: 999,
-          border: T.border,
+          border: T.border, opacity: busy ? 0.6 : 1,
+          display: 'inline-flex', alignItems: 'center', gap: 6,
           background: active ? 'var(--dsw-alias-button-primary-bg, #2563eb)' : 'transparent',
           color: active ? '#fff' : 'inherit',
         },
-      }, label)
+      }, busy ? h(Spinner, { size: 12 }) : null, icon ?? null, label)
     }
 
     /** 结论条（B2 工作台顶部总判断）。 */
@@ -1111,8 +1187,11 @@ window.__ModuleLoader__.load({
       )
     }
 
-    /** 左导航栏（B2 主从骨架的「主」）。220px 固定，含品牌 / 导航 / 状态脚。 */
-    function Rail({ t, data, pageId, onPick }) {
+    /** 左导航栏（B2 主从骨架的「主」）。220px 固定，可收起为 56px 纯图标条。
+     *  - collapsed=true 时宽度 56px，仅显示图标（导航项 hover 出 title 提示）；
+     *  - 收起/展开按钮固定在品牌区右上（展开态）/ 居中置顶（收起态），符合 VS Code / 飞书惯例；
+     *  - 收起状态由 SyncHubPanel 经 localStorage 持久化（key: syncHubRailCollapsed）。 */
+    function Rail({ t, data, pageId, onPick, collapsed, onToggle }) {
       const st = data?.status ?? {}
       const nav = [
         { id: 'status', label: t('nav.status'), icon: 'IconGaugeOutlineMedium' },
@@ -1126,25 +1205,43 @@ window.__ModuleLoader__.load({
       const behind = st.behind ?? 0
       const dirty = st.dirtyCount ?? 0
       const scheduleOn = data?.schedule?.installed
-      return h('aside', {
-        style: {
-          width: 220, flex: '0 0 220px', alignSelf: 'stretch',
-          borderRight: T.border,
-          display: 'flex', flexDirection: 'column',
-          background: 'var(--dsw-alias-bg-fill-subtle, rgba(0,0,0,0.02))',
-        },
-        'data-sync-hub-rail': 'nav',
-      },
-        // 品牌区
-        h('div', { style: { padding: '16px 16px 12px', borderBottom: T.border } },
-          h('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+      const railW = collapsed ? 56 : 220
+      const brand = collapsed
+        ? h('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '12px 0 10px', gap: 10, borderBottom: T.border } },
             h(P.IconCompareSplitOutlineMedium, { size: 20 }),
-            h('div', null,
-              h('div', { style: { fontSize: 14, fontWeight: 600, lineHeight: '18px' } }, t('panel')),
-              h('div', { style: { fontSize: 11, opacity: 0.5 } }, `v${data?.version ?? '—'}`),
+            h('button', {
+              type: 'button', 'data-rail-toggle': '1', onClick: onToggle,
+              'aria-label': t('rail.expand'), title: t('rail.expand'),
+              style: toggleBtnStyle,
+            }, h(SvgIcon, { name: 'chevronLeft', size: 16 })),
+          )
+        : h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 12px 12px 16px', borderBottom: T.border } },
+            h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 } },
+              h(P.IconCompareSplitOutlineMedium, { size: 20 }),
+              h('div', { style: { minWidth: 0 } },
+                h('div', { style: { fontSize: 14, fontWeight: 600, lineHeight: '18px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, t('panel')),
+                h('div', { style: { fontSize: 11, opacity: 0.5 } }, `${t('rail.version')} ${data?.version ?? '—'}`),
+              ),
             ),
-          ),
-        ),
+            h('button', {
+              type: 'button', 'data-rail-toggle': '1', onClick: onToggle,
+              'aria-label': t('rail.collapse'), title: t('rail.collapse'),
+              style: toggleBtnStyle,
+            }, h(SvgIcon, { name: 'chevronRight', size: 16 })),
+          )
+      return h('aside', {
+        'data-sync-hub-rail': 'nav',
+        'data-rail-collapsed': collapsed ? '1' : '0',
+        style: {
+          width: railW, flex: `0 0 ${railW}px`, alignSelf: 'stretch',
+          borderRight: T.border,
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          background: 'var(--dsw-alias-bg-fill-subtle, rgba(0,0,0,0.02))',
+          transition: 'width 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+        },
+        className: 'synchub-rail',
+      },
+        brand,
         // 导航
         h('nav', { style: { flex: '1 1 auto', overflow: 'auto', padding: '8px 8px' } },
           nav.map((n) => {
@@ -1152,8 +1249,10 @@ window.__ModuleLoader__.load({
             return h('button', {
               key: n.id, type: 'button', onClick: () => onPick(n.id),
               'aria-current': active ? 'page' : undefined,
+              title: collapsed ? n.label : undefined,
               style: {
-                width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                width: '100%', display: 'flex', alignItems: 'center',
+                justifyContent: collapsed ? 'center' : 'flex-start', gap: 10,
                 appearance: 'none', border: 'none', cursor: 'pointer',
                 padding: '8px 10px', marginBottom: 4, borderRadius: T.r,
                 fontSize: 13, textAlign: 'left',
@@ -1162,28 +1261,38 @@ window.__ModuleLoader__.load({
               },
             },
               Icon(n.icon),
-              h('span', null, n.label),
+              collapsed ? null : h('span', null, n.label),
             )
           }),
         ),
-        // 状态脚
-        h('div', { style: { padding: '10px 12px', borderTop: T.border, fontSize: 12, display: 'flex', flexDirection: 'column', gap: 6 } },
-          h('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-            h(Dot, { level: credOk ? 'pass' : 'fail' }),
-            h('span', { style: { opacity: 0.7 } }, credOk ? t('rail.credOk') : t('rail.credMissing')),
+        // 状态脚（收起态隐藏文字，仅留点）
+        collapsed
+          ? null
+          : h('div', { style: { padding: '10px 12px', borderTop: T.border, fontSize: 12, display: 'flex', flexDirection: 'column', gap: 6 } },
+            h('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+              h(Dot, { level: credOk ? 'pass' : 'fail' }),
+              h('span', { style: { opacity: 0.7 } }, credOk ? t('rail.credOk') : t('rail.credMissing')),
+            ),
+            h('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+              h(Dot, { level: behind > 0 ? 'warn' : 'pass' }),
+              h('span', { style: { opacity: 0.7 } }, `${t('bar.behind')} ${behind}`),
+              h(Dot, { level: dirty > 0 ? 'warn' : 'pass' }),
+              h('span', { style: { opacity: 0.7 } }, `${t('bar.dirty')} ${dirty}`),
+            ),
+            h('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+              h(Dot, { level: scheduleOn ? 'pass' : 'info' }),
+              h('span', { style: { opacity: 0.7 } }, scheduleOn ? `${t('bar.schedule')} ${t('bar.on')}` : `${t('bar.schedule')} ${t('bar.off')}`),
+            ),
           ),
-          h('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-            h(Dot, { level: behind > 0 ? 'warn' : 'pass' }),
-            h('span', { style: { opacity: 0.7 } }, `${t('bar.behind')} ${behind}`),
-            h(Dot, { level: dirty > 0 ? 'warn' : 'pass' }),
-            h('span', { style: { opacity: 0.7 } }, `${t('bar.dirty')} ${dirty}`),
-          ),
-          h('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-            h(Dot, { level: scheduleOn ? 'pass' : 'info' }),
-            h('span', { style: { opacity: 0.7 } }, scheduleOn ? `${t('bar.schedule')} ${t('bar.on')}` : `${t('bar.schedule')} ${t('bar.off')}`),
-          ),
-        ),
       )
+    }
+    // 收起/展开按钮：圆形、悬停反馈、44px 命中区（图标居中）
+    const toggleBtnStyle = {
+      appearance: 'none', cursor: 'pointer', border: T.border,
+      background: 'transparent', borderRadius: 999, width: 28, height: 28,
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      color: 'inherit', padding: 0, flex: '0 0 auto',
+      transition: 'background 150ms ease, transform 150ms ease',
     }
 
     // ─────────────────── 总览页 ───────────────────
@@ -1839,9 +1948,9 @@ window.__ModuleLoader__.load({
         setNote({ tone: 'success', text: `${r.receipt}\n${r.note}` })
       }
       const ROLE_META = [
-        { id: 'host', icon: '🏠', label: t('mt.role.host'), desc: t('mt.role.hostDesc') },
-        { id: 'follower', icon: '💻', label: t('mt.role.follower'), desc: t('mt.role.followerDesc') },
-        { id: 'both', icon: '🔄', label: t('mt.role.both'), desc: t('mt.role.bothDesc') },
+        { id: 'host', iconName: 'host', label: t('mt.role.host'), desc: t('mt.role.hostDesc') },
+        { id: 'follower', iconName: 'follower', label: t('mt.role.follower'), desc: t('mt.role.followerDesc') },
+        { id: 'both', iconName: 'both', label: t('mt.role.both'), desc: t('mt.role.bothDesc') },
       ]
 
       return h('div', { style: { display: 'flex', flexDirection: 'column' } },
@@ -1850,7 +1959,8 @@ window.__ModuleLoader__.load({
           h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: T.s8 } },
             ...ROLE_META.map((m) => h(Check, {
               key: m.id,
-              label: `${m.icon} ${m.label}${myRole === m.id ? t('mt.role.current') : ''}`,
+              icon: h(SvgIcon, { name: m.iconName, size: 14 }),
+              label: `${m.label}${myRole === m.id ? t('mt.role.current') : ''}`,
               active: myRole === m.id,
               busy: busy === 'set-role',
               title: m.desc,
@@ -1961,7 +2071,7 @@ window.__ModuleLoader__.load({
                 key: s.step,
                 style: { display: 'flex', gap: 6, alignItems: 'baseline', lineHeight: '18px' },
               },
-                h('span', { style: { color: s.ok ? 'var(--dsw-alias-status-success, #22c55e)' : 'var(--dsw-alias-status-danger, #ef4444)' } }, s.ok ? '✓' : '✗'),
+                h(SvgIcon, { name: s.ok ? 'check' : 'cross', size: 14, style: { color: s.ok ? 'var(--dsw-alias-status-success, #22c55e)' : 'var(--dsw-alias-status-danger, #ef4444)', flex: '0 0 auto' } }),
                 h('span', { style: { opacity: 0.6, flex: '0 0 auto' } }, s.step),
                 h('span', { style: { flex: '1 1 auto' } }, s.detail),
               )),
@@ -2740,7 +2850,9 @@ window.__ModuleLoader__.load({
         // 编辑器
         editing
           ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 } },
-            h('div', { style: { fontSize: 12, fontWeight: 600 } }, `✎ ${editing.file}`),
+            h('div', { style: { display: 'flex', gap: 6, alignItems: 'center', fontSize: 12, fontWeight: 600 } },
+              h(SvgIcon, { name: 'pencil', size: 13 }),
+              editing.file),
             h('textarea', {
               value: editing.text,
               onChange: (e) => setEditing({ ...editing, text: e.target.value, dirty: true }),
@@ -2776,7 +2888,7 @@ window.__ModuleLoader__.load({
                   borderBottom: T.divider,
                 },
               },
-                h('span', { style: { flex: '0 0 auto' } }, e.dir ? '📁' : '📄'),
+                h(SvgIcon, { name: e.dir ? 'folder' : 'file', size: 14 }),
                 h('span', {
                   style: { flex: '1 1 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
                 }, e.name),
@@ -3194,6 +3306,18 @@ window.__ModuleLoader__.load({
       const [error, setError] = useState(null)
       const [loading, setLoading] = useState(true)
       const [needsOnboarding, setNeedsOnboarding] = useState(false)
+      // 侧栏收起态：从 localStorage 还原（无 localStorage 时默认展开）。key: syncHubRailCollapsed ('1'/'0')
+      const readCollapsed = () => {
+        try { return typeof localStorage !== 'undefined' && localStorage.getItem('syncHubRailCollapsed') === '1' } catch { return false }
+      }
+      const [collapsed, setCollapsed] = useState(readCollapsed)
+      const toggleCollapsed = useCallback(() => {
+        setCollapsed((prev) => {
+          const next = !prev
+          try { if (typeof localStorage !== 'undefined') localStorage.setItem('syncHubRailCollapsed', next ? '1' : '0') } catch {}
+          return next
+        })
+      }, [])
 
       const refresh = useCallback(async () => {
         setLoading(true)
@@ -3249,20 +3373,21 @@ window.__ModuleLoader__.load({
         style: { display: 'flex', flexDirection: 'row', height: '100%', minHeight: 0 },
         'data-sync-hub-panel': PANEL_ID,
       },
-        // 主从工作台：左侧 220px 导航栏（v2.7 B 方案）
-        h(Rail, { t, data, pageId, onPick: setPageId }),
+        // 主从工作台：左侧导航栏（v2.8 可收起为 56px 图标条）
+        h(Rail, { t, data, pageId, onPick: setPageId, collapsed, onToggle: toggleCollapsed }),
         // 右侧内容区
         h('div', {
           style: { flex: '1 1 auto', minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' },
         },
           // 全局状态条
           h(StatusBar, { t, data }),
-          // 页体
+          // 页体（key=pageId 触发切换过渡动画）
           h('div', {
-            style: { flex: '1 1 auto', minHeight: 0, overflow: 'auto', padding: '16px 20px 20px' },
+            key: pageId,
+            style: { flex: '1 1 auto', minHeight: 0, overflow: 'auto', padding: '16px 20px 20px', animation: 'synchub-page-in 220ms cubic-bezier(0.22,1,0.36,1)' },
             'data-sync-hub-page': pageId,
           },
-            h(PageHeader, { t, title: t(page.labelKey), onRefresh: refresh, loading }),
+            h(PageHeader, { t, title: t(page.labelKey), iconName: t(page.iconKey), onRefresh: refresh, loading }),
             body,
           ),
         ),
@@ -3278,13 +3403,39 @@ window.__ModuleLoader__.load({
       return h(P.IconCompareSplitOutlineMedium, { size })
     }
 
+    /** 注入动画与微交互样式（仅真实浏览器生效；无 document 环境（如测试 vm）静默跳过）。
+     *  全部用 transform/opacity，尊重 prefers-reduced-motion。 */
+    function injectStyles() {
+      if (typeof document === 'undefined') return
+      if (document.getElementById('synchub-anim-style')) return
+      const css = [
+        '@keyframes synchub-page-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}',
+        '@keyframes synchub-header-in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}',
+        '.synchub-page-header{animation:synchub-header-in 260ms cubic-bezier(0.22,1,0.36,1)}',
+        '@keyframes synchub-spin{to{transform:rotate(360deg)}}',
+        '.synchub-spin{animation:synchub-spin 800ms linear infinite;transform-origin:center}',
+        // 收起/展开按钮：hover 反馈
+        '[data-rail-toggle]{transition:background 150ms ease,transform 150ms ease}',
+        '[data-rail-toggle]:hover{background:var(--dsw-alias-bg-fill-hover,rgba(0,0,0,0.08));transform:scale(1.08)}',
+        '[data-rail-toggle]:active{transform:scale(0.94)}',
+        // 导航项 hover 反馈
+        '.synchub-rail nav button{transition:background 150ms ease}',
+        '.synchub-rail nav button:hover{background:var(--dsw-alias-bg-fill-hover,rgba(0,0,0,0.06))}',
+        '@media (prefers-reduced-motion: reduce){.synchub-page-header,.synchub-spin,[data-rail-toggle],.synchub-rail nav button,[data-sync-hub-panel] *{animation:none!important;transition:none!important}}',
+      ].join('\n')
+      const el = document.createElement('style')
+      el.id = 'synchub-anim-style'
+      el.textContent = css
+      document.head.appendChild(el)
+    }
+
     /**
      * 客户端插件入口。
      * @param {object} ctx client root context。
      */
     function apply(ctx) {
       const t = ctx.locale.bind(NS)
-
+      injectStyles()
       // ① 文案：扁平键，官方解析。
       ctx.effect(() => ctx.locale.register(NS, { zh: ZH, en: EN }), 'sync-hub: dictionaries')
 
