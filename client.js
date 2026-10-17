@@ -726,6 +726,42 @@ window.__ModuleLoader__.load({
       return `${(v / 1024 / 1024).toFixed(1)} MB`
     }
 
+    // ── v2.6.1 机器看板三件套（老大"好看吗"实锤后补）──
+
+    /** 日期统一显示：git 的 2026-10-12 / ISO 串 → MM-DD HH:mm（跨年带年份）。 */
+    function fmtWhen(s) {
+      if (!s) return '—'
+      const d = new Date(String(s).replace(' ', 'T'))
+      if (Number.isNaN(d.getTime())) return String(s).slice(0, 10)
+      const now = new Date()
+      const sameYear = d.getFullYear() === now.getFullYear()
+      const md = `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+      return sameYear ? `${md} ${hm}` : `${d.getFullYear()}-${md}`
+    }
+
+    /** 距今天数（parse 失败返回 null）。 */
+    function daysAgo(s) {
+      const d = new Date(String(s).replace(' ', 'T'))
+      if (Number.isNaN(d.getTime())) return null
+      return Math.floor((Date.now() - d.getTime()) / 86400000)
+    }
+
+    /** 陈旧度 → 状态点：≥14 天 fail、≥3 天 warn、从未同步 info。 */
+    function staleLevel(s) {
+      if (!s) return 'info'
+      const n = daysAgo(s)
+      if (n === null) return 'info'
+      return n >= 14 ? 'fail' : n >= 3 ? 'warn' : 'pass'
+    }
+
+    /** 陈旧度 → 文字提醒（≥3 天才显示，避免日常噪音）。 */
+    function staleNote(s) {
+      const n = daysAgo(s)
+      if (n === null || n < 3) return null
+      return n >= 14 ? `${n} 天没同步！` : `${n} 天没同步`
+    }
+
     // ─────────────────── 数据层 ───────────────────
 
     /** 当前语言（跟随宿主 locale）。 */
@@ -1040,7 +1076,8 @@ window.__ModuleLoader__.load({
             : null,
         ),
 
-        // 中枢卡（D4 密度改造：平铺 Row → 自适应网格指标块）
+        // 中枢卡（v2.6.1：commit message 从 tile hint 移到网格下方单独一行——
+        // 原来挂在 hint 里把该 tile 撑成双倍高，同行其他 tile 底部一片空白）
         h(Card, { title: t('ov.hub') },
           h(Grid, { min: 140 },
             h(StatTile, { label: t('ov.version'), value: data?.version ?? '—', mono: true }),
@@ -1056,10 +1093,18 @@ window.__ModuleLoader__.load({
             h(StatTile, {
               label: t('ov.lastCommit'),
               value: st.lastCommit ? st.lastCommit.hash : '—',
-              hint: st.lastCommit ? st.lastCommit.subject : null,
               mono: true,
             }),
           ),
+          st.lastCommit?.subject
+            ? h('div', {
+              style: {
+                marginTop: 2, fontSize: 11, lineHeight: '16px', opacity: 0.55,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              },
+              title: st.lastCommit.subject,
+            }, st.lastCommit.subject)
+            : null,
         ),
         // 本机卡（D4：两行信息 → 双列网格，不再各占全宽）
         h(Card, { title: t('ov.machine') },
@@ -1081,13 +1126,13 @@ window.__ModuleLoader__.load({
                     padding: '5px 0', borderBottom: '1px solid var(--dsw-alias-border-l3, rgba(0,0,0,0.05))',
                   },
                 },
-                  h(Dot, { level: m.lastWhen ? 'pass' : 'info' }),
+                  h(Dot, { level: staleLevel(m.lastWhen) }),
                   h('span', { style: { flex: '0 0 auto', fontWeight: 500 } }, m.id),
                   h('span', { style: { flex: '0 0 auto', opacity: 0.5, fontSize: 12 } }, m.computer ?? '?'),
                   h('span', {
                     style: { flex: '1 1 auto', textAlign: 'right', fontSize: 12, opacity: 0.7 },
                     title: m.lastSubject ?? undefined,
-                  }, m.lastWhen ? `${m.lastWhen}${m.lastCommit ? ' · ' + m.lastCommit : ''}` : t('ov.boardNever')),
+                  }, m.lastWhen ? `${fmtWhen(m.lastWhen)}${staleNote(m.lastWhen) ? ` · ${staleNote(m.lastWhen)}` : ''}${m.lastCommit ? ` · ${m.lastCommit}` : ''}` : t('ov.boardNever')),
                 )),
               ),
           ),
@@ -1104,14 +1149,11 @@ window.__ModuleLoader__.load({
               : (recent.length === 0
                 ? h(Empty, null, t('ov.noRecent'))
                 : h('div', {
-                  // v2.6：限高 + 内部滚动。提交信息长短不一，不限高会把
-                  // 同行卡片的位置顶得忽高忽低；要看全量点右上「展开」。
-                  style: {
-                    display: 'flex', flexDirection: 'column', gap: 4,
-                    maxHeight: 220, overflow: 'auto',
-                  },
+                  // v2.6.1：去掉内部滚动条（窄面板里很憋屈，老大"好看吗"实锤）。
+                  // 只列 4 条 + 提交信息超长省略；要看全量点右上「展开」。
+                  style: { display: 'flex', flexDirection: 'column', gap: 4 },
                 },
-                  recent.slice(0, 6).map((c) => h('div', {
+                  recent.slice(0, 4).map((c) => h('div', {
                     key: c.hash,
                     style: { display: 'flex', gap: 8, fontSize: 12, alignItems: 'baseline' },
                   },
@@ -1119,7 +1161,7 @@ window.__ModuleLoader__.load({
                     h('span', {
                       style: { flex: '1 1 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
                     }, c.subject),
-                    h('span', { style: { opacity: 0.5, flex: '0 0 auto' } }, c.date),
+                    h('span', { style: { opacity: 0.5, flex: '0 0 auto' } }, fmtWhen(c.date)),
                   )),
                 )),
           ),
