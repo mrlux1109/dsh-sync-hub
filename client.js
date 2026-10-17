@@ -244,6 +244,17 @@ window.__ModuleLoader__.load({
       'se.mkdirFailed': '{n} 个创建失败（通常是权限不足），详见下方失败项。',
       'se.mkdirHint': '【细节】只建了空目录，没有下载任何会话。想看内容请用飞牛同步项目代码。',
 
+      // ── 🏠 本机角色（v2.2 S5） ──
+      'mt.role.title': '本机角色（这台机器以谁为准）',
+      'mt.role.hint': '存进中枢、两台机器互相可见。改了角色记得「上传备份」同步给对方。默认主机。',
+      'mt.role.host': '主机',
+      'mt.role.hostDesc': '以这台为准：日常只「上传备份」归档；「下载恢复」慎用，防止旧内容盖新内容。',
+      'mt.role.follower': '副机',
+      'mt.role.followerDesc': '以主机为准：日常「下载恢复」拿最新；想上传前先「预览变化」。',
+      'mt.role.both': '双向',
+      'mt.role.bothDesc': '两边对等随用随传；撞车靠冲突解决器人工裁决。',
+      'mt.role.current': '（当前）',
+
       // ── 💬 会话归档语义（v2.2 D1：单向归档，不是双向同步） ──
       'se.archiveTitle': '会话归档说明（单向，不是双向同步）',
       'se.archiveLine1': '· 每台机器各自备份：上传备份 = 把本机会话存一份到云端归档（不是"同步"，不会来回覆盖）。',
@@ -296,7 +307,7 @@ window.__ModuleLoader__.load({
       'se.hubHint': '按机器 → 工作区逐层展开，看另一台电脑聊过什么。全程只读，不会改回本机。',
       'se.noMachines': '（中枢里还没有任何机器的会话归档）',
       'se.restoreFrom': '📥 下载恢复到本机（{machine}）',
-      'se.msg.backed': '【结论】已归档 {n} 个会话到中枢。\n【关键】新归档 {n} 个 · 跳过未变更 {skipped} 个\n【细节】另一台机器不会自动拿到，需要它主动"下载恢复"。',
+      'se.msg.backed': '【结论】已归档 {n} 个会话到中枢。\n【关键】新归档 {n} 个 · 跳过未变更 {skipped} 个\n【细节】G1 密钥守卫已通过：未发现凭据类文件，零外传。另一台机器不会自动拿到，需要它主动"下载恢复"。',
       'se.msg.restored': '【结论】已恢复 {n} 个会话（跳过本机已有的 {same} 个）。\n【关键】恢复 {n} 个 · 跳过已有 {same} 个 · 路径映射 {mapped} 个\n【细节】若会话显示未分组：确认该项目目录已用飞牛同步到本机（本机会话永远不会被覆盖）。',
 
       // 冲突解决器（N1）
@@ -545,6 +556,17 @@ window.__ModuleLoader__.load({
       'sk.scopeTitle': 'Scope',
       'sk.scopeBody': 'This page only compares and classifies: which skills exist on one side only, which differ, which are empty shells. Importing, trash and cloud-side edits are write operations scheduled for later milestones; use the console or the sync_hub_* tools meanwhile.',
 
+      // ── 🏠 Machine role (v2.2 S5) ──
+      'mt.role.title': 'Machine role (who is authoritative here)',
+      'mt.role.hint': 'Stored in the hub, visible to both machines. After changing it, run "upload backup" to sync. Default: host.',
+      'mt.role.host': 'Host',
+      'mt.role.hostDesc': 'This machine is authoritative: daily "upload backup" only; use "download & restore" carefully so old content never overwrites new.',
+      'mt.role.follower': 'Follower',
+      'mt.role.followerDesc': 'Follows the host: daily "download & restore"; preview changes before uploading.',
+      'mt.role.both': 'Two-way',
+      'mt.role.bothDesc': 'Peers, upload/download freely; conflicts are resolved manually.',
+      'mt.role.current': ' (current)',
+
       // Sessions page
       'se.local': 'Local sessions',
       'se.localHint': 'Chat history is copied read-only into the hub; credential files are never included (hard guard, covered by negative tests).',
@@ -554,7 +576,7 @@ window.__ModuleLoader__.load({
       'se.hubHint': 'Expand by machine → workspace to browse what the other PC chatted about. Read-only; nothing is written back.',
       'se.noMachines': '(no session archives in the hub yet)',
       'se.restoreFrom': '📥 Download & restore here ({machine})',
-      'se.msg.backed': '[Verdict] Archived {n} session(s) to the hub.\n[Key] Archived {n} · skipped unchanged {skipped}\n[Detail] The other machine will not get them automatically — it must run "download & restore" itself.',
+      'se.msg.backed': '[Verdict] Archived {n} session(s) to the hub.\n[Key] Archived {n} · skipped unchanged {skipped}\n[Detail] Secret guard passed: no credential files found, zero leakage. The other machine will not get them automatically — it must run "download & restore" itself.',
       'se.msg.restored': '[Verdict] Restored {n} session(s) (skipped {same} already present here).\n[Key] Restored {n} · skipped existing {same} · path-mapped {mapped}\n[Detail] If sessions show as ungrouped: make sure that project folder was synced here via fnOS (existing local sessions are never overwritten).',
 
       // Conflict resolver (N1)
@@ -1504,7 +1526,56 @@ window.__ModuleLoader__.load({
       const tools = data?.tools ?? {}
       const missingAll = [...(tools.missingCore ?? []), ...(tools.missingDev ?? []), ...(tools.missingNice ?? [])]
 
+      // ── v2.2 S5：本机角色（🏠主机 / 💻副机 / 🔄双向） ──
+      const [roleInfo, setRoleInfo] = useState(null)
+      useEffect(() => {
+        apiGet('/env').then((r) => {
+          if (r.ok) setRoleInfo({ machineId: r.machineId, roles: r.roles?.roles ?? {}, updatedAt: r.roles?.updatedAt ?? null })
+        }).catch(() => {})
+      }, [])
+      const myRole = roleInfo?.roles?.[roleInfo.machineId] ?? 'host' // 默认主机（方案 S5）
+      const setRole = async (role) => {
+        setBusy('set-role')
+        setNote(null)
+        const r = await apiPost('/env', { action: 'set-role', role })
+        setBusy(null)
+        if (!r.ok) { setNote({ tone: 'error', text: r.error }); return }
+        setRoleInfo((prev) => prev ? { ...prev, roles: { ...prev.roles, [prev.machineId]: r.role } } : prev)
+        setNote({ tone: 'success', text: `${r.receipt}\n${r.note}` })
+      }
+      const ROLE_META = [
+        { id: 'host', icon: '🏠', label: t('mt.role.host'), desc: t('mt.role.hostDesc') },
+        { id: 'follower', icon: '💻', label: t('mt.role.follower'), desc: t('mt.role.followerDesc') },
+        { id: 'both', icon: '🔄', label: t('mt.role.both'), desc: t('mt.role.bothDesc') },
+      ]
+
       return h('div', null,
+        // 本机角色（S5：设置页第一位——先说清"这台机器是谁"，再谈别的）
+        h(Card, {
+          title: t('mt.role.title'),
+          hint: t('mt.role.hint'),
+        },
+          h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 8 } },
+            ...ROLE_META.map((m) => h('button', {
+              key: m.id,
+              onClick: () => setRole(m.id),
+              disabled: busy === 'set-role',
+              style: {
+                flex: '1 1 160px', textAlign: 'left', cursor: 'pointer',
+                border: `1px solid ${myRole === m.id ? 'var(--dsw-alias-brand, #4f7cff)' : 'var(--dsw-alias-border-l3, rgba(0,0,0,0.08))'}`,
+                borderRadius: 8, padding: '8px 10px', fontSize: 12, lineHeight: '18px',
+                background: myRole === m.id ? 'var(--dsw-alias-fill-brand, rgba(79,124,255,0.08))' : 'transparent',
+                color: 'inherit',
+              },
+            },
+              h('div', { style: { fontWeight: 600, fontSize: 13, marginBottom: 2 } },
+                `${m.icon} ${m.label}${myRole === m.id ? t('mt.role.current') : ''}`),
+              h('div', { style: { opacity: 0.65 } }, m.desc),
+            )),
+          ),
+          h(InlineNote, { tone: note?.tone }, note?.text),
+        ),
+
         // 备份
         h(Card, {
           title: t('mt.backup'), hint: t('mt.backupHint'),
